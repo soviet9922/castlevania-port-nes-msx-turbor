@@ -25,9 +25,11 @@ jump_pressed    equ trig_prev+1         ; 1  non-zero on the frame jump is press
 
 px              equ jump_pressed+1      ; 2  player world x (left edge of 16x32 box)
 py              equ px+2                ; 2  player y in playfield px (signed)
-py_frac         equ py+2                ; 1  sub-pixel part of py
-vy              equ py_frac+1           ; 2  vertical speed, 8.8 signed
-on_ground       equ vy+2                ; 1
+jump_idx        equ py+2                ; 1  position in the jump arc (0..2*JUMP_LEN)
+crouching       equ jump_idx+1          ; 1
+pyoff           equ crouching+1         ; 1  sprite y offset for the current pose
+anim_step       equ pyoff+1             ; 1  walk cycle position 0..3
+on_ground       equ anim_step+1         ; 1
 walk_dx         equ on_ground+1         ; 1  -1/0/+1 this frame
 air_dx          equ walk_dx+1           ; 1  horizontal speed locked at take-off
 facing          equ air_dx+1            ; 1  0 = right, 1 = left

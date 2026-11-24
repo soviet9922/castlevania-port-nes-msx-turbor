@@ -253,6 +253,12 @@ PLAYER_FRAMES = [
     UPPER + WALK2_LEGS,
     UPPER + JUMP_LEGS,
 ]
+# Placeholder jump arc: dy per frame while rising (the fall mirrors it).
+# 20 entries, peak 36 px. A converted build uses the game's own table.
+PLACEHOLDER_JUMP = [-5, -4, -4, -3, -3, -3, -2, -2, -2, -2,
+                    -1, -1, -1, -1, -1, 0, -1, 0, 0, 0]
+assert len(PLACEHOLDER_JUMP) == 20
+
 PLAYER_COLOR_A = 2
 PLAYER_COLOR_B = 4
 
@@ -429,6 +435,7 @@ def main():
     spt = player_patterns()
 
     files = {
+        "player_jump.bin": bytes(v & 0xFF for v in PLACEHOLDER_JUMP),
         "hud_pgt.bin": bytes(hud_pgt),
         "hud_ct.bin": bytes(hud_ct),
         "player_spt.bin": spt,

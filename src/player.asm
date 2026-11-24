@@ -1,6 +1,9 @@
 ; ---------------------------------------------------------------------------
-; Player: walking, a Castlevania-style committed jump (horizontal speed is
-; locked at take-off), gravity, tile collision and animation.
+; Player (Simon), following the NES game's movement model:
+;  - walks at 1 px per frame; crouches with DOWN (and cannot walk then)
+;  - the jump is a fixed arc read from jump_table: JUMP_LEN signed steps
+;    while rising, the same steps mirrored while falling, then MAX_FALL_PX
+;  - horizontal speed is decided at take-off and cannot be steered
 ;
 ; The player is a 16x32 box at (px, py); py is relative to the playfield top.
 ; ---------------------------------------------------------------------------
@@ -16,13 +19,15 @@ player_reset:
         ld (px),hl
         ld hl,START_Y
         ld (py),hl
-        ld hl,0
-        ld (vy),hl
         xor a
-        ld (py_frac),a
+        ld (jump_idx),a
+        ld (crouching),a
+        ld (pyoff),a
         ld (facing),a
         ld (pframe),a
         ld (air_dx),a
+        ld (anim_t),a
+        ld (anim_step),a
         inc a
         ld (on_ground),a
         ret
@@ -38,10 +43,23 @@ respawn:
         ret
 
 player_update:
-        ; ---- horizontal intent ----
+        ; ---- intent ----
         ld a,(on_ground)
         or a
         jr z,.in_air
+        ld a,(stick)
+        cp 4
+        jr c,.not_down
+        cp 7
+        jr nc,.not_down
+        ld a,1                          ; 4, 5, 6: down (incl. diagonals)
+        ld (crouching),a
+        xor a
+        ld (walk_dx),a
+        jp .vertical
+.not_down:
+        xor a
+        ld (crouching),a
         ld a,(stick)
         call stick_to_dx
         ld (walk_dx),a
@@ -54,11 +72,9 @@ player_update:
         ld a,(jump_pressed)
         or a
         jr z,.move_h
-        ld hl,JUMP_VY
-        ld (vy),hl
         xor a
+        ld (jump_idx),a
         ld (on_ground),a
-        ld (py_frac),a
         ld a,(walk_dx)
         ld (air_dx),a
         jr .move_h
@@ -114,48 +130,61 @@ player_update:
         ld c,32                         ; anything under the feet?
         call foot_probe
         jp c,.animate
-        xor a                           ; walked off a ledge: drop straight down
+        xor a                           ; walked off a ledge
         ld (on_ground),a
         ld (air_dx),a
-        ld (py_frac),a
-        ld hl,0
-        ld (vy),hl
+        ld a,FALL_START
+        ld (jump_idx),a
 
 .airborne:
-        ld hl,(vy)
-        ld de,GRAVITY
+        ld a,(jump_idx)
+        ld c,a
+        cp JUMP_LEN
+        jr nc,.descend
+        ld e,a                          ; rising: dy = table[idx]
+        ld d,0
+        ld hl,jump_table
         add hl,de
-        bit 7,h
-        jr nz,.no_cap
-        push hl
-        ld de,MAX_FALL+1
-        or a
-        sbc hl,de
-        pop hl
-        jr c,.no_cap
-        ld hl,MAX_FALL
-.no_cap:
-        ld (vy),hl
-        ld a,h
+        ld a,(hl)
+        jr .step
+.descend:
+        cp JUMP_LEN*2
+        jr nc,.terminal
+        ld a,JUMP_LEN*2-1               ; falling: dy = -table[2*LEN-1-idx]
+        sub c
+        ld e,a
+        ld d,0
+        ld hl,jump_table
+        add hl,de
+        ld a,(hl)
+        neg
+        jr .step
+.terminal:
+        ld a,MAX_FALL_PX
+        jr .apply
+.step:
+        inc c
+        ld b,a
+        ld a,c
+        ld (jump_idx),a
+        ld a,b
+.apply:
         ld e,a
         rla
         sbc a,a
-        ld d,a                          ; DE = integer part, sign-extended
-        ld a,(py_frac)
-        add a,l
-        ld (py_frac),a
+        ld d,a
         ld hl,(py)
-        adc hl,de
+        add hl,de
         ld (py),hl
 
-        ld a,(vy+1)
-        bit 7,a
-        jr nz,.rising
+        ld a,(jump_idx)
+        cp JUMP_LEN+1
+        jr c,.rising
 
-        ld c,31                         ; feet inside something solid?
+        ld c,31                         ; falling: feet inside something solid?
         call foot_probe
         jr nc,.check_pit
-        ld hl,(py)                      ; land on top of the metatile
+        ld hl,(py)                      ; land on top of the cell
         ld de,31
         add hl,de
         ld a,l
@@ -164,12 +193,10 @@ player_update:
         ld de,-32
         add hl,de
         ld (py),hl
-        xor a
-        ld (py_frac),a
-        ld hl,0
-        ld (vy),hl
-        inc a
+        ld a,1
         ld (on_ground),a
+        xor a
+        ld (jump_idx),a
         jr .animate
 
 .rising:
@@ -183,10 +210,11 @@ player_update:
         ld de,16
         add hl,de
         ld (py),hl
-        xor a
-        ld (py_frac),a
-        ld hl,0
-        ld (vy),hl
+        ld a,(jump_idx)                 ; continue with the mirrored fall
+        ld b,a
+        ld a,JUMP_LEN*2
+        sub b
+        ld (jump_idx),a
 
 .check_pit:
         ld hl,(py)
@@ -199,20 +227,49 @@ player_update:
 
         ; ---- animation ----
 .animate:
+        xor a
+        ld (pyoff),a
         ld a,(on_ground)
         or a
-        ld a,3                          ; jump frame
-        jr z,.set_frame
+        jr nz,.ground_anim
+        ld a,(jump_idx)                 ; in the air: tucked in mid-jump
+        cp JUMP_TUCK_FROM
+        jr c,.stand
+        cp JUMP_TUCK_TO
+        jr nc,.stand
+        ld a,TUCK_Y
+        jr .tucked
+.ground_anim:
+        ld a,(crouching)
+        or a
+        jr z,.walk_anim
+        ld a,CROUCH_Y
+.tucked:
+        ld (pyoff),a
+        ld a,3
+        jr .set_frame
+.walk_anim:
         ld a,(walk_dx)
         or a
-        jr z,.set_frame                 ; A = 0: standing
+        jr nz,.walking
+        ld (anim_t),a
+        ld (anim_step),a
+.stand:
+        xor a
+        jr .set_frame
+.walking:
         ld a,(anim_t)
         inc a
-        ld (anim_t),a
-        rrca
-        rrca
-        rrca
+        cp WALK_FRAME_TIME
+        jr c,.same_step
+        ld a,(anim_step)
+        inc a
         and 3
+        ld (anim_step),a
+        xor a
+.same_step:
+        ld (anim_t),a
+        ld a,(anim_step)
         ld e,a
         ld d,0
         ld hl,walk_cycle
@@ -223,7 +280,7 @@ player_update:
         ret
 
 walk_cycle:
-        db 1, 0, 2, 0
+        db 1, 2, 1, 0
 
 ; C = y offset from py; probes x = new_x + probe_off
 side_probe:
@@ -269,7 +326,10 @@ build_sat:
         or a
         sbc hl,de
         ld c,l                          ; C = screen x
+        ld a,(pyoff)
+        ld b,a
         ld a,(py)
+        add a,b
         add a,PF_TOP_PX-1
         ld b,a                          ; B = sprite Y of the top half
 

@@ -28,11 +28,16 @@ LEVEL_TILE_COLS equ LEVEL_W*2
 MAX_CAM         equ LEVEL_PX-256
 CAM_LEAD        equ 120                 ; player screen x the camera tries to keep
 
-; Player physics (8.8 fixed point for vertical motion)
+; Player movement (same model as the NES game)
 WALK_SPEED      equ 1                   ; px per frame
-GRAVITY         equ 0x0030
-JUMP_VY         equ -0x0400
-MAX_FALL        equ 0x0400
+JUMP_LEN        equ 20                  ; jump table entries (rising half)
+JUMP_TUCK_FROM  equ 3                   ; tucked pose from this jump frame ...
+JUMP_TUCK_TO    equ JUMP_LEN+11         ; ... until this one
+FALL_START      equ JUMP_LEN+11         ; walking off a ledge joins the arc here
+MAX_FALL_PX     equ 5                   ; px per frame after the arc ends
+WALK_FRAME_TIME equ 7                   ; frames per walk animation step
+TUCK_Y          equ 4                   ; tucked pose is drawn this much lower
+CROUCH_Y        equ 8                   ; crouching pose is drawn this much lower
 
 ; Player sprite slots (2 layers x 2 halves = 4 hardware sprites)
 PLAYER_SPRITES  equ 4

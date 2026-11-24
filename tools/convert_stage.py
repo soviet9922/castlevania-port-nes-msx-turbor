@@ -14,6 +14,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cv_rom import (BG_PATTERN_TABLE, CastlevaniaROM, load_nes_palette,  # noqa: E402
                     tile_pixels)
+import convert_simon  # noqa: E402
 import msx_area  # noqa: E402
 from gen_placeholder_assets import PALETTE as PLACEHOLDER_PALETTE  # noqa: E402
 from gen_placeholder_assets import write_png  # noqa: E402
@@ -92,6 +93,15 @@ def convert(rom_path, out_dir, area_name, nes_pal_path=None, preview=True):
         msx_pal[s] = rgb
         nes_to_slot[nes] = s
     msx_pal[0] = msx_pal[1]
+
+    # --- Simon: sprite patterns, his colours in slots 2/4/6, jump arc ---
+    spt, simon_slots, jump = convert_simon.convert(rom, nes_rgb, nes_to_msx_rgb)
+    for slot, rgb in simon_slots.items():
+        msx_pal[slot] = rgb
+    with open(os.path.join(out_dir, "player_spt.bin"), "wb") as f:
+        f.write(spt)
+    with open(os.path.join(out_dir, "player_jump.bin"), "wb") as f:
+        f.write(jump)
 
     # --- indexed image of the playfield (NES nametable rows 6..27) ---
     pixels = []

@@ -47,6 +47,7 @@ def tcl_script(syms, result_file):
                 f'screenshot -raw "{OUT}/{tag}.png"')
 
     fc = syms["frame_count"]
+    py = syms["py"]
     # keyboard matrix row 8: bit0 SPACE, bit4 LEFT, bit7 RIGHT
     # Times are relative to the moment the game's main loop is running.
     return f"""
@@ -54,13 +55,29 @@ def tcl_script(syms, result_file):
 proc play {{}} {{
     after time 0.5  {{ {dump('01_boot')}; keymatrixdown 8 0x80 }}
     after time 3.5  {{ {dump('02_walk_right')}; keymatrixup 8 0x80 }}
-    after time 3.7  {{ keymatrixdown 8 0x01 }}
+    after time 3.7  {{ keymatrixdown 8 0x01; rec_py 60 }}
     after time 3.8  {{ keymatrixup 8 0x01 }}
     after time 4.0  {{ {dump('03_jump')} }}
     after time 5.0  {{ {dump('04_landed')}; keymatrixdown 8 0x10 }}
     after time 6.0  {{ {dump('05_walk_left')}; keymatrixup 8 0x10 }}
     after time 6.1  {{ exit }}
 }}
+# record py (signed) once per game frame, sampled when the VBLANK interrupt
+# updates frame_count (game logic for the frame has finished by then)
+set ::jumpy {{}}
+set ::jump_left 0
+proc sample_py {{}} {{
+    if {{$::jump_left <= 0}} return
+    set v [expr {{[peek {py}] + 256*[peek {py + 1}]}}]
+    if {{$v >= 32768}} {{ set v [expr {{$v - 65536}}] }}
+    lappend ::jumpy $v
+    incr ::jump_left -1
+    if {{$::jump_left == 0}} {{
+        set f [open "{result_file}" a]; puts $f "jumpy $::jumpy"; close $f
+    }}
+}}
+proc rec_py {{n}} {{ set ::jump_left $n }}
+debug set_watchpoint write_mem {fc} {{}} sample_py
 proc wait_game {{}} {{
     # wait until the main loop has run ~30 frames (C-BIOS logo comes first)
     if {{[peek {fc}] + 256*[peek {fc + 1}] < 30 || [peek {fc + 1}] > 0x20}} {{
@@ -96,10 +113,26 @@ def run():
         sys.exit("FAIL: openMSX produced no results")
 
     snaps = {}
+    jump_y = []
     with open(result_file) as f:
         for line in f:
             tag, *kv = line.split()
+            if tag == "jumpy":
+                jump_y = [int(v) for v in kv]
+                continue
             snaps[tag] = {k: int(v) for k, v in (x.split("=") for x in kv)}
+
+    # expected jump: the table's 20 rising steps, then the same steps mirrored
+    gen = "converted" if os.path.basename(ROM).startswith("cvmsx-nes") else "placeholder"
+    table = [b - 256 if b >= 128 else b
+             for b in open(os.path.join(BUILD, "gen", gen, "player_jump.bin"), "rb").read()]
+    expected_arc = table + [-v for v in reversed(table)]
+    deltas = [b - a for a, b in zip(jump_y, jump_y[1:])]
+    while deltas and deltas[0] == 0:
+        deltas.pop(0)
+    # the arc may legitimately end with zero steps; compare the first 40 frames
+    actual_arc = deltas[:len(expected_arc)]
+    actual_arc += [0] * (len(expected_arc) - len(actual_arc))
     for tag, vals in snaps.items():
         print(f"{tag:16} " + " ".join(f"{k}={v}" for k, v in vals.items()))
 
@@ -127,6 +160,7 @@ def run():
          and jump["on_ground"] == 0),
         ("player lands again", land["on_ground"] == 1
          and land["py"] == walk["py"]),
+        ("jump follows the jump table frame by frame", actual_arc == expected_arc),
         ("walking left turns the player", left["facing"] == 1
          and left["px"] < land["px"]),
     ]

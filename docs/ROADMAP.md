@@ -23,10 +23,14 @@
 - [ ] Palette selection table, remaining sections of bank 4, banks for blocks 2-6
 - [ ] Area transitions (load the next area from banks 2-7)
 
-## Milestone 2: Simon
+## Milestone 2: Simon (in progress)
 
-- [ ] Original physics tables (walk speed, jump arc, knock-back)
-- [ ] Whip (2 extra sprites), crouch, stairs
+- [x] Simon's graphics from the ROM: stand, walk ×2, tucked; both directions, 3 colours, no loss
+- [x] Walk speed and animation timing as on the NES
+- [x] Jump arc from the ROM's table, matching the NES frame by frame (checked by the test)
+- [x] Crouch
+- [ ] Knock-back arc, falling speed after the arc
+- [ ] Whip (needs extra sprites; poses up to 24 px wide), stairs
 - [ ] Sub-weapons
 - [ ] Hearts, score, timer, life bar in the HUD
 

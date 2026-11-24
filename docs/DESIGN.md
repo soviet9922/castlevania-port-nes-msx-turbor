@@ -82,7 +82,9 @@ The placeholder generator and the NES converter both produce the same
 | `level_coll.bin` | solidity, 11 per 16-pixel column |
 
 Palette slots 0/1 (black), 2/4/6 (player OR-colours) and 15 (white) have
-the same meaning in every area. The HUD only uses 1, 6 and 15. The
+the same meaning in every area. In the converted build, slots 2/4/6 hold Simon's
+colours (brown = layer A, peach = layer B, orange = both), so his 3 NES
+colours are reproduced exactly. The HUD only uses 1, 6 and 15. The
 converter assigns the stage's other NES colours to the remaining 10 slots.
 
 ## Colour restrictions

@@ -14,5 +14,6 @@ bg_ct_b2:       INCBIN "bg_ct_b2.bin"
 hud_pgt:        INCBIN "hud_pgt.bin"
 hud_ct:         INCBIN "hud_ct.bin"
 player_spt:     INCBIN "player_spt.bin"
+jump_table:     INCBIN "player_jump.bin"        ; JUMP_LEN signed dy, rising half
 level_tiles:    INCBIN "level_tiles.bin"        ; PF_ROWS bytes per 8-px column
 level_coll:     INCBIN "level_coll.bin"         ; MT_ROWS bytes per 16-px column
