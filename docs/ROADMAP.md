@@ -11,13 +11,17 @@
 - [x] Walking, committed jump, gravity, tile collision, pits
 - [x] Automated headless test in openMSX (C-BIOS MSX2+)
 
-## Milestone 1: data pipeline from the user's ROM
+## Milestone 1: data pipeline from the user's ROM (in progress)
 
-- [ ] Disassemble and annotate the NES PRG banks (stage format, metatile tables)
-- [ ] Locate the CHR graphics in PRG; extract them to PNG
-- [ ] Converter: NES tiles + palettes → Screen 4 tiles (2 colours per row), with a report of lossy rows
-- [ ] Converter: stage 1 layout → engine map format
-- [ ] Load converted data from banks 2-7
+- [x] ROM check, bank split, tile viewer, 6502 disassembler
+- [x] CHR-RAM loader tables decoded; stage graphics rebuilt from ROM, byte-exact
+- [x] Stage layout format decoded (6 blocks per column, 17-byte blocks)
+- [x] Converter: NES tiles + palettes → Screen 4 tiles (2 colours per row), per-band tile sets
+- [x] Stage 1 courtyard + castle gate playable in the MSX build (`make nes`)
+- [ ] Real collision data (currently: ground tiles are solid)
+- [ ] Entrance hall (decoded, needs its palette, stairs and collision)
+- [ ] Palette selection table, remaining sections of bank 4, banks for blocks 2-6
+- [ ] Area transitions (load the next area from banks 2-7)
 
 ## Milestone 2: Simon
 

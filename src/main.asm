@@ -10,7 +10,8 @@
 ; ===========================================================================
 
         INCLUDE "msx.inc"
-        INCLUDE "assets.inc"            ; generated, see tools/
+        INCLUDE "assets.inc"            ; generated: HUD + sprites
+        INCLUDE "level.inc"             ; generated: the area (placeholder or converted)
         INCLUDE "config.inc"
         INCLUDE "ram.inc"
 

@@ -5,10 +5,12 @@ MSX turbo R, written in Z80/R800 assembly.
 
 ![engine skeleton running in openMSX](docs/img/milestone0.png)
 
-**Status: milestone 0, the engine skeleton.** The game engine already
-scrolls a castle level with a fixed HUD and has a controllable 3-colour
-character. All graphics shown are **original placeholders**. No Konami
-data is included or committed. See [docs/ROADMAP.md](docs/ROADMAP.md).
+**Status: milestone 1 in progress.** The engine scrolls a level with a
+fixed HUD at 60 fps and has a controllable 3-colour character. From your
+own NES ROM, the build converts **Stage 1's opening courtyard (up to the
+castle gate)**: graphics, layout and palette. Simon is still a placeholder.
+The screenshot above shows the ROM-free build, which uses only original
+placeholder art. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Legal
 
@@ -29,7 +31,17 @@ Requirements:
 make
 ```
 
-This creates `build/cvmsx.rom`, a 128 KB **ASCII16** MegaROM.
+This creates `build/cvmsx.rom` (placeholder art only), a 128 KB **ASCII16** MegaROM.
+
+To build with the stage converted from your own ROM, put the dump at
+`build/nes/castlevania.nes` (git-ignored) or pass `NES_ROM=`:
+
+```bash
+make nes NES_ROM=path/to/castlevania.nes
+```
+
+This creates `build/cvmsx-nes.rom`. It contains converted Konami data, so
+it is for your own use only: don't commit or distribute it.
 
 ## Running
 
@@ -45,6 +57,12 @@ On a real turbo R configuration (you'll need the FS-A1GT system ROMs installed i
 make run
 ```
 
+For the converted build:
+
+```bash
+make run-nes
+```
+
 Controls: cursor keys or joystick to walk; SPACE or button A to jump.
 Jumps are committed, like in the original: you can't steer in mid-air.
 
@@ -52,6 +70,12 @@ Jumps are committed, like in the original: you can't steer in mid-air.
 
 ```bash
 make test
+```
+
+To test the converted build:
+
+```bash
+make test-nes
 ```
 
 This boots the ROM headless in openMSX (using `xvfb-run` if there is no display),
@@ -70,11 +94,17 @@ src/        Z80 / R800 assembly (engine)
   hud.asm       status bar
 tools/
   gen_placeholder_assets.py   original placeholder art and test level
+  msx_area.py                 level image -> Screen 4 tiles, map, collision
+  convert_stage.py            NES stage -> MSX area (from YOUR ROM)
+  cv_rom.py                   Castlevania ROM format readers
+  dis6502.py                  6502 disassembler / pattern search
   nes_rom_tool.py             inspect / split / tile-view YOUR NES ROM
+  nes_probe/                  FCEUX Lua probes (ground-truth dumps)
 tests/
   run_smoke.py  headless openMSX test
 docs/
   DESIGN.md     how NES features map to the MSX turbo R
+  NES_NOTES.md  reverse-engineering notes (formats and addresses)
   ROADMAP.md    milestones
 ```
 

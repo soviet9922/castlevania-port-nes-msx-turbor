@@ -6,16 +6,12 @@ engine can be built, run and tested before the real game data is converted
 from a ROM that the user owns (see tools/nes_rom_tool.py and docs/DESIGN.md).
 
 Outputs (written to the directory given on the command line):
-  palette.bin       16 x 2 bytes, V9938/V9958 palette format
-  bg_pgt.bin        background tile patterns  (8 bytes per tile)
-  bg_ct.bin         background tile colours   (8 bytes per tile, fg<<4|bg)
-  metatiles.bin     4 tile indices per 16x16 metatile (TL, TR, BL, BR)
-  mt_solid.bin      1 byte per metatile: 1 = solid
-  level1.bin        level map, column-major, MT_ROWS bytes per column
+  palette.bin, bg_*_b?.bin, level_*.bin, level.inc
+                    the level ("area"), see tools/msx_area.py
   hud_pgt.bin       HUD tile patterns
   hud_ct.bin        HUD tile colours
   player_spt.bin    player sprite patterns (16x16, MSX order)
-  assets.inc        sjasmplus equates describing the above
+  assets.inc        sjasmplus equates for HUD and sprites
   *_preview.png     previews for humans
 """
 
@@ -23,6 +19,9 @@ import os
 import struct
 import sys
 import zlib
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import msx_area  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Palette: 16 entries, RGB components 0..7 (MSX2 9-bit palette)
@@ -48,7 +47,6 @@ PALETTE = [
     (7, 7, 7),  # f white
 ]
 
-BG_TILE_BASE = 0x80     # background tiles live at pattern numbers 0x80..0xFF
 HUD_TILE_BASE = 0x01    # HUD tiles live at 0x01..; font uses 0x20..0x5F
 MT_ROWS = 11            # metatile rows in the playfield (11 * 16 = 176 px)
 
@@ -135,7 +133,8 @@ METATILES = [
 MT = {name: i for i, (name, _, _) in enumerate(METATILES)}
 
 # ---------------------------------------------------------------------------
-# HUD tiles (8x8)
+# HUD tiles (8x8). Only palette slots 1, 6 and 15 may be used here: they keep
+# the same meaning in converted areas (black, red, white).
 # ---------------------------------------------------------------------------
 HUD_TILES = [
     ("HEART", [
@@ -148,9 +147,10 @@ HUD_TILES = [
         "11166111",
         "11111111",
     ]),
-    ("BAR_PLAYER", ["11111111"] * 2 + ["bbbbbbb1"] * 4 + ["11111111"] * 2),
-    ("BAR_EMPTY", ["11111111"] * 2 + ["33333331"] * 4 + ["11111111"] * 2),
-    ("BAR_ENEMY", ["11111111"] * 2 + ["77777771"] * 4 + ["11111111"] * 2),
+    ("BAR_PLAYER", ["11111111"] * 2 + ["6666666" + "1"] * 4 + ["11111111"] * 2),
+    ("BAR_EMPTY", ["11111111"] * 2 + ["ffffff11", "f1111f11", "f1111f11", "ffffff11"]
+     + ["11111111"] * 2),
+    ("BAR_ENEMY", ["11111111"] * 2 + ["fffffff1"] * 4 + ["11111111"] * 2),
 ]
 
 # ---------------------------------------------------------------------------
@@ -339,13 +339,6 @@ def tile_from_rows(rows, where):
     return bytes(pat), bytes(col)
 
 
-def split_metatile(art):
-    assert len(art) == 16 and all(len(r) == 16 for r in art)
-    quads = []
-    for ty in (0, 8):
-        for tx in (0, 8):
-            quads.append([r[tx:tx + 8] for r in art[ty:ty + 8]])
-    return quads  # TL, TR, BL, BR
 
 
 def sprite16(rows16):
@@ -379,11 +372,6 @@ def player_patterns():
     return bytes(out)
 
 
-def palette_bytes():
-    out = bytearray()
-    for r, g, b in PALETTE:
-        out += bytes([(r << 4) | b, g])
-    return bytes(out)
 
 
 def rgb(i):
@@ -415,23 +403,21 @@ def main():
     out_dir = sys.argv[1] if len(sys.argv) > 1 else "build/gen"
     os.makedirs(out_dir, exist_ok=True)
 
-    # --- background tiles + metatiles (deduplicated) ---
-    tiles = []          # list of (pat, col)
-    tile_index = {}
-    mt_bytes = bytearray()
-    mt_solid = bytearray()
-    for name, art, solid in METATILES:
-        for qi, quad in enumerate(split_metatile(art)):
-            t = tile_from_rows(quad, f"metatile {name} quad {qi}")
-            if t not in tile_index:
-                tile_index[t] = len(tiles)
-                tiles.append(t)
-            mt_bytes.append(BG_TILE_BASE + tile_index[t])
-        mt_solid.append(1 if solid else 0)
-    if len(tiles) > 256 - BG_TILE_BASE:
-        raise SystemExit(f"too many background tiles: {len(tiles)}")
-    if len(METATILES) > 64:
-        raise SystemExit("too many metatiles (engine assumes < 64)")
+    # --- level: render the metatile grid to an indexed image ---
+    level = build_level()
+    arts = [art for _, art, _ in METATILES]
+    solids = [solid for _, _, solid in METATILES]
+    pixels = []
+    for r in range(MT_ROWS):
+        for y in range(16):
+            pixels.append([int(arts[level[r][c]][y][x], 16)
+                           for c in range(LEVEL_W) for x in range(16)])
+    solid = [[1 if solids[level[r][c]] else 0 for c in range(LEVEL_W)]
+             for r in range(MT_ROWS)]
+    stats = msx_area.write_area(out_dir, pixels, PALETTE, solid, START_X, START_Y,
+                                "placeholder")
+    if stats["lossy_rows"]:
+        raise SystemExit("placeholder art breaks the 2-colours-per-row rule")
 
     # --- HUD tiles ---
     hud_pgt, hud_ct = bytearray(), bytearray()
@@ -440,22 +426,9 @@ def main():
         hud_pgt += p
         hud_ct += c
 
-    # --- level ---
-    level = build_level()
-    level_bytes = bytearray()
-    for c in range(LEVEL_W):
-        for r in range(MT_ROWS):
-            level_bytes.append(level[r][c])
-
     spt = player_patterns()
 
     files = {
-        "palette.bin": palette_bytes(),
-        "bg_pgt.bin": b"".join(t[0] for t in tiles),
-        "bg_ct.bin": b"".join(t[1] for t in tiles),
-        "metatiles.bin": bytes(mt_bytes),
-        "mt_solid.bin": bytes(mt_solid),
-        "level1.bin": bytes(level_bytes),
         "hud_pgt.bin": bytes(hud_pgt),
         "hud_ct.bin": bytes(hud_ct),
         "player_spt.bin": spt,
@@ -464,25 +437,16 @@ def main():
         with open(os.path.join(out_dir, fn), "wb") as f:
             f.write(data)
 
-    blank = mt_bytes[MT["VOID"] * 4]
     inc = [
         "; generated by tools/gen_placeholder_assets.py - do not edit",
-        f"BG_TILE_COUNT    equ {len(tiles)}",
-        f"MT_COUNT         equ {len(METATILES)}",
         f"MT_ROWS          equ {MT_ROWS}",
-        f"LEVEL_W          equ {LEVEL_W}",
-        f"BLANK_TILE       equ 0x{blank:02X}",
         f"HUD_TILE_COUNT   equ {len(HUD_TILES)}",
         f"PLAYER_SPT_SIZE  equ {len(spt)}",
         f"PLAYER_COLOR_A   equ {PLAYER_COLOR_A}",
         f"PLAYER_COLOR_B   equ {PLAYER_COLOR_B}",
-        f"START_X          equ {START_X}",
-        f"START_Y          equ {START_Y}",
     ]
     for i, (name, _) in enumerate(HUD_TILES):
         inc.append(f"HUDT_{name:<12} equ 0x{HUD_TILE_BASE + i:02X}")
-    for name, i in MT.items():
-        inc.append(f"MT_{name:<14} equ {i}")
     with open(os.path.join(out_dir, "assets.inc"), "w") as f:
         f.write("\n".join(inc) + "\n")
 
@@ -512,7 +476,7 @@ def main():
                     sheet[y][ox + x] = cmap[ch]
     write_png(os.path.join(out_dir, "player_preview.png"), sw, 32, sheet)
 
-    print(f"assets: {len(tiles)} bg tiles, {len(METATILES)} metatiles, "
+    print(f"placeholder assets: tiles per band {stats['tiles']}, "
           f"level {LEVEL_W}x{MT_ROWS}, {len(spt)} bytes of sprite patterns")
 
 

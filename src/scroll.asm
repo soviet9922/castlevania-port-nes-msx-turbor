@@ -46,46 +46,23 @@ prepare_column:
         sbc hl,de
         jr c,.blank                     ; DE >= LEVEL_TILE_COLS
 
-        ld a,e
-        and 1
-        ld c,a                          ; C = left (0) or right (1) half
-        srl d
-        rr e                            ; DE = metatile column
         ld h,d
         ld l,e
-        add hl,hl
-        add hl,hl
-        add hl,de
-        add hl,hl
-        add hl,de                       ; HL = column * 11
-        ASSERT MT_ROWS == 11
-        ld de,level_map
+        add hl,hl                       ; *2
+        ld b,h
+        ld c,l
+        add hl,hl                       ; *4
+        add hl,bc                       ; *6
+        add hl,hl                       ; *12
+        add hl,hl                       ; *24
+        or a
+        sbc hl,bc                       ; *22
+        ASSERT PF_ROWS == 22
+        ld de,level_tiles
         add hl,de
         ld de,col_buf
-        ld b,MT_ROWS
-.lp:
-        push bc
-        ld a,(hl)                       ; metatile id
-        inc hl
-        push hl
-        add a,a
-        add a,a
-        add a,c
-        ld l,a
-        ld h,0
-        ld bc,metatiles
-        add hl,bc
-        ld a,(hl)                       ; top tile
-        ld (de),a
-        inc de
-        inc hl
-        inc hl
-        ld a,(hl)                       ; bottom tile
-        ld (de),a
-        inc de
-        pop hl
-        pop bc
-        djnz .lp
+        ld bc,PF_ROWS
+        ldir
         jr .done
 
 .blank:
@@ -236,11 +213,8 @@ solid_at:
         add hl,de                       ; * 11
         ld b,0
         add hl,bc
-        ld de,level_map
-        add hl,de
-        ld e,(hl)
-        ld d,0
-        ld hl,mt_solid
+        ASSERT MT_ROWS == 11
+        ld de,level_coll
         add hl,de
         ld a,(hl)
         or a

@@ -65,7 +65,25 @@ written during VBLANK. The camera moves at most 8 px per frame.
 | 0x3800-0x3FFF | sprite patterns (64 x 16x16) |
 
 Tile numbers: `0x00` blank, `0x01-0x1F` HUD symbols, `0x20-0x5F` font
-(copied from the BIOS), `0x80-0xFF` background tiles (all 3 bands).
+(copied from the BIOS), `0x60-0xFF` background tiles. Each band has its
+own background tile set (160 tiles per band), holding only the tiles used in
+those rows.
+
+## Area format
+
+The placeholder generator and the NES converter both produce the same
+"area" (see `tools/msx_area.py`):
+
+| File | Contents |
+|---|---|
+| `palette.bin` | 16 colours |
+| `bg_pgt_b0..2.bin`, `bg_ct_b0..2.bin` | patterns and colours per band |
+| `level_tiles.bin` | name-table bytes, 22 per 8-pixel column |
+| `level_coll.bin` | solidity, 11 per 16-pixel column |
+
+Palette slots 0/1 (black), 2/4/6 (player OR-colours) and 15 (white) have
+the same meaning in every area. The HUD only uses 1, 6 and 15. The
+converter assigns the stage's other NES colours to the remaining 10 slots.
 
 ## Colour restrictions
 
@@ -82,8 +100,9 @@ The converter will:
 3. Deduplicate. Each band holds 128 background tiles at `0x80-0xFF`, or more if
    the HUD font moves.
 
-The placeholder generator (`tools/gen_placeholder_assets.py`) already
-enforces the 2-colours-per-row rule.
+This is implemented in `tools/msx_area.py`. For the Stage 1 courtyard
+about 22% of tile rows lose a colour, and the result still looks very close to
+the NES version. The tiles that look worst can later be redrawn by hand.
 
 ### Sprites
 

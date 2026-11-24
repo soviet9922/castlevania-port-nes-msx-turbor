@@ -134,27 +134,27 @@ load_graphics:
         ld bc,HUD_TILE_COUNT*8
         call vram_copy
 
-        ; background tiles into all three bands
-        ld de,BG_TILE_BASE*8
+        ; background tiles: each band has its own set
+        ld ix,bg_band_table
         ld b,3
 .band:
         push bc
-        push de
-        ld hl,bg_pgt
-        ld bc,BG_TILE_COUNT*8
-        call vram_copy                  ; pattern
-        pop de
-        push de
-        ld hl,VRAM_CT
-        add hl,de
-        ex de,hl
-        ld hl,bg_ct
-        ld bc,BG_TILE_COUNT*8
-        call vram_copy                  ; colour
-        pop de
-        ld hl,BAND_SIZE
-        add hl,de
-        ex de,hl
+        ld l,(ix+0)
+        ld h,(ix+1)                     ; patterns
+        ld e,(ix+4)
+        ld d,(ix+5)                     ; VRAM pattern address
+        ld c,(ix+8)
+        ld b,(ix+9)                     ; size
+        call vram_copy
+        ld l,(ix+2)
+        ld h,(ix+3)                     ; colours
+        ld e,(ix+6)
+        ld d,(ix+7)                     ; VRAM colour address
+        ld c,(ix+8)
+        ld b,(ix+9)
+        call vram_copy
+        ld de,10
+        add ix,de
         pop bc
         djnz .band
 
@@ -174,6 +174,11 @@ load_graphics:
         ld a,SAT_END_Y
         out (VDP_DATA),a
         ret
+
+bg_band_table:
+        dw bg_pgt_b0, bg_ct_b0, VRAM_PGT+0*BAND_SIZE+BG_TILE_BASE*8, VRAM_CT+0*BAND_SIZE+BG_TILE_BASE*8, BG_TILES_B0*8
+        dw bg_pgt_b1, bg_ct_b1, VRAM_PGT+1*BAND_SIZE+BG_TILE_BASE*8, VRAM_CT+1*BAND_SIZE+BG_TILE_BASE*8, BG_TILES_B1*8
+        dw bg_pgt_b2, bg_ct_b2, VRAM_PGT+2*BAND_SIZE+BG_TILE_BASE*8, VRAM_CT+2*BAND_SIZE+BG_TILE_BASE*8, BG_TILES_B2*8
 
 ; Sprite colour table entries for sprites 0..3 (16 lines each).
 ; Odd sprites set CC (bit 6): their colour is ORed with the sprite below,

@@ -20,7 +20,7 @@ VRAM_SAT        equ 0x1E00              ; sprite attribute table
 VRAM_CT         equ 0x2000              ; colour table, 3 bands x 2 KB
 VRAM_SPT        equ 0x3800              ; sprite patterns
 BAND_SIZE       equ 0x0800
-BG_TILE_BASE    equ 0x80                ; background tiles use pattern numbers 0x80-0xFF
+BG_TILE_BASE    equ 0x60                ; background tiles use pattern numbers 0x60-0xFF
 
 ; Level / camera
 LEVEL_PX        equ LEVEL_W*16

@@ -15,9 +15,9 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BUILD = os.path.join(ROOT, "build")
-OUT = os.path.join(BUILD, "test")
-ROM = os.path.join(BUILD, "cvmsx.rom")
-SYM = os.path.join(BUILD, "cvmsx.sym")
+ROM = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else os.path.join(BUILD, "cvmsx.rom")
+SYM = os.path.splitext(ROM)[0] + ".sym"
+OUT = os.path.join(BUILD, "test", os.path.splitext(os.path.basename(ROM))[0])
 MACHINE = os.environ.get("TEST_MACHINE", "C-BIOS_MSX2+")
 
 # RAM variable -> size in bytes
