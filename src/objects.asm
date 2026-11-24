@@ -5,7 +5,8 @@
 ; OBJ_MAX slots of OBJ_SIZE bytes:
 ;   +0 type   +1/+2 world x (left of a 16-wide box)   +3 y (playfield)
 ;   +4 timer  +5 item id  +6 frame  +7 kind (0 brazier, 1 wall candle)
-;   +8 candle index (0xFF: none)   +9 small heart sway offset
+;   +8 candle index (0xFF: none)   +9 small heart sway offset / panther state
+;   +10 panther vertical speed (1/16 px)   +11 its fraction
 ;
 ; Boxes: brazier y..y+31, wall candle y+8..y+23, items y+8..y+23.
 ;
@@ -28,9 +29,11 @@ OBJ_BURST       equ 2
 OBJ_ITEM        equ 3
 OBJ_CANDLE      equ 4
 OBJ_ZOMBIE      equ 5
+OBJ_PANTHER     equ 6
 
 KIND_BRAZIER    equ 0
 KIND_CANDLE     equ 1
+KIND_PANTHER    equ 2                   ; 32x16 box
 
 ; object frame numbers (OBJ_FRAMES in tools/convert_objects.py)
 OBJF_BRAZIER    equ 0
@@ -41,6 +44,7 @@ OBJF_DAGGER     equ 8
 OBJF_CANDLE     equ 9
 OBJF_SMALLHEART equ 11
 OBJF_ZOMBIE     equ 12                  ; left 1/2, right 1/2
+OBJF_PANTHER    equ 16                  ; sit, run1-3 facing left, then facing right
 
 ITEM_WHIPUP     equ 0
 ITEM_HEART      equ 1
@@ -204,6 +208,22 @@ spawn_candle:
         ld a,(hl)
         and b
         jr nz,.no                       ; already has an object
+        push hl                         ; panthers can be switched off (tests)
+        ld hl,4                         ; stack: live byte, BC, record
+        add hl,sp
+        ld e,(hl)
+        inc hl
+        ld d,(hl)                       ; DE = record
+        ld hl,4
+        add hl,de
+        ld a,(hl)                       ; kind
+        pop hl
+        cp KIND_PANTHER
+        jr nz,.allowed
+        ld a,(enemies_off)
+        and 2
+        jr nz,.no
+.allowed:
         call obj_free_slot
         jr c,.no                        ; all slots in use: try again later
         ld a,(hl)
@@ -228,12 +248,21 @@ spawn_candle:
         ld (ix+7),a
         ld (ix+4),0
         ld (ix+9),0
+        ld (ix+10),0
+        ld (ix+11),0
         or a
         ld (ix+0),OBJ_BRAZIER
         ld (ix+6),OBJF_BRAZIER
         ret z
+        cp KIND_PANTHER
+        jr z,.panther
         ld (ix+0),OBJ_CANDLE
         ld (ix+6),OBJF_CANDLE
+        ret
+.panther:
+        ld (ix+0),OBJ_PANTHER
+        ld (ix+6),OBJF_PANTHER
+        ld (ix+5),-1
         ret
 .no:
         pop bc
@@ -289,6 +318,11 @@ objects_update:
         call zombie_update
         jr .next
 .not_zombie:
+        cp OBJ_PANTHER
+        jr nz,.not_panther
+        call panther_update
+        jr .next
+.not_panther:
         cp OBJ_ITEM
         call z,item_update
 .next:
@@ -624,12 +658,264 @@ zombie_update:
         ret
 
 ; ---------------------------------------------------------------------------
+; Black panther (measured in the NES entrance hall). +9 = state:
+;   0 waits on its platform until Simon is within PANTHER_WAKE pixels
+;   1 runs towards him along the platform (2 px per frame)
+;   2 leaps off the edge: 2 px across, falls under gravity until it lands
+;   3 runs along the floor towards the side Simon was on, off the screen
+; Run cycle: 3 frames of 7. One whip hit kills it; touching it hurts Simon.
+; ---------------------------------------------------------------------------
+panther_update:
+        ld a,(ix+9)
+        or a
+        jr nz,.awake
+        call simon_dx                   ; HL = Simon centre - panther centre
+        bit 7,h                         ; |HL| < PANTHER_WAKE ?
+        jr z,.pos
+        ld a,l
+        neg
+        ld l,a
+        ld a,h
+        cpl
+        ld h,a
+.pos:
+        ld a,h
+        or a
+        jp nz,.check_hits
+        ld a,l
+        cp PANTHER_WAKE
+        jp nc,.check_hits
+        call simon_dx                   ; run towards him
+        ld (ix+5),1
+        bit 7,h
+        jr z,.dir_set
+        ld (ix+5),-1
+.dir_set:
+        ld (ix+9),1
+        ld (ix+4),0
+
+.awake:
+        inc (ix+4)                      ; move 2 px in the running direction
+        ld a,(ix+5)
+        add a,a
+        ld e,a
+        rla
+        sbc a,a
+        ld d,a
+        ld l,(ix+1)
+        ld h,(ix+2)
+        add hl,de
+        ld (ix+1),l
+        ld (ix+2),h
+
+        ld a,(ix+9)
+        cp 2
+        jr z,.leaping
+        cp 1
+        jp nz,.check_hits               ; 3: just runs
+        ld l,(ix+1)                     ; 1: ground under its front?
+        ld h,(ix+2)
+        ld de,16
+        add hl,de
+        ld e,(ix+3)
+        ld d,0
+        push hl
+        ld hl,16
+        add hl,de
+        ex de,hl
+        pop hl
+        call solid_at
+        jp c,.check_hits
+        ld (ix+9),2                     ; off the edge: leap
+        ld (ix+10),PANTHER_VY0
+        ld (ix+11),0
+        jr .check_hits
+
+.leaping:                               ; vy += g (capped), y += vy / 16
+        ld a,(ix+10)
+        add a,PANTHER_GRAVITY
+        cp PANTHER_VMAX+1
+        jp m,.vy_ok
+        ld a,PANTHER_VMAX
+.vy_ok:
+        ld (ix+10),a
+        ld c,a                          ; 16 * y + fraction += vy
+        ld a,(ix+11)
+        add a,c
+        ld c,a
+        sra a
+        sra a
+        sra a
+        sra a                           ; whole pixels (signed)
+        add a,(ix+3)
+        ld (ix+3),a
+        ld a,c
+        and 15
+        ld (ix+11),a
+        ld a,(ix+10)
+        or a
+        jp m,.check_hits                ; still rising
+        ld l,(ix+1)                     ; landed? (feet at y+16)
+        ld h,(ix+2)
+        ld de,16
+        add hl,de
+        ld e,(ix+3)
+        ld d,0
+        push hl
+        ld hl,16
+        add hl,de
+        ex de,hl
+        pop hl
+        call solid_at
+        jr nc,.not_landed
+        ld a,(ix+3)                     ; stand on the tile
+        add a,16
+        and 0xF8
+        sub 16
+        ld (ix+3),a
+        ld (ix+9),3
+        call simon_dx                   ; run towards the side Simon is on
+        ld (ix+5),1
+        bit 7,h
+        jr z,.check_hits
+        ld (ix+5),-1
+        jr .check_hits
+.not_landed:
+        ld a,(ix+3)
+        cp MT_ROWS*16
+        jr c,.check_hits
+        ld (ix+0),OBJ_NONE              ; fell out of the playfield
+        ret
+
+.check_hits:
+        ; animation frame: sit, or run cycle (leap: run2), +4 facing right
+        ld a,(ix+9)
+        or a
+        ld c,0
+        jr z,.frame
+        ld c,2
+        cp 2
+        jr z,.frame
+        ld a,(ix+4)                     ; run: (timer / 7) mod 3
+        ld c,0
+.div7:
+        sub 7
+        jr c,.cycle
+        inc c
+        jr .div7
+.cycle:
+        ld a,c
+.mod3:
+        sub 3
+        jr nc,.mod3
+        add a,3+1
+        ld c,a
+.frame:
+        ld a,(ix+5)
+        or a
+        ld a,OBJF_PANTHER
+        jp m,.left
+        add a,4
+.left:
+        add a,c
+        ld (ix+6),a
+
+        ld a,(whip_active)              ; whipped
+        or a
+        jr z,.touch
+        call whip_hits_object
+        jr nc,.touch
+        ld a,(ix+8)                     ; dead for good
+        cp 0xFF
+        jr z,.no_flag
+        call candle_bit
+        ld a,(hl)
+        or b
+        ld (hl),a
+.no_flag:
+        ld a,(ix+3)                     ; burst centred on its 16-px body
+        sub 8
+        ld (ix+3),a
+        ld l,(ix+1)
+        ld h,(ix+2)
+        ld de,8
+        add hl,de
+        ld (ix+1),l
+        ld (ix+2),h
+        ld (ix+0),OBJ_BURST
+        ld (ix+4),0
+        ld (ix+6),OBJF_BURST
+        ld (ix+5),ITEM_NONE
+        ld (ix+7),KIND_BRAZIER
+        ld hl,kills
+        inc (hl)
+        ret
+
+.touch:                                 ; panther x+4..x+27, y..y+15
+        ld a,(invuln_t)
+        or a
+        ret nz
+        ld a,(hurt_state)
+        or a
+        ret nz
+        ld hl,(px)
+        ld de,3
+        add hl,de
+        ex de,hl                        ; DE = Simon left
+        ld l,(ix+1)
+        ld h,(ix+2)
+        ld bc,27
+        add hl,bc
+        or a
+        sbc hl,de
+        ret c
+        ld hl,(px)
+        ld de,12-4
+        add hl,de                       ; Simon right - 4
+        ld e,(ix+1)
+        ld d,(ix+2)
+        or a
+        sbc hl,de
+        ret c
+        ld a,(py+1)
+        or a
+        ret nz
+        ld a,(ix+3)                     ; panther y..y+15 vs Simon py..py+31
+        add a,15
+        ld hl,py
+        sub (hl)
+        ret c
+        ld a,(py)
+        add a,31
+        sub (ix+3)
+        ret c
+        call simon_dx
+        ld b,1
+        bit 7,h
+        jp z,simon_hurt
+        ld b,-1
+        jp simon_hurt
+
+; HL = (Simon centre x) - (object centre x), for a 32-px-wide object
+simon_dx:
+        ld hl,(px)
+        ld de,8
+        add hl,de
+        ld e,(ix+1)
+        ld d,(ix+2)
+        or a
+        sbc hl,de
+        ld de,-16
+        add hl,de
+        ret
+
+; ---------------------------------------------------------------------------
 ; Zombie spawners: while one is near the camera, a zombie appears every
 ; ZOMBIE_INTERVAL frames at alternating screen edges, at most ZOMBIE_MAX.
 ; ---------------------------------------------------------------------------
 enemies_update:
         ld a,(enemies_off)
-        or a
+        and 1
         ret nz
         ld hl,(area_hdr+AH_ENEMIES)
         ld a,(hl)
@@ -735,11 +1021,24 @@ sway_table:
         db 0, -3, -6, -8, -11, -12, -14, -15, -15, -15, -14, -12, -11, -8, -6, -3
 
 ; Carry set if the whip's strike box overlaps the object's box.
-; (signed 16-bit compares: the whip box can be left of x = 0)
+; Boxes by kind: brazier/zombie 16x32 at y, wall candle 16x16 at y+8,
+; panther 32x16 at y. (signed 16-bit compares: the whip can be left of x = 0)
 whip_hits_object:
+        ld a,(ix+7)
+        ld de,15                        ; DE = box width - 1
+        ld bc,31*256 + 0                ; B = height - 1, C = top offset
+        cp KIND_PANTHER
+        jr nz,.not_wide
+        ld de,31
+        ld b,15
+        jr .box_ready
+.not_wide:
+        cp KIND_CANDLE
+        jr nz,.box_ready
+        ld bc,15*256 + 8
+.box_ready:
         ld l,(ix+1)
         ld h,(ix+2)
-        ld de,15
         add hl,de
         ld de,(whip_x1)
         or a
@@ -753,14 +1052,6 @@ whip_hits_object:
         sbc hl,de                       ; whip right - box left
         bit 7,h
         jr nz,.no
-        ld c,0                          ; box top offset / height by kind
-        ld b,31
-        ld a,(ix+7)
-        cp KIND_CANDLE
-        jr nz,.box
-        ld c,8
-        ld b,15
-.box:
         ld a,(ix+3)
         add a,c
         ld l,a
@@ -807,12 +1098,12 @@ objects_draw:
         ; turns a permanently missing sprite into flicker (as on the NES).
         ld a,(frame_count)
         and OBJ_MAX-1
+        add a,a
+        add a,a                         ; * 4
         ld e,a
-        add a,a
-        add a,a
-        add a,e                         ; * 5
-        add a,a                         ; * 10 = OBJ_SIZE
-        ASSERT OBJ_SIZE == 10 && OBJ_MAX == 8
+        add a,a                         ; * 8
+        add a,e                         ; * 12 = OBJ_SIZE
+        ASSERT OBJ_SIZE == 12 && OBJ_MAX == 8
         ld e,a
         ld d,0
         ld ix,obj_table

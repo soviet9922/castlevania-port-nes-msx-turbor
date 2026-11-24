@@ -34,9 +34,22 @@ SPRITE_PALETTES = 0xCDEB         # 4 x 4 colours after the $3F $10 header
 # engine object frame numbers (src/objects.asm)
 OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
               "heart", "whipup", "dagger", "candle1", "candle2", "smallheart",
-              "zombie_l1", "zombie_l2", "zombie_r1", "zombie_r2"]
+              "zombie_l1", "zombie_l2", "zombie_r1", "zombie_r2",
+              "panther_sit_l", "panther_run1_l", "panther_run2_l", "panther_run3_l",
+              "panther_sit_r", "panther_run1_r", "panther_run2_r", "panther_run3_r"]
 
-KIND_BRAZIER, KIND_CANDLE = 0, 1
+# Black panther: 32x16, palette 3, art faces left (recorded in the hall).
+# Run cycle run1 -> run2 -> run3, 7 frames each; the leap shows run2.
+PANTHER_LEFT = {
+    "panther_sit_l": [(0xB0, 8, 0, 3, 0), (0xB2, 16, 0, 3, 0), (0xB4, 24, 0, 3, 0)],
+    "panther_run1_l": [(0xC0, 0, 0, 3, 0), (0xC2, 8, 0, 3, 0), (0xC4, 16, 0, 3, 0), (0xC6, 24, 0, 3, 0)],
+    "panther_run2_l": [(0xB8, 0, 0, 3, 0), (0xBA, 8, 0, 3, 0), (0xBC, 16, 0, 3, 0), (0xBE, 24, 0, 3, 0)],
+    "panther_run3_l": [(0xC8, 0, 0, 3, 0), (0xCA, 8, 0, 3, 0), (0xCC, 16, 0, 3, 0), (0xCE, 24, 0, 3, 0)],
+}
+
+KIND_BRAZIER, KIND_CANDLE, KIND_PANTHER = 0, 1, 2
+ITEM_NONE = 0xFF
+ENEMY_PANTHER = 0x51            # enemy group record type: a waiting black panther
 ITEM_WHIPUP, ITEM_HEART, ITEM_DAGGER, ITEM_SMALLHEART = 0, 1, 2, 3
 
 # frame: list of (tile, dx, dy, palette, hflip) relative to the object's
@@ -96,6 +109,19 @@ def candles(rom, stage, section, level_px):
         else:
             item = ITEM_SMALLHEART
         out.append((wx - 8, y - 64, item, kind))
+
+    # black panthers are single placed enemies: spawned like candles
+    for chunk in range(level_px // 64 + 2):
+        group = rom.fixed(table + 2 * chunk)
+        if group == 0:
+            continue
+        p = w7(CANDLE_GROUPS[group >> 7] + ((group << 1) & 0xFF))
+        if rom.fixed(p) != ENEMY_PANTHER:
+            continue
+        cx, cy = (chunk - 1) * 64 + rom.fixed(p + 1) - 1, rom.fixed(p + 2)
+        if 16 <= cx < level_px - 16:
+            # 32x16 box: left = centre - 16, top = NES centre - 8 - 48
+            out.append((cx - 16, cy - 56, ITEM_NONE, KIND_PANTHER))
     return out
 
 
@@ -103,10 +129,18 @@ def sprite_frames(rom, slot_for_nes):
     """-> (SpriteBank, names) for the object frames, colours mapped to MSX slots."""
     chr_ram = rom.chr_ram()
     pals = [[rom.fixed(SPRITE_PALETTES + p * 4 + v) for v in range(4)] for p in range(4)]
+    from msx_sprites import mirror
+    frames = dict(FRAME_SPRITES)
+    frames.update(PANTHER_LEFT)
     bank = SpriteBank()
     for name in OBJ_FRAMES:
+        if name.startswith("panther") and name.endswith("_r"):
+            src = name[:-2] + "_l"
+            pixels = mirror(_frame_pixels(chr_ram, pals, frames[src], slot_for_nes), width=32)
+            bank.add_frame(pixels, name)
+            continue
         pixels = {}
-        for tile, dx, dy, pal, flip in FRAME_SPRITES[name]:
+        for tile, dx, dy, pal, flip in frames[name]:
             table, top = (tile & 1) * 0x1000, tile & 0xFE
             for half in (0, 1):
                 px = tile_pixels(chr_ram, table, top + half)
@@ -117,6 +151,20 @@ def sprite_frames(rom, slot_for_nes):
                             pixels[(dx + x, dy + half * 8 + y)] = slot_for_nes(pals[pal][v])
         bank.add_frame(pixels, name)
     return bank, list(OBJ_FRAMES)
+
+
+def _frame_pixels(chr_ram, pals, sprites, slot_for_nes):
+    pixels = {}
+    for tile, dx, dy, pal, flip in sprites:
+        table, top = (tile & 1) * 0x1000, tile & 0xFE
+        for half in (0, 1):
+            px = tile_pixels(chr_ram, table, top + half)
+            for y in range(8):
+                for x in range(8):
+                    v = px[y][7 - x if flip else x]
+                    if v:
+                        pixels[(dx + x, dy + half * 8 + y)] = slot_for_nes(pals[pal][v])
+    return pixels
 
 
 def enemy_spawners(rom, stage, section, level_px):

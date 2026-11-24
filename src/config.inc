@@ -98,13 +98,21 @@ ZOMBIE_INTERVAL equ 32                  ; frames between spawns
 ZOMBIE_MAX      equ 3
 SPAWNER_LEFT    equ 64                  ; spawner active within camera-64 .. camera+320
 SPAWNER_RIGHT   equ 320
+
+; Black panther (measured in the NES entrance hall)
+PANTHER_WAKE    equ 64                  ; wakes when Simon is this close (x)
+PANTHER_SPEED   equ 2                   ; px per frame, running and leaping
+PANTHER_VY0     equ -24                 ; leap: vertical speed in 1/16 px ...
+PANTHER_GRAVITY equ 2                   ; ... gravity in 1/16 px per frame ...
+PANTHER_VMAX    equ 64                  ; ... and terminal speed (4 px)
+PANTHER_DAMAGE  equ 8
 POSE_WHIP       equ 4                   ; whip1..whip4, then +4 for the crouched set
 SAT_END_Y       equ 216                 ; sprite mode 2 "end of list" Y value
 MAX_SPRITES     equ 32                  ; hardware sprites in total
 
 ; Objects (src/objects.asm)
 OBJ_MAX         equ 8
-OBJ_SIZE        equ 10
+OBJ_SIZE        equ 12
 MAX_CANDLES     equ 64                  ; per area (flag bits)
 SPRITE_HIDE_Y   equ 212                 ; parks a sprite below the visible area
 

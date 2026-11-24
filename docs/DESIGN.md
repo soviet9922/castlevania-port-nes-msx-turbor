@@ -181,6 +181,11 @@ shown as 8 HUD tiles. A hit freezes him, then the knock-back uses the same arc
 code as the jump, with the NES knock-back table instead of the jump table. He
 lands crouched, then blinks for 140 frames. Running out of health restarts the area.
 
+Black panthers are placed enemies: the converter adds them to the area's
+candle list as a third kind, so they spawn near the screen and stay dead
+once killed, exactly like candles. Each runs a small state machine (wait, run, leap
+with gravity, run).
+
 With more than 8 sprites on a line, the VDP drops the extras. The order of
 objects in the sprite list rotates every frame (Simon always comes first), so
 crowded lines flicker instead of losing sprites, as on the NES.

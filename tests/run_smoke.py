@@ -59,10 +59,12 @@ def tcl_script(syms, result_file):
     exit_x = syms["area_hdr"] + 42      # AH_EXITX
     stairs = syms["area_hdr"] + 46      # AH_STAIRS
     eoff, hurt, objt = syms["enemies_off"], syms["hurt_state"], syms["obj_table"]
+    obj_size = 12                       # OBJ_SIZE in src/config.inc
+    cand = syms["area_hdr"] + 32        # AH_CANDLES
     areas = syms.get("AREA_COUNT", 1)
     # with more than one area: walk into the exit (courtyard gate) and on
     hall = f"""
-    after time 9.0  {{ poke {eoff} 1; poke {px_a} [peek {exit_x}]; poke {px_a + 1} [peek {exit_x + 1}] }}
+    after time 9.0  {{ poke {eoff} 3; poke {px_a} [peek {exit_x}]; poke {px_a + 1} [peek {exit_x + 1}] }}
     after time 9.4  {{ {dump('09_next_area')}; keymatrixdown 8 0x80 }}
     after time 11.4 {{ {dump('10_next_area_walk')}; keymatrixup 8 0x80
                        # first staircase of the area (if any): stand 6 px right of its foot
@@ -79,8 +81,8 @@ def tcl_script(syms, result_file):
     after time 14.6 {{ keymatrixup 8 0x20; {dump('11_stairs_up')}; keymatrixdown 8 0x40 }}
     after time 17.6 {{ keymatrixup 8 0x40; {dump('12_stairs_down')}
                        # zombies on: stand near the hall's start and wait to be hit
-                       poke {eoff} 0; poke {px_a} 200; poke {px_a + 1} 0; set ::wait_hit 1 }}
-    after time 27.0 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
+                       poke {eoff} 2; poke {px_a} 200; poke {px_a + 1} 0; set ::wait_hit 1 }}
+    after time 31.0 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """ if areas > 1 else f"""
     after time 9.0  {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
@@ -174,21 +176,58 @@ debug set_bp {load} {{}} {{ set ::vbl_skip 4 }}
 # zombie test: snapshot when hit, then whip any zombie that comes in reach
 set ::wait_hit 0
 set ::hunting 0
+# panther test: no more zombies; stand on the floor within the first
+# panther's wake distance and let the hunter whip it
+proc panther_test {{}} {{
+    poke {eoff} 1
+    for {{set i 0}} {{$i < 8}} {{incr i}} {{
+        set b [expr {{{objt} + $i*{obj_size}}}]
+        if {{[peek $b] == 5}} {{ poke $b 0 }}
+    }}
+    set c [expr {{[peek {cand}] + 256*[peek {cand + 1}]}}]
+    set n [peek $c]
+    for {{set i 0}} {{$i < $n}} {{incr i}} {{
+        set r [expr {{$c + 1 + $i*5}}]
+        if {{[peek [expr {{$r+4}}]] == 2}} {{
+            set x [expr {{[peek $r] + 256*[peek [expr {{$r+1}}]] + 16 - 8 - 55}}]
+            poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
+            after time 0.5 {{ panther_state }}
+            after time 0.6 {{ set ::hunting 1 }}
+            after time 3.6 {{ set ::hunting 0; {dump('17_panther_whipped')} }}
+            return
+        }}
+    }}
+}}
+proc panther_state {{}} {{
+    set s 0
+    for {{set i 0}} {{$i < 8}} {{incr i}} {{
+        set b [expr {{{objt} + $i*{obj_size}}}]
+        if {{[peek $b] == 6}} {{ set s [expr {{[peek [expr {{$b+9}}]] + 1}}] }}
+    }}
+    set f [open "{result_file}" a]; puts $f "panther $s"; close $f
+}}
 proc zombie_watch {{}} {{
     if {{$::wait_hit && [peek {hurt}] != 0}} {{
         set ::wait_hit 0
         {dump('13_hit')}
         after time 1.4 {{ {dump('14_after_knockback')}; set ::hunting 1 }}
-        after time 6.0 {{ set ::hunting 0; {dump('15_whipped')} }}
+        after time 6.0 {{ set ::hunting 0; {dump('15_whipped')}; panther_test }}
     }}
     if {{$::hunting && [peek {hurt}] == 0}} {{
         set px [expr {{[peek {px_a}] + 256*[peek {px_a + 1}]}}]
         for {{set i 0}} {{$i < 8}} {{incr i}} {{
-            set b [expr {{{objt} + $i*10}}]
+            set b [expr {{{objt} + $i*{obj_size}}}]
             if {{[peek $b] != 5}} continue
             set d [expr {{[peek [expr {{$b+1}}]] + 256*[peek [expr {{$b+2}}]] - $px}}]
             if {{$d >= 14 && $d <= 36}} {{ poke {fa} 0; keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
             if {{$d <= -14 && $d >= -36}} {{ poke {fa} 1; keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
+        }}
+        for {{set i 0}} {{$i < 8}} {{incr i}} {{
+            set b [expr {{{objt} + $i*{obj_size}}}]
+            if {{[peek $b] != 6}} continue
+            set d [expr {{[peek [expr {{$b+1}}]] + 256*[peek [expr {{$b+2}}]] - $px}}]
+            if {{$d >= 14 && $d <= 36}} {{ poke {fa} 0; keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
+            if {{$d <= -14 && $d >= -50}} {{ poke {fa} 1; keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
         }}
     }}
 }}
@@ -234,6 +273,7 @@ def run():
     vblank_us = 10 ** 9
     hud_hearts = ""
     overruns = (0, 0)
+    panther = None
     stair = None
     with open(result_file) as f:
         for line in f:
@@ -246,6 +286,9 @@ def run():
                 continue
             if tag == "hud_hearts":
                 hud_hearts = kv[0] if kv else ""
+                continue
+            if tag == "panther":
+                panther = int(kv[0])
                 continue
             if tag == "overruns":
                 overruns = (int(kv[0]), int(kv[1]))
@@ -340,6 +383,10 @@ def run():
             and abs(snaps["14_after_knockback"]["px"] - snaps["13_hit"]["px"]) >= 20),
            ("the whip kills zombies", snaps["15_whipped"]["kills"] >= 1)]
           if "13_hit" in snaps else []),
+        *([("a black panther wakes up when Simon comes near", panther >= 2),
+           ("the whip kills the panther",
+            snaps["17_panther_whipped"]["kills"] > snaps["15_whipped"]["kills"])]
+          if panther is not None else []),
         ("walking left turns the player", left["facing"] == 1
          and left["px"] < land["px"]),
     ]

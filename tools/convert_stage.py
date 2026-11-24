@@ -205,7 +205,7 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, preview=True)
                         img[tr * 8][tc * 8] = (255, 255, 0)
         write_png(os.path.join(out_dir, "level_msx_preview.png"), width, len(img), img)
 
-    kinds = ["brazier", "candle"]
+    kinds = ["brazier", "candle", "panther"]
     print(f"area {index} {area['name']}: {width} px, tiles per band {params['tiles']}, "
           f"{params['lossy_rows']}/{params['total_rows']} tile rows reduced, "
           f"start ({sx},{sy}), {len(st)} stairs, {len(en)} zombie spawners {en}, {len(cl)} candles "

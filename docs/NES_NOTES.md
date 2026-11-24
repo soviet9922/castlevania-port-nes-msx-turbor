@@ -175,6 +175,19 @@ Recorded in the entrance hall (`tools/nes_probe/record_hall.lua`):
     apart, at most 3 at a time, while their spawner is near;
   - they walk straight across at 7 px every 8 frames and vanish off-screen;
   - one whip hit destroys one (burst).
+- Black panther (object id `$11`, enemy record type `$51`; one per record,
+  centre x = (chunk-1)*64 + x - 1, y = centre line). States in `$04C0+slot`:
+  `$51` waiting, `$52` running, `$1E` leaping.
+  - It waits until Simon is within about 64 px, then runs at him (2 px per frame)
+    until the platform ends, and leaps.
+  - The leap is 2 px across per frame; the arc fits a start speed of -1.5 px and
+    gravity of 1/8 px per frame, capped at 4 px. Measured, not yet found in the ROM.
+  - After landing it runs (2 px per frame) towards the side Simon is on.
+  - Sprites (32x16, palette 3): waiting `B0 B2 B4`, running `C0-C6`, `B8-BE`,
+    `C8-CE` (7 frames each), leaping `B8-BE`.
+- Enemy record type `$04` (y 128) at six hall chunks: no enemy appeared from it
+  while walking the floor, the middle platform or the upper floor
+  (`tools/nes_probe/record_upper.lua`). Not identified (bats?).
 - Simon's health: `$45`, 64 at the start (16 bar segments of 4). A zombie takes 8.
 - Getting hit:
   - frozen for 6 frames, then knocked back 1 px per frame away from the enemy,
@@ -212,6 +225,7 @@ Recorded in the entrance hall (`tools/nes_probe/record_hall.lua`):
 | `tools/nes_probe/record_simon.lua` | FCEUX script: record RAM/OAM every frame while Simon acts |
 | `tools/nes_probe/record_courtyard.lua` | FCEUX script: walk the courtyard whipping every brazier |
 | `tools/nes_probe/record_hall.lua` | FCEUX script: walk through the gate into the entrance hall |
+| `tools/nes_probe/record_upper.lua` | FCEUX script: climb to the hall's upper floor (bats/panthers) |
 | `tools/nes_probe/record_stairs.lua` | FCEUX script: walk to the hall's first staircase and climb it |
 
 To run the probe (needs FCEUX; writes to `build/nes/probe`):

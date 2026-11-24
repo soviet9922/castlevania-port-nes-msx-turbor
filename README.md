@@ -14,9 +14,8 @@ his graphics, walk animation, jump arc and whip (timing identical to the NES,
 frame by frame). **Braziers and wall candles** are placed from the ROM's data. Whip them
 and they burst and drop their items (hearts, whip upgrade, dagger), which you can collect.
 Simon can climb the hall's **stairs**, which come from the ROM's stair table.
-**Zombies** appear where the ROM's enemy data puts them. They hurt Simon
-(health bar, knock-back, blinking invincibility) and die to the whip. More
-enemy types come next.
+**Zombies** and **black panthers** appear where the ROM's enemy data puts them.
+They hurt Simon (health bar, knock-back, blinking invincibility) and die to the whip.
 The screenshot above shows the ROM-free build, which uses only original
 placeholder art. See [docs/ROADMAP.md](docs/ROADMAP.md).
 

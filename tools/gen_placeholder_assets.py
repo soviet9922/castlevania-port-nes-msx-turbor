@@ -431,7 +431,32 @@ _SMALL_HEART = _EMPTY16 + [
     "...66666666.....", "...66666666.....", "....666666......", ".....6666.......",
     "......66........",
 ]
+# placeholder black panther, 32x16, facing left (kind 2)
+_PANTHER_SIT = [
+    "................................", "................................",
+    "................................", "................................",
+    "................................", "........11......................",
+    ".......1611.....................", "......111111111111111...........",
+    ".....1111111111111111111........", "....11111111111111111111111.....",
+    "....111111111111111111111111....", "....11.11...........11.11.......",
+    "....11.11...........11.11.......", "...111.111.........111.111......",
+    "................................", "................................",
+]
+_PANTHER_RUN = [
+    "................................", "................................",
+    "................................", "................................",
+    "................................", "..11............................",
+    ".1611...........................", "111111111111111111111111........",
+    "11111111111111111111111111111...", ".1111111111111111111111111111111",
+    "..11111111111111111111111111....", "...11.11............11.11.......",
+    "..11...11..........11...11......", ".11.....11........11.....11.....",
+    "................................", "................................",
+]
 PLACEHOLDER_OBJECTS = {
+    "panther_sit_l": _PANTHER_SIT, "panther_run1_l": _PANTHER_RUN,
+    "panther_run2_l": _PANTHER_RUN, "panther_run3_l": _PANTHER_SIT,
+    "panther_sit_r": [r[::-1] for r in _PANTHER_SIT], "panther_run1_r": [r[::-1] for r in _PANTHER_RUN],
+    "panther_run2_r": [r[::-1] for r in _PANTHER_RUN], "panther_run3_r": [r[::-1] for r in _PANTHER_SIT],
     "candle1": _CANDLE_A, "candle2": _CANDLE_B, "smallheart": _SMALL_HEART,
     "zombie_l1": _ZOMBIE_TOP + _ZOMBIE_LEGS_1, "zombie_l2": _ZOMBIE_TOP + _ZOMBIE_LEGS_2,
     "zombie_r1": [r[::-1] for r in _ZOMBIE_TOP + _ZOMBIE_LEGS_1],
@@ -442,20 +467,23 @@ PLACEHOLDER_OBJECTS = {
 }
 OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
               "heart", "whipup", "dagger", "candle1", "candle2", "smallheart",
-              "zombie_l1", "zombie_l2", "zombie_r1", "zombie_r2"]
+              "zombie_l1", "zombie_l2", "zombie_r1", "zombie_r2",
+              "panther_sit_l", "panther_run1_l", "panther_run2_l", "panther_run3_l",
+              "panther_sit_r", "panther_run1_r", "panther_run2_r", "panther_run3_r"]
 PLACEHOLDER_SPAWNERS = [(900, 128)]     # one zombie spawner near the end
 # placeholder candles: (box x, box y, item id, kind) - see tools/convert_objects.py
 # item ids: 0 whip upgrade, 1 big heart, 2 dagger, 3 small heart; kind 0 brazier, 1 candle
 PLACEHOLDER_CANDLES = [(88, 128, 1, 0), (216, 128, 0, 0),     # braziers on the floor (y 160)
-                       (344, 96, 3, 1), (472, 96, 3, 1)]       # wall candles
+                       (344, 96, 3, 1), (472, 96, 3, 1),       # wall candles
+                       (376, 112, 0xFF, 2)]                    # panther on the platform
 
 
 def placeholder_objects():
     bank = msx_sprites.SpriteBank()
     for name in OBJ_FRAMES:
         art = PLACEHOLDER_OBJECTS[name]
-        art = art + ["................"] * (32 - len(art))     # pad to the 16x32 box
-        assert len(art) == 32 and all(len(r) == 16 for r in art), name
+        art = art + ["." * len(art[0])] * (32 - len(art))  # pad to 32 rows
+        assert len(art) == 32 and all(len(r) in (16, 32) for r in art), name
         bank.add_frame({(x, y): int(ch, 16) for y, row in enumerate(art)
                         for x, ch in enumerate(row) if ch != "."}, name)
     return bank
