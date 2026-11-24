@@ -8,17 +8,10 @@
 ; The player is a 16x32 box at (px, py); py is relative to the playfield top.
 ; ---------------------------------------------------------------------------
 
-level_start:
-        ld hl,0
-        ld (cam_x),hl
-        call objects_init
-        call player_reset
-        jp full_redraw
-
 player_reset:
-        ld hl,START_X
+        ld hl,(area_hdr+AH_STARTX)
         ld (px),hl
-        ld hl,START_Y
+        ld hl,(area_hdr+AH_STARTY)
         ld (py),hl
         xor a
         ld (jump_idx),a
@@ -37,14 +30,8 @@ player_reset:
 
 ; Fell into a pit: restart at the beginning of the level.
 respawn:
-        ld hl,0
-        ld (cam_x),hl
-        call objects_init
-        call player_reset
-        di
-        call full_redraw
-        ei
-        ret
+        ld a,(cur_area)
+        jp load_area
 
 player_update:
         ; ---- whip: once started it runs to the end ----
@@ -206,11 +193,11 @@ player_update:
         ld c,31                         ; falling: feet inside something solid?
         call foot_probe
         jr nc,.check_pit
-        ld hl,(py)                      ; land on top of the cell
+        ld hl,(py)                      ; land on top of the tile
         ld de,31
         add hl,de
         ld a,l
-        and 0xF0
+        and 0xF8
         ld l,a
         ld de,-32
         add hl,de
@@ -225,11 +212,11 @@ player_update:
         ld c,0                          ; head inside something solid?
         call foot_probe
         jr nc,.check_pit
-        ld hl,(py)
+        ld hl,(py)                      ; push back below the tile
         ld a,l
-        and 0xF0
+        and 0xF8
         ld l,a
-        ld de,16
+        ld de,8
         add hl,de
         ld (py),hl
         ld a,(jump_idx)                 ; continue with the mirrored fall

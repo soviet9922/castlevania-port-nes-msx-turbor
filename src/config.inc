@@ -23,11 +23,35 @@ VRAM_SPT        equ 0x3800              ; sprite patterns
 BAND_SIZE       equ 0x0800
 BG_TILE_BASE    equ 0x60                ; background tiles use pattern numbers 0x60-0xFF
 
-; Level / camera
-LEVEL_PX        equ LEVEL_W*16
-LEVEL_TILE_COLS equ LEVEL_W*2
-MAX_CAM         equ LEVEL_PX-256
+; Camera
 CAM_LEAD        equ 120                 ; player screen x the camera tries to keep
+
+; Area header (tools/areas_asm.py), copied to area_hdr in RAM
+AH_PALETTE      equ 0
+AH_PGT0         equ 2
+AH_CT0          equ 4
+AH_PGT1         equ 6
+AH_CT1          equ 8
+AH_PGT2         equ 10
+AH_CT2          equ 12
+AH_BGSZ0        equ 14
+AH_BGSZ1        equ 16
+AH_BGSZ2        equ 18
+AH_TILES        equ 20                  ; name-table bytes, PF_ROWS per 8-px column
+AH_COLL         equ 22                  ; solidity, PF_ROWS per 8-px column
+AH_TCOLS        equ 24                  ; 8-px columns in the area
+AH_MAXCAM       equ 26
+AH_STARTX       equ 28
+AH_STARTY       equ 30
+AH_CANDLES      equ 32
+AH_OBJSPT       equ 34
+AH_OBJSPTSZ     equ 36
+AH_OBJSCT       equ 38
+AH_OBJFRAMES    equ 40
+AH_EXITX        equ 42                  ; 0xFFFF = no exit
+AH_NEXT         equ 44
+AH_BLANK        equ 45
+AH_SIZE         equ 46
 
 ; Player movement (same model as the NES game)
 WALK_SPEED      equ 1                   ; px per frame
@@ -50,8 +74,8 @@ MAX_SPRITES     equ 32                  ; hardware sprites in total
 
 ; Objects (src/objects.asm)
 OBJ_MAX         equ 8
-OBJ_SIZE        equ 8
-        ASSERT PLAYER_SPRITES + OBJ_PATTERNS <= 64
+OBJ_SIZE        equ 10
+MAX_CANDLES     equ 64                  ; per area (flag bits)
 SPRITE_HIDE_Y   equ 212                 ; parks a sprite below the visible area
 
 ; Whip timing in frames (as recorded from the NES game)

@@ -69,13 +69,7 @@ vdp_init:
         call vdp_wreg
         jr .lp
 .regs_done:
-        ; palette
-        ld bc,0x0010                    ; R#16 = 0 (palette index)
-        call vdp_wreg
-        ld hl,palette
-        ld b,32
-        ld c,VDP_PAL
-        otir
+        ; (the palette comes with each area, see load_area)
         ; clear all 16 KB used by Screen 4
         ld hl,0
         ld bc,0x4000
@@ -134,41 +128,12 @@ load_graphics:
         ld bc,HUD_TILE_COUNT*8
         call vram_copy
 
-        ; background tiles: each band has its own set
-        ld ix,bg_band_table
-        ld b,3
-.band:
-        push bc
-        ld l,(ix+0)
-        ld h,(ix+1)                     ; patterns
-        ld e,(ix+4)
-        ld d,(ix+5)                     ; VRAM pattern address
-        ld c,(ix+8)
-        ld b,(ix+9)                     ; size
-        call vram_copy
-        ld l,(ix+2)
-        ld h,(ix+3)                     ; colours
-        ld e,(ix+6)
-        ld d,(ix+7)                     ; VRAM colour address
-        ld c,(ix+8)
-        ld b,(ix+9)
-        call vram_copy
-        ld de,10
-        add ix,de
-        pop bc
-        djnz .band
-
         ; empty sprite list
         ld hl,VRAM_SAT
         call vram_set_write
         ld a,SAT_END_Y
         out (VDP_DATA),a
         ret
-
-bg_band_table:
-        dw bg_pgt_b0, bg_ct_b0, VRAM_PGT+0*BAND_SIZE+BG_TILE_BASE*8, VRAM_CT+0*BAND_SIZE+BG_TILE_BASE*8, BG_TILES_B0*8
-        dw bg_pgt_b1, bg_ct_b1, VRAM_PGT+1*BAND_SIZE+BG_TILE_BASE*8, VRAM_CT+1*BAND_SIZE+BG_TILE_BASE*8, BG_TILES_B1*8
-        dw bg_pgt_b2, bg_ct_b2, VRAM_PGT+2*BAND_SIZE+BG_TILE_BASE*8, VRAM_CT+2*BAND_SIZE+BG_TILE_BASE*8, BG_TILES_B2*8
 
 ; ---------------------------------------------------------------------------
 ; Player metasprites
@@ -293,7 +258,7 @@ write_player_sprites:
         add hl,hl
         add hl,hl
         add hl,hl
-        ld de,obj_sct
+        ld de,(area_hdr+AH_OBJSCT)
         add hl,de
         ld b,16
         call vram_out_slow

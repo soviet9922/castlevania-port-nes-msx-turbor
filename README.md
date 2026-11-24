@@ -5,14 +5,15 @@ MSX turbo R, written in Z80/R800 assembly.
 
 ![engine skeleton running in openMSX](docs/img/milestone0.png)
 
-**Status: milestone 1 in progress.** The engine scrolls a level with a
+**Status: milestones 1-3 in progress.** The engine scrolls a level with a
 fixed HUD at 60 fps and has a controllable 3-colour character. From your
-own NES ROM, the build converts **Stage 1's opening courtyard (up to the
-castle gate)**: graphics, layout and palette. **Simon** is converted too:
+own NES ROM, the build converts **Stage 1: the courtyard and, through the
+castle gate, the entrance hall**: graphics, layout, palette and the NES's own
+collision rule. **Simon** is converted too:
 his graphics, walk animation, jump arc and whip (timing identical to the NES,
-frame by frame). The courtyard's **braziers** are placed from the ROM's data. Whip them
-and they burst and drop their items (big hearts, whip upgrade, dagger), which you can collect.
-Enemies come next.
+frame by frame). **Braziers and wall candles** are placed from the ROM's data. Whip them
+and they burst and drop their items (hearts, whip upgrade, dagger), which you can collect.
+Stairs and enemies come next.
 The screenshot above shows the ROM-free build, which uses only original
 placeholder art. See [docs/ROADMAP.md](docs/ROADMAP.md).
 

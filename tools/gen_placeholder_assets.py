@@ -23,6 +23,7 @@ import zlib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import msx_area  # noqa: E402
 import msx_sprites  # noqa: E402
+import areas_asm  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Palette: 16 entries, RGB components 0..7 (MSX2 9-bit palette)
@@ -405,15 +406,33 @@ _DAGGER = _EMPTY16 + [
     "................"] * 5 + [
     "..22.....7......", "..2277777777....", "22227777777777f.", "..2277777777....",
     "..22.....7......"] + ["................"] * 6
+_CANDLE_A = _EMPTY16 + [
+    "................", ".......b........", "......bcb.......", ".......c........",
+    "......ffff......", "......ffff......", "......ffff......", "......ffff......",
+    "......ffff......", "......ffff......", ".....777777.....", "......7777......",
+]
+_CANDLE_B = _EMPTY16 + [
+    "........b.......", "......bcb.......", ".......cb.......", ".......c........",
+    "......ffff......", "......ffff......", "......ffff......", "......ffff......",
+    "......ffff......", "......ffff......", ".....777777.....", "......7777......",
+]
+_SMALL_HEART = _EMPTY16 + [
+    "................", "................", "................", "....66..66......",
+    "...66666666.....", "...66666666.....", "....666666......", ".....6666.......",
+    "......66........",
+]
 PLACEHOLDER_OBJECTS = {
+    "candle1": _CANDLE_A, "candle2": _CANDLE_B, "smallheart": _SMALL_HEART,
     "brazier1": _FLAME_A + _BOWL, "brazier2": _FLAME_B + _BOWL,
     "burst1": _BURSTS[0], "burst2": _BURSTS[1], "burst3": _BURSTS[2], "burst4": _BURSTS[3],
     "heart": _HEART, "whipup": _WHIPUP, "dagger": _DAGGER,
 }
 OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
-              "heart", "whipup", "dagger"]
-# placeholder braziers: (world x of the box's left edge, box top, drop code)
-PLACEHOLDER_CANDLES = [(88, 128, 4), (216, 128, 0)]      # box top on the floor (y 160)
+              "heart", "whipup", "dagger", "candle1", "candle2", "smallheart"]
+# placeholder candles: (box x, box y, item id, kind) - see tools/convert_objects.py
+# item ids: 0 whip upgrade, 1 big heart, 2 dagger, 3 small heart; kind 0 brazier, 1 candle
+PLACEHOLDER_CANDLES = [(88, 128, 1, 0), (216, 128, 0, 0),     # braziers on the floor (y 160)
+                       (344, 96, 3, 1), (472, 96, 3, 1)]       # wall candles
 
 
 def placeholder_objects():
@@ -512,9 +531,11 @@ def main():
         for y in range(16):
             pixels.append([int(arts[level[r][c]][y][x], 16)
                            for c in range(LEVEL_W) for x in range(16)])
-    solid = [[1 if solids[level[r][c]] else 0 for c in range(LEVEL_W)]
-             for r in range(MT_ROWS)]
-    stats = msx_area.write_area(out_dir, pixels, PALETTE, solid, START_X, START_Y,
+    # collision per 8x8 tile (each solid metatile = 2x2 solid tiles)
+    solid = [[1 if solids[level[r // 2][c // 2]] else 0 for c in range(LEVEL_W * 2)]
+             for r in range(MT_ROWS * 2)]
+    area_dir = os.path.join(out_dir, "area_0")
+    stats = msx_area.write_area(area_dir, pixels, PALETTE, solid, START_X, START_Y,
                                 "placeholder")
     if stats["lossy_rows"]:
         raise SystemExit("placeholder art breaks the 2-colours-per-row rule")
@@ -528,12 +549,15 @@ def main():
 
     bank, frame_names = player_sprites()
     n_patterns, n_frames = msx_sprites.write_bank(out_dir, bank, frame_names)
-    msx_sprites.write_bank(out_dir, placeholder_objects(), OBJ_FRAMES, prefix="obj")
+    n_obj, _ = msx_sprites.write_bank(area_dir, placeholder_objects(), OBJ_FRAMES,
+                                      prefix="a0_obj")
     cdata = bytearray([len(PLACEHOLDER_CANDLES)])
-    for x, y, item in PLACEHOLDER_CANDLES:
-        cdata += bytes([x & 0xFF, x >> 8, y, item])
-    with open(os.path.join(out_dir, "candles.bin"), "wb") as f:
+    for x, y, item, kind in PLACEHOLDER_CANDLES:
+        cdata += bytes([x & 0xFF, x >> 8, y, item, kind])
+    with open(os.path.join(area_dir, "candles.bin"), "wb") as f:
         f.write(cdata)
+    stats.update(dir="area_0", obj_patterns=n_obj, exit_x=None)
+    areas_asm.write(out_dir, [stats])
 
     files = {
         "player_jump.bin": bytes(v & 0xFF for v in PLACEHOLDER_JUMP),

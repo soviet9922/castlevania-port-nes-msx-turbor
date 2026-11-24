@@ -63,7 +63,14 @@ whip_level      equ hearts+1            ; 1  0 leather, 1 chain, 2 morning star
 subweapon       equ whip_level+1        ; 1  0 none, 1 dagger
 hud_dirty       equ subweapon+1         ; 1
 
-sat_buf         equ hud_dirty+1         ; (MAX_SPRITES+1)*4
+area_hdr        equ hud_dirty+1         ; AH_SIZE copy of the current area's header
+cur_area        equ area_hdr+AH_SIZE    ; 1
+candle_dead     equ cur_area+1          ; MAX_CANDLES/8 bits: destroyed candles
+candle_live     equ candle_dead+MAX_CANDLES/8 ; bits: candles that have an object
+spawn_last      equ candle_live+MAX_CANDLES/8 ; 2  camera x / 16 at the last spawn pass
+tmp_w           equ spawn_last+2        ; 2  scratch
+
+sat_buf         equ tmp_w+2             ; (MAX_SPRITES+1)*4
 
 RAM_END         equ sat_buf+(MAX_SPRITES+1)*4
         ASSERT RAM_END < 0xF380

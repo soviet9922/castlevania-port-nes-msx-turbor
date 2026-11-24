@@ -2,16 +2,15 @@
 ;  Castlevania port for MSX turbo R - engine skeleton
 ;
 ;  Cartridge: ASCII16 MegaROM, 128 KB (8 banks of 16 KB)
-;    bank 0 -> 0x4000-0x7FFF (code, fixed)
-;    bank 1 -> 0x8000-0xBFFF (data, switchable)
+;    bank 0    -> 0x4000-0x7FFF  code + data shared by all areas (fixed)
+;    bank 1..n -> 0x8000-0xBFFF  one bank per area (see src/area.asm)
 ;
 ;  Runs on any MSX2+ (V9958 needed for hardware horizontal scroll); on a
 ;  turbo R it switches to the R800 CPU.
 ; ===========================================================================
 
         INCLUDE "msx.inc"
-        INCLUDE "assets.inc"            ; generated: HUD + sprites
-        INCLUDE "level.inc"             ; generated: the area (placeholder or converted)
+        INCLUDE "assets.inc"            ; generated: HUD tile numbers, MT_ROWS
         INCLUDE "config.inc"
         INCLUDE "ram.inc"
 
@@ -31,8 +30,6 @@ init:
         di
         call select_cpu
         call enable_page2
-        ld a,1
-        ld (ASCII16_PAGE2),a            ; data bank -> 0x8000
 
         ; clear engine RAM
         ld hl,RAM_BASE
@@ -44,17 +41,11 @@ init:
         call vdp_init
         call load_graphics
         call hud_draw
-        call objects_load_patterns
         ld a,5
         ld (hearts),a                   ; the game starts with 5 hearts
-        call level_start
-        ld a,0xFF
-        ld (loaded_frames),a            ; no sprite patterns loaded yet
-        ld (loaded_frames+1),a
-        call build_sat
-        call write_player_sprites       ; first frame goes to page 1
         call install_irq
-        ei
+        xor a
+        call load_area                  ; area 0: Stage 1 courtyard
 
 ; ---------------------------------------------------------------------------
 ; Main loop: one iteration per video frame
@@ -74,6 +65,8 @@ vblank_done:                            ; (tests measure VBLANK work up to here)
         ; --- game logic ---
         call read_input
         call player_update
+        call check_area_exit
+        call objects_spawn
         call objects_update
         call camera_update
         call build_sat
@@ -135,24 +128,24 @@ enable_page2:
         INCLUDE "scroll.asm"
         INCLUDE "player.asm"
         INCLUDE "objects.asm"
+        INCLUDE "area.asm"
+
+; ---------------------------------------------------------------------------
+; Data shared by all areas (stays in bank 0)
+; ---------------------------------------------------------------------------
+player_spt:     INCBIN "player_spt.bin"         ; 32 bytes per 16x16 pattern
+player_sct:     INCBIN "player_sct.bin"         ; 16 colour bytes per sprite
+player_frames:  INCBIN "player_frames.bin"      ; count, then (dy, dx, pattern, colour)
+        INCLUDE "player_frames.inc"             ; player_frame_table
+jump_table:     INCBIN "player_jump.bin"        ; JUMP_LEN signed dy, rising half
+hud_pgt:        INCBIN "hud_pgt.bin"
+hud_ct:         INCBIN "hud_ct.bin"
 
 code_end:
         ASSERT code_end <= 0x8000
         ds 0x8000-$, 0xFF
 
 ; ---------------------------------------------------------------------------
-; Bank 1: data (mapped at 0x8000)
+; Banks 1..n: one per area (generated), then empty banks up to 128 KB
 ; ---------------------------------------------------------------------------
-        ORG 0x8000
-        INCLUDE "data_bank1.asm"
-data1_end:
-        ASSERT data1_end <= 0xC000
-        ds 0xC000-$, 0xFF
-
-; ---------------------------------------------------------------------------
-; Banks 2..7: reserved for converted game data (stages, music, graphics)
-; ---------------------------------------------------------------------------
-        DUP 6
-        ORG 0x8000
-        ds 0x4000, 0xFF
-        EDUP
+        INCLUDE "areas.asm"

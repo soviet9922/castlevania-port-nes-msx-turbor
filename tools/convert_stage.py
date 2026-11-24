@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Convert a Castlevania (NES) stage area from YOUR ROM into the engine format.
+"""Convert Castlevania (NES) areas from YOUR ROM into the engine format.
 
-  convert_stage.py ROM OUT_DIR [--area 1-courtyard] [--nes-palette FILE.pal]
+  convert_stage.py ROM OUT_DIR [--nes-palette FILE.pal]
 
-Output goes to OUT_DIR (normally build/gen, which is git-ignored) and
-replaces the placeholder level. Nothing converted is ever committed.
+Writes the common data (Simon) to OUT_DIR, each area to OUT_DIR/area_<n>/,
+and OUT_DIR/areas.asm with one ROM bank per area. OUT_DIR is normally
+build/gen/converted, which is git-ignored: nothing converted is committed.
 """
 
 import argparse
@@ -14,6 +15,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cv_rom import (BG_PATTERN_TABLE, CastlevaniaROM, load_nes_palette,  # noqa: E402
                     tile_pixels)
+import areas_asm  # noqa: E402
 import convert_objects  # noqa: E402
 import convert_simon  # noqa: E402
 import msx_area  # noqa: E402
@@ -27,47 +29,49 @@ from gen_placeholder_assets import write_png  # noqa: E402
 FIXED_SLOTS = {0: None, 1: 0x0F, 2: None, 4: None, 6: None, 15: 0x30}
 FREE_SLOTS = [3, 5, 7, 8, 9, 10, 11, 12, 13]     # 14 = whip (convert_simon.py)
 
-AREAS = {
-    # name: layout sections [(layout key, first column, last column+1)],
-    #       palette key, NES tiles that are solid ground, start position
-    "1-courtyard": {
-        "sections": [("1-courtyard", 0, None), ("1-hall", 0, 2)],  # + castle gate
-        "palette": "1-courtyard",
-        "solid_tiles": {0x60, 0x68},
-        "stage": 0, "section": 0,       # candle placement ($28, $46)
-        "start": (32, 9 * 16 - 32),
-    },
-}
+# The NES decides collision per tile: tiles $60-$6B are solid ($F9DB).
+SOLID_TILES = range(0x60, 0x6C)
 
-# Layout sections in bank 4 (see docs/NES_NOTES.md)
-SECTIONS = {
-    "1-courtyard": (4, 0x800A, 0x8082, 0x830A),
-    "1-hall": (4, 0x8082, 0x81A2, 0x830A),
-}
+# Stage maps in bank 4: world column 0 is the stage's header word + 24 bytes
+# (6 bytes per 32-px column; the 4 columns before it are pre-drawn off-screen).
+MAP_BANK, BLOCKS = 4, 0x830A
+
+# Areas in ROM bank order. Map ranges are [start, end) addresses in bank 4.
+AREAS = [
+    {
+        "name": "1-courtyard",
+        "map": (0x800A, 0x809A),        # courtyard + castle gate (768 px)
+        "palette": "1-courtyard",
+        "stage": 0, "section": 0,       # candle placement ($28, $46)
+        "start_x": 40,                  # NES: Simon at world x 48 (centre)
+        "exit_x": 688,                  # walking into the gate ...
+        "next_area": 1,                 # ... enters the hall
+    },
+    {
+        "name": "1-hall",
+        "map": (0x809A, 0x81BA),        # entrance hall (1536 px)
+        "palette": "1-courtyard",       # the hall uses the same palette
+        "stage": 1, "section": 0,
+        "start_x": 40,
+        "exit_x": None,
+    },
+]
 
 
 def nes_to_msx_rgb(c):
     return tuple(min(7, (v * 7 + 127) // 255) for v in c)
 
 
-def convert(rom_path, out_dir, area_name, nes_pal_path=None, preview=True):
+def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, preview=True):
     import cv_rom
-    rom = CastlevaniaROM(rom_path)
-    area = AREAS[area_name]
-    nes_rgb = load_nes_palette(nes_pal_path)
+    out_dir = os.path.join(out_root, f"area_{index}")
+    os.makedirs(out_dir, exist_ok=True)
     chr_ram = rom.chr_ram()
     pal = rom.palette(area["palette"])
 
-    # --- assemble NES tiles + palette indices for the whole area ---
-    tiles = [[] for _ in range(24)]
-    pals = [[] for _ in range(24)]
-    for key, c0, c1 in area["sections"]:
-        cv_rom.STAGE_LAYOUTS[key] = SECTIONS[key]
-        t, p = rom.stage_nametable(key)
-        a, b = c0 * 4, (c1 * 4 if c1 is not None else len(t[0]))
-        for r in range(24):
-            tiles[r] += t[r][a:b]
-            pals[r] += p[r][a:b]
+    key = f"area{index}"
+    cv_rom.STAGE_LAYOUTS[key] = (MAP_BANK, area["map"][0], area["map"][1], BLOCKS)
+    tiles, pals = rom.stage_nametable(key)
     width = len(tiles[0]) * 8
 
     # --- NES colours -> MSX palette slots ---
@@ -82,6 +86,8 @@ def convert(rom_path, out_dir, area_name, nes_pal_path=None, preview=True):
         if nes is not None:
             nes_to_slot[nes] = slot
             msx_pal[slot] = nes_to_msx_rgb(nes_rgb[nes])
+    for slot, rgb in simon_slots.items():
+        msx_pal[slot] = rgb
     free = list(FREE_SLOTS)
     for nes in sorted(used):
         if nes in nes_to_slot:
@@ -92,19 +98,11 @@ def convert(rom_path, out_dir, area_name, nes_pal_path=None, preview=True):
             nes_to_slot[nes] = same[0]
             continue
         if not free:
-            raise SystemExit(f"{area_name}: more than 11 background colours")
+            raise SystemExit(f"{area['name']}: more than 9 background colours")
         s = free.pop(0)
         msx_pal[s] = rgb
         nes_to_slot[nes] = s
     msx_pal[0] = msx_pal[1]
-
-    # --- Simon: sprite patterns, his colours in slots 2/4/6, jump arc ---
-    bank, frame_names, simon_slots, jump = convert_simon.convert(rom, nes_rgb, nes_to_msx_rgb)
-    for slot, rgb in simon_slots.items():
-        msx_pal[slot] = rgb
-    msx_sprites.write_bank(out_dir, bank, frame_names)
-    with open(os.path.join(out_dir, "player_jump.bin"), "wb") as f:
-        f.write(jump)
 
     # --- indexed image of the playfield (NES nametable rows 6..27) ---
     pixels = []
@@ -117,14 +115,15 @@ def convert(rom_path, out_dir, area_name, nes_pal_path=None, preview=True):
                 rows[y] += [nes_to_slot[pal[0] if v == 0 else pal[p * 4 + v]] for v in px[y]]
         pixels += rows
 
-    # --- collision: 16x16 cells containing solid ground tiles ---
-    solid = []
-    for mr in range(msx_area.MT_ROWS):
-        row = []
-        for mc in range(width // 16):
-            cell = {tiles[2 + mr * 2 + y][mc * 2 + x] for y in (0, 1) for x in (0, 1)}
-            row.append(1 if cell & area["solid_tiles"] else 0)
-        solid.append(row)
+    # --- collision per tile, as on the NES ---
+    solid = [[1 if tiles[r][c] in SOLID_TILES else 0 for c in range(len(tiles[r]))]
+             for r in range(2, 24)]
+
+    # start: standing on the first solid tile below the top, at start_x
+    sx = area["start_x"]
+    col = (sx + 8) // 8
+    row = next(r for r in range(4, msx_area.PF_ROWS) if solid[r][col])
+    sy = row * 8 - 32
 
     # --- candles and object sprites (colours: exact slot, else nearest) ---
     def slot_for_nes(nes):
@@ -134,18 +133,16 @@ def convert(rom_path, out_dir, area_name, nes_pal_path=None, preview=True):
         return min(range(1, 16), key=lambda s: (sum((a - b) ** 2 for a, b in
                                                     zip(msx_pal[s], rgb)), s))
     obj_bank, obj_names = convert_objects.sprite_frames(rom, slot_for_nes)
-    msx_sprites.write_bank(out_dir, obj_bank, obj_names, prefix="obj")
+    n_obj_patterns, _ = msx_sprites.write_bank(out_dir, obj_bank, obj_names,
+                                               prefix=f"a{index}_obj")
     cl = convert_objects.candles(rom, area["stage"], area["section"], width)
     convert_objects.write_candles(os.path.join(out_dir, "candles.bin"), cl)
 
-    sx, sy = area["start"]
-    stats = msx_area.write_area(out_dir, pixels, msx_pal, solid, sx, sy, area_name)
+    params = msx_area.write_area(out_dir, pixels, msx_pal, solid, sx, sy, area["name"])
+    params.update(dir=f"area_{index}", obj_patterns=n_obj_patterns,
+                  exit_x=area.get("exit_x"), next_area=area.get("next_area", 0))
 
     if preview:
-        img = []
-        for y in range(len(pixels)):
-            img.append([])
-        # preview of the MSX result (after 2-colour reduction): rebuild from files
         pgt = [open(os.path.join(out_dir, f"bg_pgt_b{b}.bin"), "rb").read() for b in range(3)]
         ct = [open(os.path.join(out_dir, f"bg_ct_b{b}.bin"), "rb").read() for b in range(3)]
         tmap = open(os.path.join(out_dir, "level_tiles.bin"), "rb").read()
@@ -156,27 +153,44 @@ def convert(rom_path, out_dir, area_name, nes_pal_path=None, preview=True):
                 b = msx_area.band_of(tr)
                 t = tmap[tc * msx_area.PF_ROWS + tr] - msx_area.BG_TILE_BASE
                 for y in range(8):
-                    bits, col = pgt[b][t * 8 + y], ct[b][t * 8 + y]
+                    bits, colr = pgt[b][t * 8 + y], ct[b][t * 8 + y]
                     for x in range(8):
-                        c = col >> 4 if bits & (0x80 >> x) else col & 15
+                        c = colr >> 4 if bits & (0x80 >> x) else colr & 15
                         img[tr * 8 + y][tc * 8 + x] = rgb8[c]
+                    if solid[tr][tc]:
+                        img[tr * 8][tc * 8] = (255, 255, 0)
         write_png(os.path.join(out_dir, "level_msx_preview.png"), width, len(img), img)
 
-    print(f"{area_name}: {len(cl)} braziers at x {[c[0] + 8 for c in cl]}, items {[c[2] for c in cl]}")
-    print(f"{area_name}: {width} px wide, tiles per band {stats['tiles']}, "
-          f"{stats['lossy_rows']} of {stats['total_rows']} tile rows reduced to 2 colours, "
-          f"{len(used)} NES colours")
-    return stats
+    kinds = ["brazier", "candle"]
+    print(f"area {index} {area['name']}: {width} px, tiles per band {params['tiles']}, "
+          f"{params['lossy_rows']}/{params['total_rows']} tile rows reduced, "
+          f"start ({sx},{sy}), {len(cl)} candles "
+          f"({', '.join(f'{kinds[k]}@{x + 8}' for x, _, _, k in cl[:6])}{', ...' if len(cl) > 6 else ''})")
+    return params
+
+
+def convert(rom_path, out_dir, nes_pal_path=None):
+    rom = CastlevaniaROM(rom_path)
+    nes_rgb = load_nes_palette(nes_pal_path)
+    os.makedirs(out_dir, exist_ok=True)
+
+    # Simon (common to all areas): sprites, colours for slots 2/4/6/14, jump arc
+    bank, frame_names, simon_slots, jump = convert_simon.convert(rom, nes_rgb, nes_to_msx_rgb)
+    msx_sprites.write_bank(out_dir, bank, frame_names)
+    with open(os.path.join(out_dir, "player_jump.bin"), "wb") as f:
+        f.write(jump)
+
+    areas = [convert_area(rom, a, i, out_dir, nes_rgb, simon_slots) for i, a in enumerate(AREAS)]
+    areas_asm.write(out_dir, areas)
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("rom")
     ap.add_argument("out_dir")
-    ap.add_argument("--area", default="1-courtyard", choices=sorted(AREAS))
     ap.add_argument("--nes-palette")
     args = ap.parse_args()
-    convert(args.rom, args.out_dir, args.area, args.nes_palette)
+    convert(args.rom, args.out_dir, args.nes_palette)
 
 
 if __name__ == "__main__":

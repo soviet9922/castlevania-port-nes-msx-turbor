@@ -18,10 +18,11 @@
 - [x] Stage layout format decoded (6 blocks per column, 17-byte blocks)
 - [x] Converter: NES tiles + palettes → Screen 4 tiles (2 colours per row), per-band tile sets
 - [x] Stage 1 courtyard + castle gate playable in the MSX build (`make nes`)
-- [ ] Real collision data (currently: ground tiles are solid)
-- [ ] Entrance hall (decoded, needs its palette, stairs and collision)
-- [ ] Palette selection table, remaining sections of bank 4, banks for blocks 2-6
-- [ ] Area transitions (load the next area from banks 2-7)
+- [x] Real collision rule from the ROM (tiles $60-$6B), per 8x8 tile
+- [x] Areas in their own ROM banks; the courtyard gate leads into the entrance hall
+- [x] Entrance hall: graphics, layout, collision, wall candles
+- [ ] Stairs (needed to reach the hall's upper floor and its exit)
+- [ ] Palette selection table, stages 2 and up
 
 ## Milestone 2: Simon (in progress)
 
@@ -42,7 +43,9 @@
 - [x] Braziers from the ROM's placement data; whip destroys them (NES burst timing)
 - [x] Item drops: big heart (+5, shown in the HUD), whip upgrade, dagger; fall and pickup
 - [ ] Use the whip upgrade (chain whip graphics and reach) and the dagger (throwing, heart cost)
-- [ ] Wall candles, small hearts, money bags; spawn by camera position like the NES
+- [x] Wall candles and small hearts; candles spawn by camera position like the NES
+- [ ] The NES item drop rule, money bags, enemy drops
+- [ ] Enemies: zombies first (the hall's enemy groups are in the same table as the candles)
 - [ ] Zombie, panther, bat, fishman, …
 - [ ] Sprite multiplexing and flicker when more than 8 sprites share a line
 - [ ] Vertical transitions between sections (V9958 vertical scroll)

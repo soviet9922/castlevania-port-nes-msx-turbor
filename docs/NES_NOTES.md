@@ -34,12 +34,18 @@ Everything was found in a user-supplied dump (iNES, mapper 2,
 
 ```
 $8000  header: 5 little-endian words ($7FF2, $8082, $8292, $81A2, $8202)
-$800A  map: courtyard (stage 1 opening), 20 columns
-$8082  map: castle gate + entrance hall, 48 columns
-$81A2  map: 16 columns   (not identified yet)
-$8202  map: 24 columns   (not identified yet)
+$800A  courtyard (internal stage 0): world column 0
+$809A  entrance hall (internal stage 1): world column 0, 48 columns
 $830A  block table
 ```
+
+**World column 0 of a stage is at its header word + 24 bytes** (4 columns).
+The 4 columns before it are drawn off-screen to the left when the stage
+starts, so they overlap the end of the previous stage's map. That's why
+the courtyard (`$800A`) runs 24 columns, through the gate, into
+`$8082-$8099`. This was confirmed by matching the emulator's nametables
+against the map at camera positions 0, 1, 11 and 100. The words `$81A2`,
+`$8202` and `$8292` are probably stages 2-4.
 
 - **Map:** one byte per 32x32-pixel block, **6 blocks per column**, top to
   bottom, columns left to right. The top block row sits under the HUD and
@@ -49,6 +55,21 @@ $830A  block table
   - bytes 1–16: 4x4 tile numbers, row-major, from pattern table `$1000`
 - Checked against the emulator: every fully visible block on screen, tiles
   and attributes, matches.
+
+## Collision
+
+Collision is derived from the background tiles: when a column is drawn,
+`$F7E8` calls `$F9DB` for each tile, and **tiles `$60-$6B` are solid**
+(tile `$66` gets value 2, probably breakable blocks). The resulting 2-bit-per-tile map
+is kept at `$0600-$06FF`. The port applies the same rule per 8x8 tile
+when converting (`tools/convert_stage.py`).
+
+## Stage 1 = two internal stages
+
+The HUD always says STAGE 01, but the game switches the internal stage number `$28` from 0
+(courtyard) to 1 (entrance hall) when Simon walks into the gate (around
+screen x 195 with the camera at 512). The hall starts with the camera at 0,
+Simon at world x 48, and the floor 16 px lower. Both use the palette at `$CE28`.
 
 ## Palettes
 
@@ -100,6 +121,15 @@ Measured with `tools/nes_probe/record_courtyard.lua`, which walks through the co
     record `[$FF item] [$FE] x y` (0 = none). `$FE` spawns object `$28`
     (brazier) instead of `$27`. The item goes to `$0584+slot`.
   - Observed world X = (chunk - 1) * 64 + x; Y is the foot line.
+- Wall candles are object `$27`: one 8x16 sprite, tiles `$40`/`$50`
+  alternating every 9 frames (palette 3). Record y is the candle's centre line.
+  The entrance hall has 24 of them (stage 1, section 0 table at `$D319`), one per
+  64-px chunk, alternating between floor height and mid-wall.
+- Small heart: tile `$9F` (palette 3). It drifts down at 1/2 px per frame,
+  swaying sideways by about 15 px, and is worth 1 heart.
+- Drop codes seen in the hall: `$11`, `$21`, `$0A`, `$0B` (not identified), and
+  0 on wall candles, which usually gave a small heart. One gave another item (`$C5/$C9`).
+  Enemies also drop items. The NES's drop rule is not decoded yet.
 - Stage 1 courtyard: 5 braziers at X 96, 224, 352, 480, 608 with drop codes
   4, 0, 0, 4, 8. Codes: 0 = whip upgrade, 4 = big heart (+5), 8 = dagger.
 - Sprites use 8x16 mode, so tile bit 0 selects the pattern table. Brazier: flame
@@ -112,11 +142,9 @@ Measured with `tools/nes_probe/record_courtyard.lua`, which walks through the co
 
 ## Still unknown
 
-- Collision. The port currently treats 16x16 cells that contain the ground
-  tiles (`$60`, `$68`) as solid, which is right for the flat courtyard. The
-  real collision data (and stairs) still has to be found. The `$0600-$06FF`
-  RAM area turned out to be object data, not collision.
-- The meaning of the `$7FF2` header word and the sections at `$81A2` / `$8202`.
+- Stairs (not part of the tile collision; probably their own data per stage).
+- The candle drop rule (codes other than 4 and 8, and code 0 on wall candles).
+- Stages 2 and up (`$81A2`, `$8202`, `$8292` in bank 4; other banks for later blocks).
 - Wall candles (object `$27`), enemy groups, Simon's sprite assembly table, the whip's exact
   hit box and damage rules, the crouching whip pose (the port draws the
   standing whip pose with the crouched legs), music.
@@ -136,6 +164,7 @@ Measured with `tools/nes_probe/record_courtyard.lua`, which walks through the co
 | `tools/nes_probe/dump_stage.lua` | FCEUX script: start a game and dump PPU/RAM state (ground truth) |
 | `tools/nes_probe/record_simon.lua` | FCEUX script: record RAM/OAM every frame while Simon acts |
 | `tools/nes_probe/record_courtyard.lua` | FCEUX script: walk the courtyard whipping every brazier |
+| `tools/nes_probe/record_hall.lua` | FCEUX script: walk through the gate into the entrance hall |
 
 To run the probe (needs FCEUX; writes to `build/nes/probe`):
 

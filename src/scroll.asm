@@ -41,10 +41,11 @@ prepare_column:
         and 31
         ld (col_slot),a
 
-        ld hl,LEVEL_TILE_COLS-1
+        ld hl,(area_hdr+AH_TCOLS)
+        dec hl
         or a
         sbc hl,de
-        jr c,.blank                     ; DE >= LEVEL_TILE_COLS
+        jr c,.blank                     ; DE >= tile columns of the area
 
         ld h,d
         ld l,e
@@ -58,7 +59,7 @@ prepare_column:
         or a
         sbc hl,bc                       ; *22
         ASSERT PF_ROWS == 22
-        ld de,level_tiles
+        ld de,(area_hdr+AH_TILES)
         add hl,de
         ld de,col_buf
         ld bc,PF_ROWS
@@ -68,8 +69,9 @@ prepare_column:
 .blank:
         ld hl,col_buf
         ld b,PF_ROWS
+        ld a,(area_hdr+AH_BLANK)
 .blp:
-        ld (hl),BLANK_TILE
+        ld (hl),a
         inc hl
         djnz .blp
 
@@ -140,13 +142,13 @@ camera_update:
         jr c,.not_neg                   ; px >= CAM_LEAD
         ld hl,0
 .not_neg:
+        ld de,(area_hdr+AH_MAXCAM)
         push hl
-        ld de,MAX_CAM+1
         or a
         sbc hl,de
         pop hl
         jr c,.not_max
-        ld hl,MAX_CAM
+        ex de,hl                        ; clamp to the area's maximum
 .not_max:
         ld (cam_new),hl
         call hl_shr3
@@ -172,49 +174,49 @@ camera_update:
         jp prepare_column
 
 ; ---------------------------------------------------------------------------
-; Collision: is world pixel (HL = x, DE = y, signed) inside a solid metatile?
+; Collision: is world pixel (HL = x, DE = y, signed) inside a solid tile?
+; Collision is per 8x8 tile, as on the NES (tiles $60-$6B are solid there).
 ; Returns carry set if solid. Clobbers AF, BC, DE, HL.
 ; Above the top or below the bottom of the playfield counts as empty;
-; beyond the right end of the level counts as solid.
+; beyond the right end of the area counts as solid.
 ; ---------------------------------------------------------------------------
 solid_at:
         ld a,d
         or a
         jr nz,.empty                    ; y < 0 or y >= 256
         ld a,e
-        cp MT_ROWS*16
+        cp PF_ROWS*8
         jr nc,.empty
         rrca
         rrca
         rrca
-        rrca
-        and 0x0F
-        ld c,a                          ; C = metatile row
+        and 0x1F
+        ld c,a                          ; C = tile row
         srl h
         rr l
         srl h
         rr l
         srl h
-        rr l
-        srl h
-        rr l                            ; HL = metatile column
-        ld a,h
+        rr l                            ; HL = tile column
+        ld de,(area_hdr+AH_TCOLS)
+        push hl
         or a
-        jr nz,.solid
-        ld a,l
-        cp LEVEL_W
+        sbc hl,de
+        pop hl
         jr nc,.solid
+        add hl,hl                       ; column * 22
         ld d,h
         ld e,l
         add hl,hl
-        add hl,hl
         add hl,de
         add hl,hl
-        add hl,de                       ; * 11
+        add hl,hl
+        or a
+        sbc hl,de
+        ASSERT PF_ROWS == 22
         ld b,0
         add hl,bc
-        ASSERT MT_ROWS == 11
-        ld de,level_coll
+        ld de,(area_hdr+AH_COLL)
         add hl,de
         ld a,(hl)
         or a

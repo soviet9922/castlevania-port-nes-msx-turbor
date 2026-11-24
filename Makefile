@@ -4,7 +4,6 @@ OPENMSX   ?= openmsx
 
 # Your own Castlevania (NES) ROM dump, used only by the *-nes targets.
 NES_ROM   ?= build/nes/castlevania.nes
-AREA      ?= 1-courtyard
 
 BUILD     := build
 PH_GEN    := $(BUILD)/gen/placeholder
@@ -13,8 +12,8 @@ ROM       := $(BUILD)/cvmsx.rom
 NES_OUT   := $(BUILD)/cvmsx-nes.rom
 
 ASM_SRC   := $(wildcard src/*.asm src/*.inc)
-PH_TOOLS  := tools/gen_placeholder_assets.py tools/msx_area.py
-CV_TOOLS  := $(PH_TOOLS) tools/convert_stage.py tools/cv_rom.py
+PH_TOOLS  := tools/gen_placeholder_assets.py tools/msx_area.py tools/msx_sprites.py tools/areas_asm.py
+CV_TOOLS  := $(PH_TOOLS) tools/convert_stage.py tools/cv_rom.py tools/convert_simon.py tools/convert_objects.py
 
 SJASM_FLAGS = --nologo --msg=war --fullpath --inc=src
 
@@ -33,7 +32,7 @@ $(PH_GEN)/.stamp: $(PH_TOOLS)
 $(CV_GEN)/.stamp: $(PH_GEN)/.stamp $(CV_TOOLS) $(NES_ROM)
 	@mkdir -p $(CV_GEN)
 	cp $(PH_GEN)/*.bin $(PH_GEN)/*.inc $(CV_GEN)/
-	$(PYTHON) tools/convert_stage.py $(NES_ROM) $(CV_GEN) --area $(AREA)
+	$(PYTHON) tools/convert_stage.py $(NES_ROM) $(CV_GEN)
 	@touch $@
 
 $(ROM): $(ASM_SRC) $(PH_GEN)/.stamp

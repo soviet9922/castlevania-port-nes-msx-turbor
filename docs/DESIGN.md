@@ -157,4 +157,30 @@ The hardware shows at most 8 sprites per scanline. Simon uses up to 6 on a line
 (whip strike) and a brazier 2, so two braziers on Simon's lines can exceed the
 limit. Sprite rotation (flicker, as on the NES) is still to do.
 
+### Collision
+
+As on the NES, collision is decided per 8x8 tile: the converter marks the
+tiles the NES treats as solid (`$60-$6B`). The area stores one byte per
+tile in `level_coll` (22 bytes per 8-px column).
+
+## Areas and ROM banks
+
+Each area (courtyard, entrance hall, …) is one 16 KB ROM bank (area n =
+bank n+1) that starts with a header: palette, background tiles per band,
+map, collision, candle list, object sprites, start position, and an exit
+(x position plus next area). The current area's bank stays mapped at
+0x8000 because column streaming and collision read it directly. The header
+is copied to RAM. Code and data shared by all areas (Simon's sprites, HUD)
+live in bank 0, at 0x4000.
+
+`load_area` turns the display off, loads the palette, tiles and object
+patterns, resets objects and the player, redraws the screen and turns
+the display back on. Walking past the area's exit x loads the next area.
+Falling into a pit reloads the current one.
+
+Candles spawn like on the NES: only candles within the screen
+(plus a margin) get one of the 8 object slots, objects far outside the
+screen are freed, and a destroyed candle stays destroyed (one bit per candle)
+until the area is loaded again.
+
 ## Memory

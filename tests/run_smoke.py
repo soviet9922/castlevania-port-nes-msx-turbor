@@ -24,7 +24,8 @@ MACHINE = os.environ.get("TEST_MACHINE", "C-BIOS_MSX2+")
 WATCH = {"frame_count": 2, "line_irq_count": 2, "px": 2, "py": 2, "cam_x": 2,
          "on_ground": 1, "facing": 1, "scroll_r26": 1, "scroll_r27": 1,
          "pframe": 1, "whip_active": 1, "whip_x1": 2, "whip_x2": 2,
-         "hearts": 1, "obj_table": 1}     # obj_table = type of object slot 0
+         "hearts": 1, "obj_table": 1,     # obj_table = type of object slot 0
+         "cur_area": 1}
 
 
 def load_symbols():
@@ -51,13 +52,25 @@ def tcl_script(syms, result_file):
     fc = syms["frame_count"]
     py = syms["py"]
     pf, wa = syms["pframe"], syms["whip_active"]
-    irq_vbl, vbl_done = syms["irq_vblank"], syms["vblank_done"]
+    irq_vbl, vbl_done, load = syms["irq_vblank"], syms["vblank_done"], syms["load_area"]
     px_a, fa, obj = syms["px"], syms["facing"], syms["obj_table"]
+    exit_x = syms["area_hdr"] + 42      # AH_EXITX
+    areas = syms.get("AREA_COUNT", 1)
+    # with more than one area: walk into the exit (courtyard gate) and on
+    hall = f"""
+    after time 9.0  {{ poke {px_a} [peek {exit_x}]; poke {px_a + 1} [peek {exit_x + 1}] }}
+    after time 9.4  {{ {dump('09_next_area')}; keymatrixdown 8 0x80 }}
+    after time 11.4 {{ {dump('10_next_area_walk')}; keymatrixup 8 0x80 }}
+    after time 11.5 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; close $f; exit }}
+""" if areas > 1 else f"""
+    after time 9.0  {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; close $f; exit }}
+"""
     # keyboard matrix row 8: bit0 SPACE, bit4 LEFT, bit7 RIGHT
     # Times are relative to the moment the game's main loop is running.
     return f"""
 # normal speed: with "throttle off" openMSX skips rendering and screenshots are black
 proc play {{}} {{
+    set ::vbl_on 1
     after time 0.5  {{ {dump('01_boot')}; keymatrixdown 8 0x80 }}
     after time 3.5  {{ {dump('02_walk_right')}; keymatrixup 8 0x80 }}
     after time 3.7  {{ keymatrixdown 8 0x01; rec_py 60 }}
@@ -80,7 +93,7 @@ proc play {{}} {{
                        set f [open "{result_file}" a]
                        puts $f "hud_hearts [format %c [vpeek {0x1800 + 32 + 25}]][format %c [vpeek {0x1800 + 32 + 26}]]"
                        close $f }}
-    after time 9.0  {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; close $f; exit }}
+{hall}
 }}
 # record py (signed) once per game frame, sampled when the VBLANK interrupt
 # updates frame_count (game logic for the frame has finished by then)
@@ -114,13 +127,22 @@ debug set_watchpoint write_mem {fc} {{}} sample_py
 # worst time from the VBLANK interrupt to the end of the main loop's VBLANK work
 set ::vbl_t0 0
 set ::vbl_worst 0
-proc vbl_start {{}} {{ set ::vbl_t0 [machine_info time] }}
+set ::vbl_on 0
+set ::vbl_fc 0
+proc vbl_start {{}} {{ set ::vbl_t0 [machine_info time]; set ::vbl_fc [peek {fc}] }}
 proc vbl_end {{}} {{
+    if {{!$::vbl_on}} return
+    # area loading spans several frames with the display off: not VBLANK work
+    # skip loads (display off) and the first frames after one
+    if {{$::vbl_skip > 0}} {{ incr ::vbl_skip -1; return }}
+    if {{(([peek {fc}] - $::vbl_fc) & 255) > 1}} return
     set dt [expr {{([machine_info time] - $::vbl_t0) * 1e6}}]
     if {{$dt > $::vbl_worst}} {{ set ::vbl_worst $dt }}
 }}
 debug set_bp {irq_vbl} {{}} vbl_start
 debug set_bp {vbl_done} {{}} vbl_end
+set ::vbl_skip 0
+debug set_bp {load} {{}} {{ set ::vbl_skip 4 }}
 proc wait_game {{}} {{
     # wait until the main loop has run ~30 frames (C-BIOS logo comes first)
     if {{[peek {fc}] + 256*[peek {fc + 1}] < 30 || [peek {fc + 1}] > 0x20}} {{
@@ -235,6 +257,14 @@ def run():
         ("walking into the big heart collects it: 10 hearts",
          got["obj_table"] == 0 and got["hearts"] == 10),
         (f"HUD shows the new heart count ({hud_hearts!r})", hud_hearts == "10"),
+        *([("walking into the gate loads the next area at its start",
+            snaps["09_next_area"]["cur_area"] == 1 and snaps["09_next_area"]["px"] == 40
+            and snaps["09_next_area"]["on_ground"] == 1),
+           ("the next area scrolls and its floor holds Simon",
+            snaps["10_next_area_walk"]["cam_x"] > 0
+            and snaps["10_next_area_walk"]["py"] == snaps["09_next_area"]["py"]
+            and snaps["10_next_area_walk"]["on_ground"] == 1)]
+          if "09_next_area" in snaps else []),
         ("walking left turns the player", left["facing"] == 1
          and left["px"] < land["px"]),
     ]

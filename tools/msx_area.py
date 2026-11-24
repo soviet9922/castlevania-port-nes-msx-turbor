@@ -4,15 +4,16 @@ Input
   pixels      list of rows (PF_ROWS*8 = 176 rows), each a list of MSX palette
               indices (0..15); width must be a multiple of 16
   palette     16 (r, g, b) tuples, components 0..7
-  solid       list of rows (11) of 0/1 per 16x16 cell
+  solid       list of rows (PF_ROWS = 22) of 0/1 per 8x8 tile (the NES
+              decides collision per tile, see docs/NES_NOTES.md)
 
 Output files (in out_dir)
   palette.bin            V9938 palette, 32 bytes
   bg_pgt_b{0,1,2}.bin    pattern bytes for the tiles used in each band
   bg_ct_b{0,1,2}.bin     colour bytes (fg<<4 | bg per row)
   level_tiles.bin        column-major tile numbers, PF_ROWS bytes per 8-px column
-  level_coll.bin         column-major solidity, MT_ROWS bytes per 16-px column
-  level.inc              equates
+  level_coll.bin         column-major solidity, PF_ROWS bytes per 8-px column
+Returns a dict of parameters for the area header (tools/areas_asm.py).
 
 Screen 4 allows 2 colours per 8-pixel tile row. Rows with more colours are
 reduced to the best pair (least RGB error) and counted as lossy.
@@ -72,7 +73,7 @@ def write_area(out_dir, pixels, palette, solid, start_x, start_y, name="area"):
     w = len(pixels[0])
     assert h == PF_ROWS * 8, h
     assert w % 16 == 0, w
-    assert len(solid) == MT_ROWS and all(len(r) == w // 16 for r in solid)
+    assert len(solid) == PF_ROWS and all(len(r) == w // 8 for r in solid)
     tcols = w // 8
 
     bands = [dict() for _ in range(3)]          # (pat, col) -> index
@@ -113,22 +114,15 @@ def write_area(out_dir, pixels, palette, solid, start_x, start_y, name="area"):
         wr(f"bg_pgt_b{b}.bin", b"".join(k[0] for k in band_lists[b]) or b"\0" * 8)
         wr(f"bg_ct_b{b}.bin", b"".join(k[1] for k in band_lists[b]) or b"\0" * 8)
     wr("level_tiles.bin", bytes(v for col in tile_map for v in col))
-    wr("level_coll.bin", bytes(solid[r][c] for c in range(w // 16) for r in range(MT_ROWS)))
+    wr("level_coll.bin", bytes(solid[r][c] for c in range(tcols) for r in range(PF_ROWS)))
 
-    blank = tile_map[0][0]
-    inc = [
-        f"; generated area '{name}' - do not edit",
-        f"LEVEL_W          equ {w // 16}",
-        f"BG_TILES_B0      equ {max(1, len(band_lists[0]))}",
-        f"BG_TILES_B1      equ {max(1, len(band_lists[1]))}",
-        f"BG_TILES_B2      equ {max(1, len(band_lists[2]))}",
-        f"BLANK_TILE       equ 0x{blank:02X}",
-        f"START_X          equ {start_x}",
-        f"START_Y          equ {start_y}",
-    ]
-    with open(os.path.join(out_dir, "level.inc"), "w") as f:
-        f.write("\n".join(inc) + "\n")
     return {
+        "name": name,
+        "tcols": tcols,
+        "bg_tiles": [max(1, len(x)) for x in band_lists],
+        "blank": tile_map[0][0],
+        "start_x": start_x,
+        "start_y": start_y,
         "tiles": [len(x) for x in band_lists],
         "lossy_rows": lossy_rows,
         "total_rows": PF_ROWS * tcols * 8,
