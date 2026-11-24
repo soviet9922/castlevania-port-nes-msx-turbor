@@ -143,4 +143,18 @@ page 0 + 0x4000 (the V9958 has 128 KB). The game writes the next frame
 into the hidden page during the frame. In VBLANK, R#5 and R#6 are switched
 to it. Worst-case VBLANK work is now about 2.7 ms, and the smoke test checks it.
 
+### Objects
+
+Braziers, their bursts and the items they drop live in 8 object slots
+(`src/objects.asm`). Their sprite patterns stay in VRAM permanently, in pattern
+slots 12 and up of both sprite pages, after Simon's 12 streamed slots. Their sprites are
+appended after Simon's in the attribute table each frame. Their hardware sprite
+numbers change with Simon's sprite count, so their colour columns are rewritten
+into the hidden page every frame (16 bytes per sprite). Object colours use the stage
+palette: the exact colour where it exists, otherwise the nearest one.
+
+The hardware shows at most 8 sprites per scanline. Simon uses up to 6 on a line
+(whip strike) and a brazier 2, so two braziers on Simon's lines can exceed the
+limit. Sprite rotation (flicker, as on the NES) is still to do.
+
 ## Memory

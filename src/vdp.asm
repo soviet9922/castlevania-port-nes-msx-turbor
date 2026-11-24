@@ -253,8 +253,55 @@ write_player_sprites:
         call vram_set_write_far
         ei
         ld hl,sat_buf
-        ld b,(PLAYER_SPRITES+1)*4
+        ld a,(spr_total)                ; (sprites + end marker) * 4 bytes
+        inc a
+        add a,a
+        add a,a
+        ld b,a
         call vram_out_slow
+
+        ; colour columns of the object sprites (their sprite numbers change
+        ; with Simon's sprite count, so they are written every frame)
+        ld a,(spr_player_n)
+        ld c,a
+        ld a,(spr_total)
+        sub c
+        jr z,.no_objects
+        ld b,a
+        ld l,c
+        ld h,0
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        ld de,VRAM_SCT
+        add hl,de
+        di
+        ld a,(spr_back)
+        call vram_set_write_far
+        ei
+        ld e,c
+        ld d,0
+        ld hl,obj_sct_list
+        add hl,de
+.obj_lp:
+        push bc
+        push hl
+        ld l,(hl)
+        ld h,0
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        ld de,obj_sct
+        add hl,de
+        ld b,16
+        call vram_out_slow
+        pop hl
+        inc hl
+        pop bc
+        djnz .obj_lp
+.no_objects:
         call vram_r14_zero
         ld a,1
         ld (flip_pending),a

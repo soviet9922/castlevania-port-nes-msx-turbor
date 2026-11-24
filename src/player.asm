@@ -11,6 +11,7 @@
 level_start:
         ld hl,0
         ld (cam_x),hl
+        call objects_init
         call player_reset
         jp full_redraw
 
@@ -38,6 +39,7 @@ player_reset:
 respawn:
         ld hl,0
         ld (cam_x),hl
+        call objects_init
         call player_reset
         di
         call full_redraw
@@ -490,5 +492,12 @@ build_sat:
         add ix,de
         add iy,de
         djnz .lp
+        ld a,(spr_pat)                  ; Simon's sprite count = slots used
+        rrca
+        rrca
+        and 0x3F
+        ld (spr_player_n),a
+        ld (spr_total),a
+        call objects_draw               ; objects follow Simon's sprites
         ld (iy+0),SAT_END_Y
         ret

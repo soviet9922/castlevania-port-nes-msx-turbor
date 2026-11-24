@@ -44,6 +44,9 @@ init:
         call vdp_init
         call load_graphics
         call hud_draw
+        call objects_load_patterns
+        ld a,5
+        ld (hearts),a                   ; the game starts with 5 hearts
         call level_start
         ld a,0xFF
         ld (loaded_frames),a            ; no sprite patterns loaded yet
@@ -63,6 +66,7 @@ main_loop:
         di
         call upload_column
         call flip_sprites
+        call hud_update
         call calc_scroll
         ei
 vblank_done:                            ; (tests measure VBLANK work up to here)
@@ -70,6 +74,7 @@ vblank_done:                            ; (tests measure VBLANK work up to here)
         ; --- game logic ---
         call read_input
         call player_update
+        call objects_update
         call camera_update
         call build_sat
         call write_player_sprites       ; into the hidden sprite page
@@ -129,6 +134,7 @@ enable_page2:
         INCLUDE "hud.asm"
         INCLUDE "scroll.asm"
         INCLUDE "player.asm"
+        INCLUDE "objects.asm"
 
 code_end:
         ASSERT code_end <= 0x8000

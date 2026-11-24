@@ -354,6 +354,79 @@ def tile_from_rows(rows, where):
 
 
 
+# ---------------------------------------------------------------------------
+# Placeholder objects (original art), hex digit = palette slot, "." = clear.
+# Same frame order and 16x32 box as tools/convert_objects.py.
+# ---------------------------------------------------------------------------
+_FLAME_A = [
+    "................", "......b.........", ".....bb....b....", ".....bcb..bb....",
+    "....bccb.bcb....", "....bcccbccb....", "...bccccccccb...", "...bcccffcccb...",
+    "...bccfffcccb...", "....bccffccb....", "....bbccccbb....", ".....bbbbbb.....",
+    "................", "................", "................", "................",
+]
+_FLAME_B = [
+    "................", ".........b......", "....b....bb.....", "....bb..bcb.....",
+    "....bcb.bccb....", "....bccbcccb....", "...bccccccccb...", "...bcccffcccb...",
+    "...bcccfffccb...", "....bccffccb....", "....bbccccbb....", ".....bbbbbb.....",
+    "................", "................", "................", "................",
+]
+_BOWL = [
+    "7777777777777777", "5777777777777775", ".55777777777755.", "..555555555555..",
+    "......5775......", "......5775......", "......5775......", "......5775......",
+    "......5775......", "......5775......", ".....557755.....", "....55577555....",
+    "...5555555555...", "..555555555555..", "................", "................",
+]
+_EMPTY16 = ["................"] * 8
+_BURSTS = [
+    _EMPTY16 + ["................", ".......f........", "...f...c...f....", "....c.fcf.c.....",
+                ".....fcccf......", "...ffcccccff....", ".....fcccf......", "....c.fcf.c.....",
+                "...f...c...f....", ".......f........", "................", "................",
+                "................", "................", "................", "................"],
+    _EMPTY16 + ["................", "................", ".......c........", "......cfc.......",
+                ".....cfffc......", "......cfc.......", ".......c........", "................"]
+    + ["................"] * 8,
+    _EMPTY16 + ["................"] * 3 + [".......c........", "......cbc.......", ".......c........"]
+    + ["................"] * 10,
+    _EMPTY16 + ["................"] * 4 + [".......b........"] + ["................"] * 11,
+]
+_HEART = _EMPTY16 + [
+    "................", "...666....666...", "..66666..66666..", ".6666f6666666666",
+    ".666ff666666666.", ".66666666666666.", "..666666666666..", "...6666666666...",
+    "....66666666....", ".....666666.....", "......6666......", ".......66.......",
+    "................", "................", "................", "................",
+]
+_WHIPUP = _EMPTY16 + [
+    "................", ".....222222.....", "...22......22...", "..2..222222..2..",
+    "..2.2......2.2..", "..2.2.2222.2.2..", "..2.2.2..2.2.2..", "..2.2..22..2.2..",
+    "..2..2....2..2..", "...2..2222..2...", "....22....22....", "......2222......",
+    "................", "................", "................", "................",
+]
+_DAGGER = _EMPTY16 + [
+    "................"] * 5 + [
+    "..22.....7......", "..2277777777....", "22227777777777f.", "..2277777777....",
+    "..22.....7......"] + ["................"] * 6
+PLACEHOLDER_OBJECTS = {
+    "brazier1": _FLAME_A + _BOWL, "brazier2": _FLAME_B + _BOWL,
+    "burst1": _BURSTS[0], "burst2": _BURSTS[1], "burst3": _BURSTS[2], "burst4": _BURSTS[3],
+    "heart": _HEART, "whipup": _WHIPUP, "dagger": _DAGGER,
+}
+OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
+              "heart", "whipup", "dagger"]
+# placeholder braziers: (world x of the box's left edge, box top, drop code)
+PLACEHOLDER_CANDLES = [(88, 128, 4), (216, 128, 0)]      # box top on the floor (y 160)
+
+
+def placeholder_objects():
+    bank = msx_sprites.SpriteBank()
+    for name in OBJ_FRAMES:
+        art = PLACEHOLDER_OBJECTS[name]
+        art = art + ["................"] * (32 - len(art))     # pad to the 16x32 box
+        assert len(art) == 32 and all(len(r) == 16 for r in art), name
+        bank.add_frame({(x, y): int(ch, 16) for y, row in enumerate(art)
+                        for x, ch in enumerate(row) if ch != "."}, name)
+    return bank
+
+
 def _ascii_pixels(frame):
     return {(x, y): ch for y, row in enumerate(frame) for x, ch in enumerate(row) if ch in "ABC"}
 
@@ -455,6 +528,12 @@ def main():
 
     bank, frame_names = player_sprites()
     n_patterns, n_frames = msx_sprites.write_bank(out_dir, bank, frame_names)
+    msx_sprites.write_bank(out_dir, placeholder_objects(), OBJ_FRAMES, prefix="obj")
+    cdata = bytearray([len(PLACEHOLDER_CANDLES)])
+    for x, y, item in PLACEHOLDER_CANDLES:
+        cdata += bytes([x & 0xFF, x >> 8, y, item])
+    with open(os.path.join(out_dir, "candles.bin"), "wb") as f:
+        f.write(cdata)
 
     files = {
         "player_jump.bin": bytes(v & 0xFF for v in PLACEHOLDER_JUMP),

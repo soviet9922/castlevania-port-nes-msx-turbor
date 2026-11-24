@@ -46,6 +46,12 @@ NPOSES          equ 12                  ; poses per facing direction
 POSE_TUCK       equ 3
 POSE_WHIP       equ 4                   ; whip1..whip4, then +4 for the crouched set
 SAT_END_Y       equ 216                 ; sprite mode 2 "end of list" Y value
+MAX_SPRITES     equ 32                  ; hardware sprites in total
+
+; Objects (src/objects.asm)
+OBJ_MAX         equ 8
+OBJ_SIZE        equ 8
+        ASSERT PLAYER_SPRITES + OBJ_PATTERNS <= 64
 SPRITE_HIDE_Y   equ 212                 ; parks a sprite below the visible area
 
 ; Whip timing in frames (as recorded from the NES game)

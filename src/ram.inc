@@ -54,8 +54,16 @@ flip_pending    equ spr_back+1          ; 1  1 = show the other page at VBLANK
 spr_bx          equ flip_pending+1      ; 2  scratch: player screen x
 spr_by          equ spr_bx+2            ; 2  scratch: player sprite y
 spr_pat         equ spr_by+2            ; 1  scratch
+spr_total       equ spr_pat+1           ; 1  sprites in sat_buf this frame
+spr_player_n    equ spr_total+1         ; 1  of which Simon's
+obj_sct_list    equ spr_player_n+1      ; MAX_SPRITES colour column per sprite
+obj_table       equ obj_sct_list+MAX_SPRITES ; OBJ_MAX*OBJ_SIZE
+hearts          equ obj_table+OBJ_MAX*OBJ_SIZE ; 1
+whip_level      equ hearts+1            ; 1  0 leather, 1 chain, 2 morning star
+subweapon       equ whip_level+1        ; 1  0 none, 1 dagger
+hud_dirty       equ subweapon+1         ; 1
 
-sat_buf         equ spr_pat+1           ; (PLAYER_SPRITES+1)*4
+sat_buf         equ hud_dirty+1         ; (MAX_SPRITES+1)*4
 
-RAM_END         equ sat_buf+(PLAYER_SPRITES+1)*4
+RAM_END         equ sat_buf+(MAX_SPRITES+1)*4
         ASSERT RAM_END < 0xF380

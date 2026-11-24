@@ -85,6 +85,31 @@ Measured with `tools/nes_probe/record_simon.lua`, which records RAM and OAM ever
 - The bytes after the jump table (`$9BA4`: `81 A8 9B 80`, then another
   signed table) are probably the knock-back arc.
 
+## Objects, candles and items
+
+Measured with `tools/nes_probe/record_courtyard.lua`, which walks through the courtyard whipping:
+
+- Object slots are parallel arrays indexed by slot: Y at `$0354+i`, X
+  (screen) at `$038C+i`; slot 0 is Simon. Simon's world X is at `$40/$41`, and
+  the camera is world X minus screen X. Hearts are at `$71`, whip level at `$70`.
+- **Candle placement** (fixed bank, routine around `$D132`-`$D29A`):
+  - the per-stage table is the word at `$D29B + 2*stage` (`$28`), and the
+    per-section table is the word at that pointer + 2*section (`$46`);
+  - the section table has 2 bytes per **64-px chunk**: enemy group, candle group;
+  - a candle group indexes word tables `$D6D1` (or `$D7D1` when bit 7 is set) →
+    record `[$FF item] [$FE] x y` (0 = none). `$FE` spawns object `$28`
+    (brazier) instead of `$27`. The item goes to `$0584+slot`.
+  - Observed world X = (chunk - 1) * 64 + x; Y is the foot line.
+- Stage 1 courtyard: 5 braziers at X 96, 224, 352, 480, 608 with drop codes
+  4, 0, 0, 4, 8. Codes: 0 = whip upgrade, 4 = big heart (+5), 8 = dagger.
+- Sprites use 8x16 mode, so tile bit 0 selects the pattern table. Brazier: flame
+  `$97/$99` (palette 3, alternating every 8 frames) over bowl `$9B` (palette 2),
+  each a mirrored pair. Burst: `$91+$70` 9 frames, `$93+$70` 7, `$93` 2, `$95` 2.
+  Items: big heart `$BF` pair, whip upgrade `$C1 $C3`, dagger `$BD $BB` (palette 2).
+  The upgraded whips use other tiles (`$6A $6C`, `$46-$58`, flashing palettes).
+- An item hangs for 4 frames, then falls 1 px/frame (2 px from the 8th
+  frame) until it lands.
+
 ## Still unknown
 
 - Collision. The port currently treats 16x16 cells that contain the ground
@@ -92,7 +117,7 @@ Measured with `tools/nes_probe/record_simon.lua`, which records RAM and OAM ever
   real collision data (and stairs) still has to be found. The `$0600-$06FF`
   RAM area turned out to be object data, not collision.
 - The meaning of the `$7FF2` header word and the sections at `$81A2` / `$8202`.
-- Object/enemy placement, Simon's sprite assembly table, the whip's exact
+- Wall candles (object `$27`), enemy groups, Simon's sprite assembly table, the whip's exact
   hit box and damage rules, the crouching whip pose (the port draws the
   standing whip pose with the crouched legs), music.
 - Falling speed after the jump arc ends, and the exact arc used when
@@ -107,8 +132,10 @@ Measured with `tools/nes_probe/record_simon.lua`, which records RAM and OAM ever
 | `tools/cv_rom.py` | readers for the formats above |
 | `tools/convert_stage.py` | ROM → MSX area (palette, per-band tiles, map, collision) |
 | `tools/convert_simon.py` | Simon's sprites, palette and jump table → MSX |
+| `tools/convert_objects.py` | candle placement and object/item sprites → MSX |
 | `tools/nes_probe/dump_stage.lua` | FCEUX script: start a game and dump PPU/RAM state (ground truth) |
 | `tools/nes_probe/record_simon.lua` | FCEUX script: record RAM/OAM every frame while Simon acts |
+| `tools/nes_probe/record_courtyard.lua` | FCEUX script: walk the courtyard whipping every brazier |
 
 To run the probe (needs FCEUX; writes to `build/nes/probe`):
 

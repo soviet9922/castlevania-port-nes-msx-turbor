@@ -10,7 +10,9 @@ fixed HUD at 60 fps and has a controllable 3-colour character. From your
 own NES ROM, the build converts **Stage 1's opening courtyard (up to the
 castle gate)**: graphics, layout and palette. **Simon** is converted too:
 his graphics, walk animation, jump arc and whip (timing identical to the NES,
-frame by frame). There is nothing to hit yet: candles and enemies come next.
+frame by frame). The courtyard's **braziers** are placed from the ROM's data. Whip them
+and they burst and drop their items (big hearts, whip upgrade, dagger), which you can collect.
+Enemies come next.
 The screenshot above shows the ROM-free build, which uses only original
 placeholder art. See [docs/ROADMAP.md](docs/ROADMAP.md).
 

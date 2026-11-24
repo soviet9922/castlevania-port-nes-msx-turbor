@@ -36,10 +36,13 @@
 - [ ] Sub-weapons
 - [ ] Hearts, score, timer, life bar in the HUD
 
-## Milestone 3: objects and enemies
+## Milestone 3: objects and enemies (in progress)
 
-- [ ] Object system modelled on the NES one (slots, spawn by camera position)
-- [ ] Candles and item drops
+- [x] Object system: 8 slots, sprites after Simon's, colours written per frame
+- [x] Braziers from the ROM's placement data; whip destroys them (NES burst timing)
+- [x] Item drops: big heart (+5, shown in the HUD), whip upgrade, dagger; fall and pickup
+- [ ] Use the whip upgrade (chain whip graphics and reach) and the dagger (throwing, heart cost)
+- [ ] Wall candles, small hearts, money bags; spawn by camera position like the NES
 - [ ] Zombie, panther, bat, fishman, …
 - [ ] Sprite multiplexing and flicker when more than 8 sprites share a line
 - [ ] Vertical transitions between sections (V9958 vertical scroll)

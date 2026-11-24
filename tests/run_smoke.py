@@ -23,7 +23,8 @@ MACHINE = os.environ.get("TEST_MACHINE", "C-BIOS_MSX2+")
 # RAM variable -> size in bytes
 WATCH = {"frame_count": 2, "line_irq_count": 2, "px": 2, "py": 2, "cam_x": 2,
          "on_ground": 1, "facing": 1, "scroll_r26": 1, "scroll_r27": 1,
-         "pframe": 1, "whip_active": 1, "whip_x1": 2, "whip_x2": 2}
+         "pframe": 1, "whip_active": 1, "whip_x1": 2, "whip_x2": 2,
+         "hearts": 1, "obj_table": 1}     # obj_table = type of object slot 0
 
 
 def load_symbols():
@@ -51,6 +52,7 @@ def tcl_script(syms, result_file):
     py = syms["py"]
     pf, wa = syms["pframe"], syms["whip_active"]
     irq_vbl, vbl_done = syms["irq_vblank"], syms["vblank_done"]
+    px_a, fa, obj = syms["px"], syms["facing"], syms["obj_table"]
     # keyboard matrix row 8: bit0 SPACE, bit4 LEFT, bit7 RIGHT
     # Times are relative to the moment the game's main loop is running.
     return f"""
@@ -66,7 +68,19 @@ proc play {{}} {{
     after time 6.3  {{ keymatrixdown 4 0x04; rec_whip 40 }}
     after time 6.4  {{ keymatrixup 4 0x04 }}
     after time 6.55 {{ {dump('06_whip_strike')} }}
-    after time 7.2  {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; close $f; exit }}
+    # brazier: stand 26 px left of the first one, facing right, and whip it
+    after time 7.2  {{ set bx [expr {{[peek {obj + 1}] + 256*[peek {obj + 2}] - 26}}]
+                       poke {px_a} [expr {{$bx & 255}}]; poke {px_a + 1} [expr {{$bx >> 8}}]
+                       poke {fa} 0 }}
+    after time 7.3  {{ keymatrixdown 4 0x04 }}
+    after time 7.35 {{ keymatrixup 4 0x04 }}
+    after time 8.1  {{ {dump('07_brazier_hit')}; keymatrixdown 8 0x80 }}
+    after time 8.6  {{ keymatrixup 8 0x80 }}
+    after time 8.8  {{ {dump('08_item_collected')}
+                       set f [open "{result_file}" a]
+                       puts $f "hud_hearts [format %c [vpeek {0x1800 + 32 + 25}]][format %c [vpeek {0x1800 + 32 + 26}]]"
+                       close $f }}
+    after time 9.0  {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; close $f; exit }}
 }}
 # record py (signed) once per game frame, sampled when the VBLANK interrupt
 # updates frame_count (game logic for the frame has finished by then)
@@ -145,11 +159,15 @@ def run():
     jump_y = []
     whip_seq = []
     vblank_us = 10 ** 9
+    hud_hearts = ""
     with open(result_file) as f:
         for line in f:
             tag, *kv = line.split()
             if tag == "jumpy":
                 jump_y = [int(v) for v in kv]
+                continue
+            if tag == "hud_hearts":
+                hud_hearts = kv[0] if kv else ""
                 continue
             if tag == "vblank_us":
                 vblank_us = int(kv[0])
@@ -176,9 +194,10 @@ def run():
     def s16(v):
         return v - 65536 if v >= 32768 else v
 
-    boot, walk, jump, land, left, strike = (snaps[t] for t in
-                                            ("01_boot", "02_walk_right", "03_jump",
-                                             "04_landed", "05_walk_left", "06_whip_strike"))
+    boot, walk, jump, land, left, strike, hit, got = (
+        snaps[t] for t in ("01_boot", "02_walk_right", "03_jump", "04_landed",
+                           "05_walk_left", "06_whip_strike", "07_brazier_hit",
+                           "08_item_collected"))
     # expected whip (NES timing): wind-up 5, swing 7, strike 9 (hits), recovery 2
     poses = [p for p, _ in whip_seq]
     start = next((i for i, p in enumerate(poses) if p >= 4), None)
@@ -211,6 +230,11 @@ def run():
         # NTSC VBLANK is 70 lines of 63.7 us; the HUD split follows soon after
         (f"VBLANK work fits in the vertical blank ({vblank_us} us of 4450)",
          vblank_us < 4450),
+        ("whipped brazier turns into an item (hearts still 5)",
+         hit["obj_table"] == 3 and hit["hearts"] == 5),
+        ("walking into the big heart collects it: 10 hearts",
+         got["obj_table"] == 0 and got["hearts"] == 10),
+        (f"HUD shows the new heart count ({hud_hearts!r})", hud_hearts == "10"),
         ("walking left turns the player", left["facing"] == 1
          and left["px"] < land["px"]),
     ]

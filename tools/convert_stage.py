@@ -14,6 +14,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cv_rom import (BG_PATTERN_TABLE, CastlevaniaROM, load_nes_palette,  # noqa: E402
                     tile_pixels)
+import convert_objects  # noqa: E402
 import convert_simon  # noqa: E402
 import msx_area  # noqa: E402
 import msx_sprites  # noqa: E402
@@ -33,6 +34,7 @@ AREAS = {
         "sections": [("1-courtyard", 0, None), ("1-hall", 0, 2)],  # + castle gate
         "palette": "1-courtyard",
         "solid_tiles": {0x60, 0x68},
+        "stage": 0, "section": 0,       # candle placement ($28, $46)
         "start": (32, 9 * 16 - 32),
     },
 }
@@ -124,6 +126,18 @@ def convert(rom_path, out_dir, area_name, nes_pal_path=None, preview=True):
             row.append(1 if cell & area["solid_tiles"] else 0)
         solid.append(row)
 
+    # --- candles and object sprites (colours: exact slot, else nearest) ---
+    def slot_for_nes(nes):
+        if nes == 0x0F:
+            return 1
+        rgb = nes_to_msx_rgb(nes_rgb[nes])
+        return min(range(1, 16), key=lambda s: (sum((a - b) ** 2 for a, b in
+                                                    zip(msx_pal[s], rgb)), s))
+    obj_bank, obj_names = convert_objects.sprite_frames(rom, slot_for_nes)
+    msx_sprites.write_bank(out_dir, obj_bank, obj_names, prefix="obj")
+    cl = convert_objects.candles(rom, area["stage"], area["section"], width)
+    convert_objects.write_candles(os.path.join(out_dir, "candles.bin"), cl)
+
     sx, sy = area["start"]
     stats = msx_area.write_area(out_dir, pixels, msx_pal, solid, sx, sy, area_name)
 
@@ -148,6 +162,7 @@ def convert(rom_path, out_dir, area_name, nes_pal_path=None, preview=True):
                         img[tr * 8 + y][tc * 8 + x] = rgb8[c]
         write_png(os.path.join(out_dir, "level_msx_preview.png"), width, len(img), img)
 
+    print(f"{area_name}: {len(cl)} braziers at x {[c[0] + 8 for c in cl]}, items {[c[2] for c in cl]}")
     print(f"{area_name}: {width} px wide, tiles per band {stats['tiles']}, "
           f"{stats['lossy_rows']} of {stats['total_rows']} tile rows reduced to 2 colours, "
           f"{len(used)} NES colours")

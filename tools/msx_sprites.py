@@ -134,12 +134,13 @@ def write_bank(out_dir, bank, frame_names, prefix="player"):
     for suffix, data in (("spt", pats), ("sct", cols), ("frames", frames)):
         with open(os.path.join(out_dir, f"{prefix}_{suffix}.bin"), "wb") as f:
             f.write(data)
+    up = prefix.upper()
     lines = ["; generated sprite frames - do not edit",
-             f"PLAYER_FRAME_COUNT equ {len(offsets)}",
-             f"PLAYER_PATTERNS    equ {len(pats) // 32}",
-             "player_frame_table:"]
+             f"{up}_FRAME_COUNT equ {len(offsets)}",
+             f"{up}_PATTERNS    equ {len(pats) // 32}",
+             f"{prefix}_frame_table:"]
     for name, off in zip(frame_names, offsets):
-        lines.append(f"        dw player_frames+{off:<5}  ; {name}")
+        lines.append(f"        dw {prefix}_frames+{off:<5}  ; {name}")
     with open(os.path.join(out_dir, f"{prefix}_frames.inc"), "w") as f:
         f.write("\n".join(lines) + "\n")
     return len(pats) // 32, len(offsets)
