@@ -9,6 +9,7 @@ MSXVER          equ 0x002D      ; 0=MSX1 1=MSX2 2=MSX2+ 3=turbo R
 GTSTCK          equ 0x00D5      ; A=port (0=cursor keys) -> A=direction 0..8
 GTTRIG          equ 0x00D8      ; A=trigger id -> A=0xFF if pressed
 RSLREG          equ 0x0138      ; read primary slot register
+SNSMAT          equ 0x0141      ; A=keyboard matrix row -> A=bits (0 = pressed)
 CHGCPU          equ 0x0180      ; turbo R only: A=0x80|mode (0 Z80, 1 R800 ROM, 2 R800 DRAM)
 
 ; System variables

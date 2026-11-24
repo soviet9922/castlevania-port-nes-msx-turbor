@@ -158,16 +158,6 @@ load_graphics:
         pop bc
         djnz .band
 
-        ; sprite patterns and the player's sprite colours
-        ld hl,player_spt
-        ld de,VRAM_SPT
-        ld bc,PLAYER_SPT_SIZE
-        call vram_copy
-        ld hl,player_sprite_colors
-        ld de,VRAM_SCT
-        ld bc,PLAYER_SPRITES*16
-        call vram_copy
-
         ; empty sprite list
         ld hl,VRAM_SAT
         call vram_set_write
@@ -180,20 +170,186 @@ bg_band_table:
         dw bg_pgt_b1, bg_ct_b1, VRAM_PGT+1*BAND_SIZE+BG_TILE_BASE*8, VRAM_CT+1*BAND_SIZE+BG_TILE_BASE*8, BG_TILES_B1*8
         dw bg_pgt_b2, bg_ct_b2, VRAM_PGT+2*BAND_SIZE+BG_TILE_BASE*8, VRAM_CT+2*BAND_SIZE+BG_TILE_BASE*8, BG_TILES_B2*8
 
-; Sprite colour table entries for sprites 0..3 (16 lines each).
-; Odd sprites set CC (bit 6): their colour is ORed with the sprite below,
-; giving 3 colours per 16-pixel-wide figure: A, B and A|B.
-player_sprite_colors:
-        ds 16, PLAYER_COLOR_A           ; sprite 0: top, layer A
-        ds 16, 0x40 | PLAYER_COLOR_B    ; sprite 1: top, layer B (CC)
-        ds 16, PLAYER_COLOR_A           ; sprite 2: bottom, layer A
-        ds 16, 0x40 | PLAYER_COLOR_B    ; sprite 3: bottom, layer B (CC)
+; ---------------------------------------------------------------------------
+; Player metasprites
+;
+; A frame (tools/msx_sprites.py) is: count, then count x (dy, dx, pattern,
+; colour). The player owns hardware sprites 0..PLAYER_SPRITES-1; sprite i
+; always uses pattern slot i (pattern number i*4). When the frame changes,
+; its patterns and colour columns are copied into those slots, so only the
+; current frame occupies VRAM.
+; ---------------------------------------------------------------------------
 
-; Copy sat_buf to the sprite attribute table (VBLANK only).
-upload_sat:
+; A = frame id -> IX = frame data
+frame_address:
+        ld l,a
+        ld h,0
+        add hl,hl
+        ld de,player_frame_table
+        add hl,de
+        ld a,(hl)
+        inc hl
+        ld h,(hl)
+        ld l,a
+        push hl
+        pop ix
+        ret
+
+; Set the VRAM write address anywhere in 128 KB (interrupts disabled).
+; A = address bits 16-14 (R#14), HL = address bits 13-0
+vram_set_write_far:
+        out (VDP_CTRL),a
+        ld a,0x80|14
+        out (VDP_CTRL),a
+        jp vram_set_write
+
+; Back to R#14 = 0, which every other VRAM routine assumes.
+vram_r14_zero:
+        di
+        xor a
+        out (VDP_CTRL),a
+        ld a,0x80|14
+        out (VDP_CTRL),a
+        ei
+        ret
+
+; Write B bytes from HL to the VDP at a pace that is safe during display.
+vram_out_slow:
+        ld c,VDP_DATA
+.lp:
+        outi
+        jp nz,.lp
+        ret
+
+; ---------------------------------------------------------------------------
+; Double-buffered sprites
+;
+; Two complete sprite pages exist in VRAM; page 1 is page 0 + 0x4000:
+;   page 0: patterns 0x3800, attributes 0x1E00, colours 0x1C00
+;   page 1: patterns 0x7800, attributes 0x5E00, colours 0x5C00
+; The game logic writes the next frame into the page that is NOT shown,
+; at any time during the frame. In VBLANK, flip_sprites just points R#5 and
+; R#6 at it, so VBLANK work no longer depends on how many sprites change.
+; ---------------------------------------------------------------------------
+
+; Write the current frame (cur_frame, sat_buf) into the hidden page.
+write_player_sprites:
+        ld a,(spr_page)
+        xor 1
+        ld (spr_back),a
+        ld e,a
+        ld d,0
+        ld hl,loaded_frames
+        add hl,de
+        ld a,(cur_frame)
+        cp (hl)
+        jr z,.sat
+        ld (hl),a
+        call stream_frame
+.sat:
+        di
+        ld a,(spr_back)
         ld hl,VRAM_SAT
-        call vram_set_write
+        call vram_set_write_far
+        ei
         ld hl,sat_buf
-        ld bc,(PLAYER_SPRITES+1)*4*256 + VDP_DATA
-        otir
+        ld b,(PLAYER_SPRITES+1)*4
+        call vram_out_slow
+        call vram_r14_zero
+        ld a,1
+        ld (flip_pending),a
+        ret
+
+; Copy the patterns and colour columns of cur_frame into the hidden page.
+stream_frame:
+        ld a,(cur_frame)
+        call frame_address
+        ld b,(ix+0)
+        inc ix
+        ld c,0                          ; sprite / pattern slot
+.lp:
+        push bc
+        ld l,(ix+2)                     ; pattern: player_spt + n*32
+        ld h,0
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        ld de,player_spt
+        add hl,de
+        ex de,hl
+        ld l,c                          ; -> VRAM_SPT + slot*32
+        ld h,0
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        ld bc,VRAM_SPT
+        add hl,bc
+        di
+        ld a,(spr_back)
+        call vram_set_write_far
+        ei
+        ex de,hl
+        ld b,32
+        call vram_out_slow
+        pop bc
+        push bc
+        ld l,(ix+3)                     ; colours: player_sct + n*16
+        ld h,0
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        ld de,player_sct
+        add hl,de
+        ex de,hl
+        ld l,c                          ; -> VRAM_SCT + slot*16
+        ld h,0
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        ld bc,VRAM_SCT
+        add hl,bc
+        di
+        ld a,(spr_back)
+        call vram_set_write_far
+        ei
+        ex de,hl
+        ld b,16
+        call vram_out_slow
+        ld de,4
+        add ix,de
+        pop bc
+        inc c
+        djnz .lp
+        ret
+
+; VBLANK: show the page written last frame (interrupts disabled).
+flip_sprites:
+        ld a,(flip_pending)
+        or a
+        ret z
+        xor a
+        ld (flip_pending),a
+        ld a,(spr_page)
+        xor 1
+        ld (spr_page),a
+        ld b,VRAM_SAT >> 7 | 7          ; page 0: R#5, R#6
+        ld c,VRAM_SPT >> 11
+        jr z,.set
+        ld b,(VRAM_SAT + 0x4000) >> 7 | 7
+        ld c,(VRAM_SPT + 0x4000) >> 11
+.set:
+        ld a,b
+        out (VDP_CTRL),a
+        ld a,0x80|5
+        out (VDP_CTRL),a
+        ld a,c
+        out (VDP_CTRL),a
+        ld a,0x80|6
+        out (VDP_CTRL),a
         ret

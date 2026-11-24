@@ -16,13 +16,15 @@ from cv_rom import (BG_PATTERN_TABLE, CastlevaniaROM, load_nes_palette,  # noqa:
                     tile_pixels)
 import convert_simon  # noqa: E402
 import msx_area  # noqa: E402
+import msx_sprites  # noqa: E402
 from gen_placeholder_assets import PALETTE as PLACEHOLDER_PALETTE  # noqa: E402
 from gen_placeholder_assets import write_png  # noqa: E402
 
 # Palette slots that keep a fixed meaning in every area:
-#   0 transparent/backdrop, 1 black, 2/4/6 player sprite (OR trick), 15 white
+#   0 transparent/backdrop, 1 black, 2/4/6 player sprite (OR trick), 14 whip,
+#   15 white
 FIXED_SLOTS = {0: None, 1: 0x0F, 2: None, 4: None, 6: None, 15: 0x30}
-FREE_SLOTS = [3, 5, 7, 8, 9, 10, 11, 12, 13, 14]
+FREE_SLOTS = [3, 5, 7, 8, 9, 10, 11, 12, 13]     # 14 = whip (convert_simon.py)
 
 AREAS = {
     # name: layout sections [(layout key, first column, last column+1)],
@@ -83,23 +85,22 @@ def convert(rom_path, out_dir, area_name, nes_pal_path=None, preview=True):
         if nes in nes_to_slot:
             continue
         rgb = nes_to_msx_rgb(nes_rgb[nes])
-        same = [s for s, v in enumerate(msx_pal) if v == rgb and s not in (0, 2, 4, 6)]
+        same = [s for s, v in enumerate(msx_pal) if v == rgb and s not in (0, 2, 4, 6, 14)]
         if same:
             nes_to_slot[nes] = same[0]
             continue
         if not free:
-            raise SystemExit(f"{area_name}: more than 13 background colours")
+            raise SystemExit(f"{area_name}: more than 11 background colours")
         s = free.pop(0)
         msx_pal[s] = rgb
         nes_to_slot[nes] = s
     msx_pal[0] = msx_pal[1]
 
     # --- Simon: sprite patterns, his colours in slots 2/4/6, jump arc ---
-    spt, simon_slots, jump = convert_simon.convert(rom, nes_rgb, nes_to_msx_rgb)
+    bank, frame_names, simon_slots, jump = convert_simon.convert(rom, nes_rgb, nes_to_msx_rgb)
     for slot, rgb in simon_slots.items():
         msx_pal[slot] = rgb
-    with open(os.path.join(out_dir, "player_spt.bin"), "wb") as f:
-        f.write(spt)
+    msx_sprites.write_bank(out_dir, bank, frame_names)
     with open(os.path.join(out_dir, "player_jump.bin"), "wb") as f:
         f.write(jump)
 

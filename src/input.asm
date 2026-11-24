@@ -1,5 +1,6 @@
 ; ---------------------------------------------------------------------------
-; Input: cursor keys or joystick 1; SPACE or joystick button A = jump.
+; Input: cursor keys or joystick 1; SPACE or joystick button A = jump;
+;        M, X or joystick button B = whip.
 ; ---------------------------------------------------------------------------
 
 read_input:
@@ -29,6 +30,36 @@ read_input:
         ld (jump_pressed),a
         ld a,b
         ld (trig_prev),a
+
+        ; whip: joystick 1 button B, or the M / X keys
+        ld a,TRIG_JOY1_B
+        call GTTRIG
+        push af
+        ld a,4                          ; matrix row 4, bit 2 = M
+        call SNSMAT
+        cpl
+        and 0x04
+        ld b,a
+        pop af
+        or b
+        push af
+        ld a,5                          ; matrix row 5, bit 5 = X
+        call SNSMAT
+        cpl
+        and 0x20
+        ld b,a
+        pop af
+        or b
+        jr z,.whip_up
+        ld a,1
+.whip_up:
+        ld b,a                          ; B = 1 while held
+        ld a,(whip_prev)
+        xor 1
+        and b
+        ld (whip_pressed),a             ; 1 on the frame it is pressed
+        ld a,b
+        ld (whip_prev),a
         ret
 
 ; A = stick direction -> A = -1 / 0 / +1 horizontal

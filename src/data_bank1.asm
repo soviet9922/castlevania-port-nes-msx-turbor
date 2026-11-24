@@ -13,7 +13,10 @@ bg_pgt_b2:      INCBIN "bg_pgt_b2.bin"
 bg_ct_b2:       INCBIN "bg_ct_b2.bin"
 hud_pgt:        INCBIN "hud_pgt.bin"
 hud_ct:         INCBIN "hud_ct.bin"
-player_spt:     INCBIN "player_spt.bin"
+player_spt:     INCBIN "player_spt.bin"         ; 32 bytes per 16x16 pattern
+player_sct:     INCBIN "player_sct.bin"         ; 16 colour bytes per sprite
+player_frames:  INCBIN "player_frames.bin"      ; count, then (dy, dx, pattern, colour)
+        INCLUDE "player_frames.inc"             ; player_frame_table
 jump_table:     INCBIN "player_jump.bin"        ; JUMP_LEN signed dy, rising half
 level_tiles:    INCBIN "level_tiles.bin"        ; PF_ROWS bytes per 8-px column
 level_coll:     INCBIN "level_coll.bin"         ; MT_ROWS bytes per 16-px column

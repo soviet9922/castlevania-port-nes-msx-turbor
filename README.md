@@ -9,8 +9,8 @@ MSX turbo R, written in Z80/R800 assembly.
 fixed HUD at 60 fps and has a controllable 3-colour character. From your
 own NES ROM, the build converts **Stage 1's opening courtyard (up to the
 castle gate)**: graphics, layout and palette. **Simon** is converted too:
-his graphics, walk animation and jump arc (identical to the NES, frame by frame). He can't
-whip yet.
+his graphics, walk animation, jump arc and whip (timing identical to the NES,
+frame by frame). There is nothing to hit yet: candles and enemies come next.
 The screenshot above shows the ROM-free build, which uses only original
 placeholder art. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -72,7 +72,8 @@ make run-nes
 | openMSX | works (recommended; used by the automated tests) |
 | fMSX 6.0 | runs, but the playfield doesn't scroll: fMSX ignores the V9958 horizontal scroll registers in Screen 4, so Simon appears to hit an invisible wall |
 
-Controls: cursor keys or joystick to walk, DOWN to crouch, SPACE or button A to jump.
+Controls: cursor keys or joystick to walk, DOWN to crouch, SPACE or button A to jump,
+M, X or button B to whip.
 Jumps are committed, like in the original: you can't steer in mid-air.
 
 ## Testing

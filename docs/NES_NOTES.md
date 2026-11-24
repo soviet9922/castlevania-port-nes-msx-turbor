@@ -76,6 +76,12 @@ Measured with `tools/nes_probe/record_simon.lua`, which records RAM and OAM ever
   flipped. Horizontal speed (1 px) is fixed at take-off. Standing pose for
   frames 0-2, tucked from frame 3 until 11 frames into the fall.
 - Crouch: tucked pose, Y + 4 (drawn 8 px lower than standing).
+- Whip (recorded with B pressed): wind-up 5 frames, swing 7, strike 9,
+  recovery 1-2, then standing. Simon can't walk during a ground whip.
+  The whip itself uses sprite palette 1 (`0F 23 34 0F`): tiles `1E 20`
+  (wind-up, behind Simon), `24 26` (swing, above and behind), `2E 2E 30`
+  (strike, 20-44 px in front, at the height of his hands).
+  Simon's body: `1C 1A` / `22` / `2A 28 2C` / `2A 28` on top of the normal legs.
 - The bytes after the jump table (`$9BA4`: `81 A8 9B 80`, then another
   signed table) are probably the knock-back arc.
 
@@ -86,7 +92,9 @@ Measured with `tools/nes_probe/record_simon.lua`, which records RAM and OAM ever
   real collision data (and stairs) still has to be found. The `$0600-$06FF`
   RAM area turned out to be object data, not collision.
 - The meaning of the `$7FF2` header word and the sections at `$81A2` / `$8202`.
-- Object/enemy placement, Simon's sprite assembly table, the whip, music.
+- Object/enemy placement, Simon's sprite assembly table, the whip's exact
+  hit box and damage rules, the crouching whip pose (the port draws the
+  standing whip pose with the crouched legs), music.
 - Falling speed after the jump arc ends, and the exact arc used when
   walking off a ledge (the port joins the arc's fall at frame 31 and caps at 5 px).
 

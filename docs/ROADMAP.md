@@ -30,7 +30,9 @@
 - [x] Jump arc from the ROM's table, matching the NES frame by frame (checked by the test)
 - [x] Crouch
 - [ ] Knock-back arc, falling speed after the arc
-- [ ] Whip (needs extra sprites; poses up to 24 px wide), stairs
+- [x] Whip: standing, crouching and jumping, NES timing (checked by the test), hit box
+- [x] Metasprites with double-buffered sprite pages (VBLANK work stays under 3 ms)
+- [ ] Stairs, whip upgrades (chain, morning star), sub-weapons
 - [ ] Sub-weapons
 - [ ] Hearts, score, timer, life bar in the HUD
 

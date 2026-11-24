@@ -118,43 +118,29 @@ layer A = palette 2 (brown)    layer B = palette 4 (skin)    A|B = palette 6 (re
 So a 16x16 NES-style figure with 3 colours costs **2 hardware sprites**,
 and the 16x32 player costs 4. Palette entries 2, 4 and 6 are chosen together for this.
 
-Sprite budget: 32 sprites total, 8 per scanline. The player takes 2 per line,
-and the whip will add up to 2 more. Enemies have to be mostly 1–2 colours,
-or flicker by rotating sprite priority each frame, like the NES game does.
+### Metasprites
 
-The MSX has no sprite flipping, so left-facing patterns are stored
-pre-mirrored. For the real game, patterns will be streamed to VRAM per
-frame rather than all being resident.
+Each pose of the player is a list of hardware sprites (`tools/msx_sprites.py`):
+`count`, then `dy, dx, pattern, colour column` for each sprite. The body
+uses the OR layers above. Single-colour parts such as the whip use one
+sprite per 16x16 cell; MSX sprites can change colour on every line, so the
+whip's light line and black outline fit in one sprite. A second sprite is added only
+for lines with two colours. The converter refuses frames with more than
+12 sprites, or more than 8 on one scanline (the hardware limit). The
+whip strike needs 10 sprites, at most 8 on a line.
+
+The MSX has no sprite flipping, so left-facing frames are stored
+pre-mirrored: 12 poses x 2 directions.
+
+### Double-buffered sprite pages
+
+Patterns are streamed: only the current frame's patterns are in VRAM, in
+the player's 12 pattern slots, leaving the rest of the sprite patterns for enemies.
+Copying a new frame (up to 480 bytes) during VBLANK took too long on a 3.58 MHz
+Z80 (7.5 ms worst case; the vertical blank is 4.4 ms). So there are two
+complete sprite pages in VRAM: patterns, attributes and colours, with page 1 at
+page 0 + 0x4000 (the V9958 has 128 KB). The game writes the next frame
+into the hidden page during the frame. In VBLANK, R#5 and R#6 are switched
+to it. Worst-case VBLANK work is now about 2.7 ms, and the smoke test checks it.
 
 ## Memory
-
-| Region | Use |
-|---|---|
-| 0x0000-0x3FFF | BIOS |
-| 0x4000-0x7FFF | cartridge bank 0: engine code (fixed) |
-| 0x8000-0xBFFF | cartridge bank 1-7: data (switched via 0x7000) |
-| 0xC000-       | engine RAM (`src/ram.inc`) |
-
-## Interrupt handling and the BIOS
-
-The engine currently keeps the BIOS interrupt handler and uses its hooks.
-That costs CPU time every frame (keyboard scan, etc.). A later step is to put RAM
-in page 0 and own the interrupt vector at 0x0038. This is easy on a
-turbo R, which always has a memory mapper.
-
-On a turbo R, cartridge ROM is slower to read than internal RAM under the
-R800. Hot code (the object update loop, column builder) should be copied
-to RAM at boot.
-
-## Porting the game logic
-
-The plan is a faithful re-implementation, not emulation:
-
-1. Disassemble the NES PRG banks (`tools/nes_rom_tool.py split`) and
-   document the object system, stage format, and enemy/boss AI.
-2. Re-implement each routine in Z80, keeping the NES data formats
-   (stage layouts, enemy placement, physics tables) wherever possible, so
-   converted data can be used directly.
-3. Convert graphics and music at build time from the user's ROM.
-
-No Konami code or data is committed to this repository.

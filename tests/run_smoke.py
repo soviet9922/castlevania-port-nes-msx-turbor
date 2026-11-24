@@ -22,7 +22,8 @@ MACHINE = os.environ.get("TEST_MACHINE", "C-BIOS_MSX2+")
 
 # RAM variable -> size in bytes
 WATCH = {"frame_count": 2, "line_irq_count": 2, "px": 2, "py": 2, "cam_x": 2,
-         "on_ground": 1, "facing": 1, "scroll_r26": 1, "scroll_r27": 1}
+         "on_ground": 1, "facing": 1, "scroll_r26": 1, "scroll_r27": 1,
+         "pframe": 1, "whip_active": 1, "whip_x1": 2, "whip_x2": 2}
 
 
 def load_symbols():
@@ -48,6 +49,8 @@ def tcl_script(syms, result_file):
 
     fc = syms["frame_count"]
     py = syms["py"]
+    pf, wa = syms["pframe"], syms["whip_active"]
+    irq_vbl, vbl_done = syms["irq_vblank"], syms["vblank_done"]
     # keyboard matrix row 8: bit0 SPACE, bit4 LEFT, bit7 RIGHT
     # Times are relative to the moment the game's main loop is running.
     return f"""
@@ -60,7 +63,10 @@ proc play {{}} {{
     after time 4.0  {{ {dump('03_jump')} }}
     after time 5.0  {{ {dump('04_landed')}; keymatrixdown 8 0x10 }}
     after time 6.0  {{ {dump('05_walk_left')}; keymatrixup 8 0x10 }}
-    after time 6.1  {{ exit }}
+    after time 6.3  {{ keymatrixdown 4 0x04; rec_whip 40 }}
+    after time 6.4  {{ keymatrixup 4 0x04 }}
+    after time 6.55 {{ {dump('06_whip_strike')} }}
+    after time 7.2  {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; close $f; exit }}
 }}
 # record py (signed) once per game frame, sampled when the VBLANK interrupt
 # updates frame_count (game logic for the frame has finished by then)
@@ -77,7 +83,30 @@ proc sample_py {{}} {{
     }}
 }}
 proc rec_py {{n}} {{ set ::jump_left $n }}
+# record "pose:whip_active" once per game frame while whipping
+set ::whipseq {{}}
+set ::whip_left 0
+proc sample_whip {{}} {{
+    if {{$::whip_left <= 0}} return
+    lappend ::whipseq "[peek {pf}]:[peek {wa}]"
+    incr ::whip_left -1
+    if {{$::whip_left == 0}} {{
+        set f [open "{result_file}" a]; puts $f "whipseq $::whipseq"; close $f
+    }}
+}}
+proc rec_whip {{n}} {{ set ::whip_left $n }}
+debug set_watchpoint write_mem {fc} {{}} sample_whip
 debug set_watchpoint write_mem {fc} {{}} sample_py
+# worst time from the VBLANK interrupt to the end of the main loop's VBLANK work
+set ::vbl_t0 0
+set ::vbl_worst 0
+proc vbl_start {{}} {{ set ::vbl_t0 [machine_info time] }}
+proc vbl_end {{}} {{
+    set dt [expr {{([machine_info time] - $::vbl_t0) * 1e6}}]
+    if {{$dt > $::vbl_worst}} {{ set ::vbl_worst $dt }}
+}}
+debug set_bp {irq_vbl} {{}} vbl_start
+debug set_bp {vbl_done} {{}} vbl_end
 proc wait_game {{}} {{
     # wait until the main loop has run ~30 frames (C-BIOS logo comes first)
     if {{[peek {fc}] + 256*[peek {fc + 1}] < 30 || [peek {fc + 1}] > 0x20}} {{
@@ -114,11 +143,19 @@ def run():
 
     snaps = {}
     jump_y = []
+    whip_seq = []
+    vblank_us = 10 ** 9
     with open(result_file) as f:
         for line in f:
             tag, *kv = line.split()
             if tag == "jumpy":
                 jump_y = [int(v) for v in kv]
+                continue
+            if tag == "vblank_us":
+                vblank_us = int(kv[0])
+                continue
+            if tag == "whipseq":
+                whip_seq = [tuple(int(x) for x in v.split(":")) for v in kv]
                 continue
             snaps[tag] = {k: int(v) for k, v in (x.split("=") for x in kv)}
 
@@ -139,9 +176,14 @@ def run():
     def s16(v):
         return v - 65536 if v >= 32768 else v
 
-    boot, walk, jump, land, left = (snaps[t] for t in
-                                    ("01_boot", "02_walk_right", "03_jump",
-                                     "04_landed", "05_walk_left"))
+    boot, walk, jump, land, left, strike = (snaps[t] for t in
+                                            ("01_boot", "02_walk_right", "03_jump",
+                                             "04_landed", "05_walk_left", "06_whip_strike"))
+    # expected whip (NES timing): wind-up 5, swing 7, strike 9 (hits), recovery 2
+    poses = [p for p, _ in whip_seq]
+    start = next((i for i, p in enumerate(poses) if p >= 4), None)
+    expected_whip = [(4, 0)] * 5 + [(5, 0)] * 7 + [(6, 1)] * 9 + [(7, 0)] * 2 + [(0, 0)]
+    actual_whip = whip_seq[start:start + len(expected_whip)] if start is not None else []
     checks = [
         # 3 s of emulated time between boot and walk_right snapshots
         ("main loop runs at 60 fps", 170 <= walk["frame_count"] - boot["frame_count"] <= 190),
@@ -161,6 +203,14 @@ def run():
         ("player lands again", land["on_ground"] == 1
          and land["py"] == walk["py"]),
         ("jump follows the jump table frame by frame", actual_arc == expected_arc),
+        ("whip runs wind-up 5 / swing 7 / strike 9 / recovery 2 frames",
+         actual_whip == expected_whip),
+        ("whip hit box reaches 28 px in front (facing left)",
+         strike["whip_active"] == 1
+         and strike["whip_x1"] == strike["px"] - 28 and strike["whip_x2"] == strike["px"] - 5),
+        # NTSC VBLANK is 70 lines of 63.7 us; the HUD split follows soon after
+        (f"VBLANK work fits in the vertical blank ({vblank_us} us of 4450)",
+         vblank_us < 4450),
         ("walking left turns the player", left["facing"] == 1
          and left["px"] < land["px"]),
     ]

@@ -45,6 +45,11 @@ init:
         call load_graphics
         call hud_draw
         call level_start
+        ld a,0xFF
+        ld (loaded_frames),a            ; no sprite patterns loaded yet
+        ld (loaded_frames+1),a
+        call build_sat
+        call write_player_sprites       ; first frame goes to page 1
         call install_irq
         ei
 
@@ -57,15 +62,17 @@ main_loop:
         ; --- VBLANK work: everything that touches VRAM ---
         di
         call upload_column
-        call upload_sat
+        call flip_sprites
         call calc_scroll
         ei
+vblank_done:                            ; (tests measure VBLANK work up to here)
 
         ; --- game logic ---
         call read_input
         call player_update
         call camera_update
         call build_sat
+        call write_player_sprites       ; into the hidden sprite page
         jp main_loop
 
 wait_frame:

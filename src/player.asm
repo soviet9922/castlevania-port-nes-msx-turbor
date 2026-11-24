@@ -28,6 +28,8 @@ player_reset:
         ld (air_dx),a
         ld (anim_t),a
         ld (anim_step),a
+        ld (whip_t),a
+        ld (whip_active),a
         inc a
         ld (on_ground),a
         ret
@@ -43,7 +45,25 @@ respawn:
         ret
 
 player_update:
+        ; ---- whip: once started it runs to the end ----
+        ld a,(whip_t)
+        or a
+        jr nz,.whip_busy
+        ld a,(whip_pressed)
+        or a
+        jr z,.intent
+        ld a,1
+        ld (whip_t),a
+.whip_busy:
+        ld a,(on_ground)
+        or a
+        jr z,.in_air                    ; in the air the jump arc carries on
+        xor a
+        ld (walk_dx),a                  ; on the ground Simon stands still
+        jp .vertical
+
         ; ---- intent ----
+.intent:
         ld a,(on_ground)
         or a
         jr z,.in_air
@@ -277,6 +297,80 @@ player_update:
         ld a,(hl)
 .set_frame:
         ld (pframe),a
+
+        ; ---- whip pose override and hit box ----
+        xor a
+        ld (whip_active),a
+        ld a,(whip_t)
+        or a
+        ret z
+        ld c,a
+        ld b,POSE_WHIP
+        cp WHIP_P2
+        jr c,.whip_pose
+        inc b
+        cp WHIP_P3
+        jr c,.whip_pose
+        inc b
+        cp WHIP_P4
+        jr c,.whip_strike
+        inc b
+        jr .whip_pose
+.whip_strike:
+        push bc
+        call whip_hitbox
+        pop bc
+.whip_pose:
+        ld a,(pframe)
+        cp POSE_TUCK                    ; crouching / tucked: crouched set
+        ld a,b
+        jr nz,.whip_standing
+        add a,4
+.whip_standing:
+        ld (pframe),a
+        ld a,c
+        inc a
+        cp WHIP_END
+        jr c,.whip_next
+        xor a
+.whip_next:
+        ld (whip_t),a
+        ret
+
+; Hit box of the extended whip in world coordinates (mirrored when facing left).
+whip_hitbox:
+        ld a,1
+        ld (whip_active),a
+        ld hl,(px)
+        ld a,(facing)
+        or a
+        jr nz,.left
+        ld de,WHIP_HIT_X1
+        add hl,de
+        ld (whip_x1),hl
+        ld de,WHIP_HIT_X2-WHIP_HIT_X1
+        add hl,de
+        ld (whip_x2),hl
+        jr .y
+.left:
+        ld de,15-WHIP_HIT_X2
+        add hl,de
+        ld (whip_x1),hl
+        ld de,WHIP_HIT_X2-WHIP_HIT_X1
+        add hl,de
+        ld (whip_x2),hl
+.y:
+        ld a,(pyoff)
+        ld e,a
+        ld d,0
+        ld hl,(py)
+        add hl,de
+        ld de,WHIP_HIT_Y1
+        add hl,de
+        ld (whip_y1),hl
+        ld de,WHIP_HIT_Y2-WHIP_HIT_Y1
+        add hl,de
+        ld (whip_y2),hl
         ret
 
 walk_cycle:
@@ -317,61 +411,84 @@ foot_probe:
         jp solid_at
 
 ; ---------------------------------------------------------------------------
-; Fill sat_buf: 4 sprites (2 OR-coloured layers x 2 halves) + end marker.
-; Pattern layout per (facing, frame): topA, topB, botA, botB (see tools/).
+; Fill sat_buf from the current metasprite frame, then the end marker.
+; Sprites that would be off the left/right edge are parked below the screen.
 ; ---------------------------------------------------------------------------
 build_sat:
         ld hl,(px)
         ld de,(cam_x)
         or a
         sbc hl,de
-        ld c,l                          ; C = screen x
+        ld (spr_bx),hl
         ld a,(pyoff)
-        ld b,a
-        ld a,(py)
-        add a,b
-        add a,PF_TOP_PX-1
-        ld b,a                          ; B = sprite Y of the top half
+        ld e,a
+        ld d,0
+        ld hl,(py)
+        add hl,de
+        ld de,PF_TOP_PX-1
+        add hl,de
+        ld (spr_by),hl
 
         ld a,(facing)
-        add a,a
-        add a,a
-        ld e,a
+        or a
         ld a,(pframe)
-        add a,e
-        add a,a
-        add a,a
-        add a,a
-        add a,a
-        ld d,a                          ; D = first pattern number
-
-        ld hl,sat_buf
-        ld e,2                          ; two halves
-.half:
-        ld (hl),b
-        inc hl
-        ld (hl),c
-        inc hl
-        ld (hl),d
-        inc hl
-        inc hl
-        ld a,d
-        add a,4
+        jr z,.right
+        add a,NPOSES
+.right:
+        ld (cur_frame),a
+        call frame_address
+        ld b,(ix+0)
+        inc ix
+        xor a
+        ld (spr_pat),a
+        ld iy,sat_buf
+.lp:
+        ld a,(ix+0)                     ; y = base + dy
+        ld e,a
+        rla
+        sbc a,a
         ld d,a
-        ld (hl),b
-        inc hl
-        ld (hl),c
-        inc hl
-        ld (hl),d
-        inc hl
-        inc hl
-        ld a,d
-        add a,4
+        ld hl,(spr_by)
+        add hl,de
+        ld a,h
+        or a
+        jr nz,.y_neg
+        ld a,l
+        cp 192
+        jr nc,.hide
+        jr .y_ok
+.y_neg:
+        inc a
+        jr nz,.hide                     ; far above the screen
+        ld a,l
+        cp 0xF0
+        jr c,.hide                      ; more than 16 lines above
+.y_ok:
+        ld c,a
+        ld a,(ix+1)                     ; x = base + dx
+        ld e,a
+        rla
+        sbc a,a
         ld d,a
-        ld a,b
-        add a,16
-        ld b,a
-        dec e
-        jr nz,.half
-        ld (hl),SAT_END_Y
+        ld hl,(spr_bx)
+        add hl,de
+        ld a,h
+        or a
+        jr nz,.hide                     ; off the left or right edge
+        ld (iy+0),c
+        ld (iy+1),l
+        jr .store
+.hide:
+        ld (iy+0),SPRITE_HIDE_Y
+        ld (iy+1),0
+.store:
+        ld a,(spr_pat)
+        ld (iy+2),a
+        add a,4
+        ld (spr_pat),a
+        ld de,4
+        add ix,de
+        add iy,de
+        djnz .lp
+        ld (iy+0),SAT_END_Y
         ret

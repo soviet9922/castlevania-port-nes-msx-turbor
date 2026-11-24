@@ -38,7 +38,24 @@ anim_t          equ pframe+1            ; 1
 new_x           equ anim_t+1            ; 2  scratch
 probe_off       equ new_x+2             ; 1  scratch
 
-sat_buf         equ probe_off+1         ; (PLAYER_SPRITES+1)*4
+whip_t          equ probe_off+1         ; 1  0 = not whipping, else frame 1..WHIP_END-1
+whip_prev       equ whip_t+1            ; 1
+whip_pressed    equ whip_prev+1         ; 1
+whip_active     equ whip_pressed+1      ; 1  1 while the whip can hit
+whip_x1         equ whip_active+1       ; 2  hit box, world coordinates
+whip_x2         equ whip_x1+2           ; 2
+whip_y1         equ whip_x2+2           ; 2  playfield y
+whip_y2         equ whip_y1+2           ; 2
+cur_frame       equ whip_y2+2           ; 1  metasprite frame shown (facing*NPOSES+pose)
+loaded_frames   equ cur_frame+1         ; 2  frame whose patterns are in sprite page 0 / 1
+spr_page        equ loaded_frames+2     ; 1  sprite page being displayed (0/1)
+spr_back        equ spr_page+1          ; 1  scratch: page being written
+flip_pending    equ spr_back+1          ; 1  1 = show the other page at VBLANK
+spr_bx          equ flip_pending+1      ; 2  scratch: player screen x
+spr_by          equ spr_bx+2            ; 2  scratch: player sprite y
+spr_pat         equ spr_by+2            ; 1  scratch
+
+sat_buf         equ spr_pat+1           ; (PLAYER_SPRITES+1)*4
 
 RAM_END         equ sat_buf+(PLAYER_SPRITES+1)*4
         ASSERT RAM_END < 0xF380
