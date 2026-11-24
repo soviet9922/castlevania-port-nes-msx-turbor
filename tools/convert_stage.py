@@ -53,6 +53,16 @@ AREAS = [
         "palette": "1-courtyard",       # the hall uses the same palette
         "stage": 1, "section": 0,
         "start_x": 40,
+        "exit_x": 1500,                 # NES: the door opens at world x 1516
+        "exit_y": 40,                   # (centre), on the upper floor only
+        "next_area": 2,
+    },
+    {
+        "name": "2-upper",
+        "map": (0x81BA, 0x821A),        # stage 2, section 1 (512 px): behind
+        "palette": "1-courtyard",       # the hall's door; same palette
+        "stage": 2, "section": 1,
+        "start_x": 40,                  # NES: world x 48 (centre), upper floor
         "exit_x": None,
     },
 ]
@@ -80,17 +90,35 @@ def stairs(rom, stage, section):
         t = b0 & 3
         a = adj[t] - 256 if adj[t] >= 128 else adj[t]
         ends.append((t, (b1 & 0xF8) + ((b1 & 7) << 8) + a, b0 & 0xF0))
+    # Ends come in (foot, top) pairs. An end without a partner in this section
+    # leads to another section (a staircase down to the section below, say);
+    # those are left out until sections are joined.
     out = []
-    for (ta, xa, ya), (tb, xb, yb) in zip(ends[0::2], ends[1::2]):
-        foot, top = ((xa, ya, ta), (xb, yb, tb)) if not ta & 2 else ((xb, yb, tb), (xa, ya, ta))
-        d = -1 if foot[2] & 1 else 1
-        # Simon lines up 2 px right of the endpoint (measured); exact 45 degrees
-        fx, fy, ty = foot[0] + 2 - 8, foot[1] - 64, top[1] - 64
-        tx = fx + d * (fy - ty)
-        if abs(tx - (top[0] + 2 - 8)) > 6:
-            raise SystemExit(f"stair endpoints do not form a 45 degree staircase: {foot} {top}")
-        out.append((fx, fy, tx, ty, d))
+    i = 0
+    while i < len(ends):
+        pair = _staircase(ends[i], ends[i + 1]) if i + 1 < len(ends) else None
+        if pair is None:
+            i += 1
+            continue
+        out.append(pair)
+        i += 2
     return out
+
+
+def _staircase(a, b):
+    """Two stair ends -> (foot x, foot y, top x, top y, dir), or None if they
+    aren't the foot and top of one 45 degree staircase."""
+    (ta, xa, ya), (tb, xb, yb) = a, b
+    if (ta & 2) == (tb & 2) or (ta & 1) != (tb & 1):
+        return None
+    foot, top = ((xa, ya, ta), (xb, yb, tb)) if not ta & 2 else ((xb, yb, tb), (xa, ya, ta))
+    d = -1 if foot[2] & 1 else 1
+    # Simon lines up 2 px right of the endpoint (measured); exact 45 degrees
+    fx, fy, ty = foot[0] + 2 - 8, foot[1] - 64, top[1] - 64
+    tx = fx + d * (fy - ty)
+    if fy <= ty or abs(tx - (top[0] + 2 - 8)) > 6:
+        return None
+    return (fx, fy, tx, ty, d)
 
 
 def nes_to_msx_rgb(c):
@@ -185,7 +213,8 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, preview=True)
 
     params = msx_area.write_area(out_dir, pixels, msx_pal, solid, sx, sy, area["name"])
     params.update(dir=f"area_{index}", obj_patterns=n_obj_patterns,
-                  exit_x=area.get("exit_x"), next_area=area.get("next_area", 0))
+                  exit_x=area.get("exit_x"), exit_y=area.get("exit_y", 0xFF),
+                  next_area=area.get("next_area", 0))
 
     if preview:
         pgt = [open(os.path.join(out_dir, f"bg_pgt_b{b}.bin"), "rb").read() for b in range(3)]

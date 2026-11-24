@@ -213,7 +213,7 @@ how often (about 3%). The turbo R's R800 runs the logic several times faster.
 Each area (courtyard, entrance hall, …) is one 16 KB ROM bank (area n =
 bank n+1) that starts with a header: palette, background tiles per band,
 map, collision, candle list, object sprites, start position, and an exit
-(x position plus next area). The current area's bank stays mapped at
+(x position, the highest y at which it counts, plus next area). The current area's bank stays mapped at
 0x8000 because column streaming and collision read it directly. The header
 is copied to RAM. Code and data shared by all areas (Simon's sprites, HUD)
 live in bank 0, at 0x4000.

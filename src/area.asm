@@ -117,5 +117,18 @@ check_area_exit:
         or a
         sbc hl,de
         ret c
+        ld a,(area_hdr+AH_EXITY)        ; on the right floor? (the hall's door
+        cp 0xFF                         ; is on the upper floor)
+        jr z,.go
+        ld hl,(py)
+        bit 7,h
+        jr nz,.go                       ; above the playfield
+        ld e,a
+        ld d,0
+        ex de,hl
+        or a
+        sbc hl,de                       ; exit y - py
+        ret c
+.go:
         ld a,(area_hdr+AH_NEXT)
         jp load_area

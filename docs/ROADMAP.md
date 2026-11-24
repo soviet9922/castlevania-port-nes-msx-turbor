@@ -22,7 +22,9 @@
 - [x] Areas in their own ROM banks; the courtyard gate leads into the entrance hall
 - [x] Entrance hall: graphics, layout, collision, wall candles
 - [x] Stairs from the ROM's stair table: get on/off, climb and descend, whip on stairs
-- [ ] The exit door at the end of the hall (into stage 2)
+- [x] The exit door at the end of the hall (upper floor) into stage 2's first section
+- [ ] The door's opening animation and camera scroll; STAGE 02 in the HUD
+- [ ] Sections joined by stairs (stage 2's stairs down to the section below)
 - [ ] Palette selection table, stages 2 and up
 
 ## Milestone 2: Simon (in progress)

@@ -91,6 +91,24 @@ The HUD always says STAGE 01, but the game switches the internal stage number `$
 screen x 195 with the camera at 512). The hall starts with the camera at 0,
 Simon at world x 48, and the floor 16 px lower. Both use the palette at `$CE28`.
 
+## The hall's exit and stage 2
+
+Recorded with `tools/nes_probe/record_exit.lua`. The hall's floor ends at a wall
+(Simon stops at world x 1519). The exit is the door on the upper floor, reached by
+the last staircase. At world x 1516 (centre) the game mode `$18` goes from 5 to 8:
+the door opens, the camera scrolls from 1280 to 1408, and Simon walks through to
+about 1604. Then `$28` becomes 2 and `$46` (section) 1, and the HUD says STAGE 02.
+Simon starts at world x 48 on the upper floor (y 96), with the camera at 0.
+
+- **Map pointer:** `$D00F` reads the word at `$FB2A + 2*stage` (a pointer into
+  the layout bank), then the word at that pointer + 2*section, into `$33/$34`.
+  Stage 2 section 1 is `$81A2`, so its world column 0 is at `$81BA`, straight
+  after the hall's map: 16 columns (512 px). It matched the PPU nametables exactly.
+- Stage 2 section 1 uses the same palette as stage 1 (read from the PPU).
+- **Stair ends without a partner:** stage 2 section 1 has two staircase tops
+  (`$C7`, y `$C0`) with no foot in the same section. These are the stairs down to
+  the section below. Ends are paired only when they form a foot and a top.
+
 ## Palettes
 
 Stored in the fixed bank as `$3F $00 <16 colour bytes> $FE` strings.

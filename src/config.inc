@@ -53,7 +53,8 @@ AH_NEXT         equ 44
 AH_BLANK        equ 45
 AH_STAIRS       equ 46                  ; count, then 7 bytes per staircase
 AH_ENEMIES      equ 48                  ; count, then 4 bytes per spawner (x, y, type)
-AH_SIZE         equ 50
+AH_EXITY        equ 50                  ; exit only when py <= this (0xFF = any)
+AH_SIZE         equ 51
 
 ; Stair records (tools/convert_stage.py): foot x, foot y, top x, top y, dir
 ST_FOOTX        equ 0

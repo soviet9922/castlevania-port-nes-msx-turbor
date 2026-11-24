@@ -83,6 +83,14 @@ def tcl_script(syms, result_file):
     after time 17.6 {{ keymatrixup 8 0x40; {dump('12_stairs_down')}
                        # zombies on: stand near the hall's start and wait to be hit
                        poke {eoff} 2; poke {px_a} 200; poke {px_a + 1} 0; set ::wait_hit 1 }}
+    after time 28.0 {{ if {{[peek {exit_x}] != 255}} {{
+                           # the hall's door: on the upper floor, 24 px before the exit
+                           set ::hunting 0; poke {eoff} 3
+                           set x [expr {{[peek {exit_x}] + 256*[peek {exit_x + 1}] - 24}}]
+                           poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
+                           poke {py} [expr {{[peek {exit_x + 8}] - 8}}]; poke {py + 1} 0
+                           keymatrixdown 8 0x80 }} }}
+    after time 29.5 {{ keymatrixup 8 0x80; {dump('18_through_the_door')} }}
     after time 31.0 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """ if areas > 1 else f"""
     after time 9.0  {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
@@ -371,6 +379,10 @@ def run():
             and snaps["10_next_area_walk"]["py"] == snaps["09_next_area"]["py"]
             and snaps["10_next_area_walk"]["on_ground"] == 1)]
           if "09_next_area" in snaps else []),
+        *([("the hall's door on the upper floor leads to stage 2",
+            snaps["18_through_the_door"]["cur_area"] == 2
+            and snaps["18_through_the_door"]["on_ground"] == 1)]
+          if syms.get("AREA_COUNT", 1) > 2 and "18_through_the_door" in snaps else []),
         *([("UP at a staircase's foot climbs it to the top",
             (snaps["11_stairs_up"]["px"], snaps["11_stairs_up"]["py"]) == stair["top"]
             and snaps["11_stairs_up"]["stair_state"] == 0 and snaps["11_stairs_up"]["on_ground"] == 1),
