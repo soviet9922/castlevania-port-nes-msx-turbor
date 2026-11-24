@@ -65,6 +65,13 @@ For the converted build:
 make run-nes
 ```
 
+### Emulator compatibility
+
+| Emulator | Status |
+|---|---|
+| openMSX | works (recommended; used by the automated tests) |
+| fMSX 6.0 | runs, but the playfield doesn't scroll: fMSX ignores the V9958 horizontal scroll registers in Screen 4, so Simon appears to hit an invisible wall |
+
 Controls: cursor keys or joystick to walk, DOWN to crouch, SPACE or button A to jump.
 Jumps are committed, like in the original: you can't steer in mid-air.
 
