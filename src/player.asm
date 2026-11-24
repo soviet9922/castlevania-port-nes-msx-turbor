@@ -15,6 +15,7 @@ player_reset:
         ld (py),hl
         xor a
         ld (jump_idx),a
+        ld (stair_state),a
         ld (crouching),a
         ld (pyoff),a
         ld (facing),a
@@ -34,6 +35,10 @@ respawn:
         jp load_area
 
 player_update:
+        ld a,(stair_state)
+        or a
+        jp nz,stairs_update
+
         ; ---- whip: once started it runs to the end ----
         ld a,(whip_t)
         or a
@@ -56,11 +61,22 @@ player_update:
         ld a,(on_ground)
         or a
         jr z,.in_air
+        ld a,(stick)                    ; UP near the foot of a staircase
+        call stick_vertical
+        cp 1
+        jr nz,.not_up
+        ld c,ST_FOOTX
+        call find_stair
+        jp c,stairs_begin_up
+.not_up:
         ld a,(stick)
         cp 4
         jr c,.not_down
         cp 7
         jr nc,.not_down
+        ld c,ST_TOPX                    ; DOWN near the top of a staircase
+        call find_stair
+        jp c,stairs_begin_down
         ld a,1                          ; 4, 5, 6: down (incl. diagonals)
         ld (crouching),a
         xor a
@@ -138,7 +154,7 @@ player_update:
         jr z,.airborne
         ld c,32                         ; anything under the feet?
         call foot_probe
-        jp c,.animate
+        jp c,player_animate
         xor a                           ; walked off a ledge
         ld (on_ground),a
         ld (air_dx),a
@@ -206,7 +222,7 @@ player_update:
         ld (on_ground),a
         xor a
         ld (jump_idx),a
-        jr .animate
+        jp player_animate
 
 .rising:
         ld c,0                          ; head inside something solid?
@@ -228,16 +244,27 @@ player_update:
 .check_pit:
         ld hl,(py)
         bit 7,h
-        jr nz,.animate
+        jp nz,player_animate
         ld de,MT_ROWS*16
         or a
         sbc hl,de
         jp nc,respawn
 
         ; ---- animation ----
-.animate:
+player_animate:
         xor a
         ld (pyoff),a
+        ld a,(stair_state)
+        cp 1
+        jr z,.walk_anim                 ; walking to the stairs
+        jr c,.not_stairs
+        ld a,(stair_anim)               ; on the stairs: stair pose / walk1
+        and 8
+        ld a,POSE_WALK1
+        jr z,.set_frame
+        ld a,POSE_STAIR
+        jr .set_frame
+.not_stairs:
         ld a,(on_ground)
         or a
         jr nz,.ground_anim
@@ -487,4 +514,242 @@ build_sat:
         ld (spr_total),a
         call objects_draw               ; objects follow Simon's sprites
         ld (iy+0),SAT_END_Y
+        ret
+
+; ---------------------------------------------------------------------------
+; Stairs (data: area header AH_STAIRS, from the NES stair table)
+;
+; UP near a staircase's foot, or DOWN near its top, makes Simon walk to the
+; exact spot (1 px per frame) and get on. On the stairs he moves diagonally,
+; one pixel across and one pixel up/down on alternating frames, while the
+; stick points up or down (or along the stairs); he whips standing still,
+; and gets off at either end. Measured on the NES hall's first staircase.
+; ---------------------------------------------------------------------------
+
+; A = stick -> A = +1 (up, up-left, up-right), -1 (down...), 0 otherwise
+stick_vertical:
+        or a
+        ret z
+        cp 3
+        jr c,.up                        ; 1, 2
+        cp 8
+        jr z,.up
+        cp 4
+        jr c,.none                      ; 3
+        cp 7
+        jr nc,.none                     ; 7
+        ld a,-1
+        ret
+.up:
+        ld a,1
+        ret
+.none:
+        xor a
+        ret
+
+; C = ST_FOOTX or ST_TOPX: find a staircase end at Simon's height within
+; STAIR_REACH pixels. Carry set if found: stair_ptr, stair_tx, stair_dir.
+find_stair:
+        ld hl,(area_hdr+AH_STAIRS)
+        ld a,(hl)
+        inc hl
+        or a
+        ret z
+        ld b,a
+.lp:
+        push bc
+        push hl
+        ld b,0
+        add hl,bc
+        ld e,(hl)
+        inc hl
+        ld d,(hl)                       ; DE = x of this end
+        inc hl
+        ld a,(py+1)
+        or a
+        jr nz,.next
+        ld a,(py)
+        cp (hl)                         ; same height?
+        jr nz,.next
+        ld hl,(px)
+        or a
+        sbc hl,de
+        ld bc,STAIR_REACH
+        add hl,bc                       ; 0 .. 2*STAIR_REACH if close enough
+        ld a,h
+        or a
+        jr nz,.next
+        ld a,l
+        cp STAIR_REACH*2+1
+        jr nc,.next
+        pop hl
+        pop bc
+        ld (stair_ptr),hl
+        ld (stair_tx),de
+        push hl
+        pop ix
+        ld a,(ix+ST_DIR)
+        ld (stair_dir),a
+        scf
+        ret
+.next:
+        pop hl
+        pop bc
+        ld de,ST_SIZE
+        add hl,de
+        djnz .lp
+        or a
+        ret
+
+stairs_begin_up:
+        ld a,1
+        jr stairs_begin
+stairs_begin_down:
+        ld a,-1
+stairs_begin:
+        ld (stair_going),a
+        ld a,1
+        ld (stair_state),a
+        xor a
+        ld (crouching),a
+        ld (stair_phase),a
+        jp player_animate
+
+stairs_update:
+        ld a,(whip_t)                   ; whipping: stand still until it ends
+        or a
+        jr nz,.still
+        ld a,(whip_pressed)
+        or a
+        jr z,.no_whip
+        ld a,1
+        ld (whip_t),a
+.still:
+        xor a
+        ld (walk_dx),a
+        jp player_animate
+.no_whip:
+        ld a,(stair_state)
+        cp 2
+        jr z,.on_stairs
+
+        ; --- walking to the end of the staircase ---
+        ld hl,(px)
+        ld de,(stair_tx)
+        or a
+        sbc hl,de
+        jr z,.arrived
+        ld a,1
+        jr c,.step
+        ld a,-1
+.step:
+        ld (walk_dx),a
+        ld e,a
+        rlca
+        and 1
+        ld (facing),a
+        ld a,e
+        rla
+        sbc a,a
+        ld d,a
+        ld hl,(px)
+        add hl,de
+        ld (px),hl
+        jp player_animate
+.arrived:
+        ld a,2
+        ld (stair_state),a
+        xor a
+        ld (walk_dx),a
+        call stair_face
+        jp player_animate
+
+        ; --- on the stairs ---
+.on_stairs:
+        xor a
+        ld (walk_dx),a
+        ld a,(stick)
+        call stick_vertical
+        or a
+        jr nz,.move
+        ld a,(stick)                    ; left/right: along the stairs
+        call stick_to_dx
+        or a
+        jp z,player_animate
+        ld b,a
+        ld a,(stair_dir)
+        xor b                           ; same sign: up, else down
+        ld a,1
+        jp p,.move
+        ld a,-1
+.move:
+        ld (stair_going),a
+        call stair_face
+        ld hl,stair_anim
+        inc (hl)
+        ld a,(stair_phase)
+        xor 1
+        ld (stair_phase),a
+        jr z,.y_step
+        ld a,(stair_going)              ; x step: going * dir
+        ld b,a
+        ld a,(stair_dir)
+        xor b
+        ld e,1
+        jp p,.dx
+        ld e,-1
+.dx:
+        ld a,e
+        rla
+        sbc a,a
+        ld d,a
+        ld hl,(px)
+        add hl,de
+        ld (px),hl
+        jp player_animate
+.y_step:
+        ld a,(stair_going)              ; y step: up = -1
+        neg
+        ld e,a
+        rla
+        sbc a,a
+        ld d,a
+        ld hl,(py)
+        add hl,de
+        ld (py),hl
+
+        ; reached the end it is moving towards?
+        ld ix,(stair_ptr)
+        ld a,(stair_going)
+        or a
+        ld a,(ix+ST_TOPY)
+        ld c,ST_TOPX
+        jp p,.end_y
+        ld a,(ix+ST_FOOTY)
+        ld c,ST_FOOTX
+.end_y:
+        ld hl,py
+        cp (hl)
+        jp nz,player_animate
+        ld b,0                          ; step off: exactly on the end point
+        add ix,bc
+        ld l,(ix+0)
+        ld h,(ix+1)
+        ld (px),hl
+        xor a
+        ld (stair_state),a
+        ld (jump_idx),a
+        inc a
+        ld (on_ground),a
+        jp player_animate
+
+; Face the way Simon is moving on the stairs (going * dir > 0: right).
+stair_face:
+        ld a,(stair_going)
+        ld b,a
+        ld a,(stair_dir)
+        xor b
+        rlca
+        and 1
+        ld (facing),a
         ret

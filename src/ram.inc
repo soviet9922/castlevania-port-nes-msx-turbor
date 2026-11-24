@@ -69,8 +69,15 @@ candle_dead     equ cur_area+1          ; MAX_CANDLES/8 bits: destroyed candles
 candle_live     equ candle_dead+MAX_CANDLES/8 ; bits: candles that have an object
 spawn_last      equ candle_live+MAX_CANDLES/8 ; 2  camera x / 16 at the last spawn pass
 tmp_w           equ spawn_last+2        ; 2  scratch
+stair_state     equ tmp_w+2             ; 1  0 off, 1 walking to the stair end, 2 on the stairs
+stair_ptr       equ stair_state+1       ; 2  stair record
+stair_tx        equ stair_ptr+2         ; 2  x of the end being walked to
+stair_dir       equ stair_tx+2          ; 1  +1 / -1: which way the stairs rise
+stair_going     equ stair_dir+1         ; 1  +1 up / -1 down
+stair_phase     equ stair_going+1       ; 1  alternates x and y steps
+stair_anim      equ stair_phase+1       ; 1  climbing animation counter
 
-sat_buf         equ tmp_w+2             ; (MAX_SPRITES+1)*4
+sat_buf         equ stair_anim+1        ; (MAX_SPRITES+1)*4
 
 RAM_END         equ sat_buf+(MAX_SPRITES+1)*4
         ASSERT RAM_END < 0xF380

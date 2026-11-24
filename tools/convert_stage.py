@@ -58,6 +58,41 @@ AREAS = [
 ]
 
 
+# Stairs (bank 6, $9CBD): word at $FBF3 + 2*stage -> list of 2-byte endpoints,
+# 0-terminated. Byte 0: y (high nibble), section (bit 2), type (bits 0-1:
+# bit 1 = top end, bit 0 = staircase rises to the left). Byte 1: x / 8 in
+# bits 7-3, screen page in bits 0-2. The pointers point into bank 6.
+STAIR_TABLE = 0xFBF3
+STAIR_X_ADJUST = 0x9D47         # bank 6: per-type x adjustment (signed)
+
+
+def stairs(rom, stage, section):
+    """-> list of (foot x, foot y, top x, top y, dir) in engine coordinates
+    (Simon's box left/top); dir +1 = rises to the right, -1 = to the left."""
+    p = rom.fixed(STAIR_TABLE + 2 * stage) | rom.fixed(STAIR_TABLE + 2 * stage + 1) << 8
+    adj = [rom.rd(6, STAIR_X_ADJUST + i) for i in range(4)]
+    ends = []
+    while rom.rd(6, p) != 0:
+        b0, b1 = rom.rd(6, p), rom.rd(6, p + 1)
+        p += 2
+        if (b0 >> 2) & 1 != section:
+            continue
+        t = b0 & 3
+        a = adj[t] - 256 if adj[t] >= 128 else adj[t]
+        ends.append((t, (b1 & 0xF8) + ((b1 & 7) << 8) + a, b0 & 0xF0))
+    out = []
+    for (ta, xa, ya), (tb, xb, yb) in zip(ends[0::2], ends[1::2]):
+        foot, top = ((xa, ya, ta), (xb, yb, tb)) if not ta & 2 else ((xb, yb, tb), (xa, ya, ta))
+        d = -1 if foot[2] & 1 else 1
+        # Simon lines up 2 px right of the endpoint (measured); exact 45 degrees
+        fx, fy, ty = foot[0] + 2 - 8, foot[1] - 64, top[1] - 64
+        tx = fx + d * (fy - ty)
+        if abs(tx - (top[0] + 2 - 8)) > 6:
+            raise SystemExit(f"stair endpoints do not form a 45 degree staircase: {foot} {top}")
+        out.append((fx, fy, tx, ty, d))
+    return out
+
+
 def nes_to_msx_rgb(c):
     return tuple(min(7, (v * 7 + 127) // 255) for v in c)
 
@@ -138,6 +173,13 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, preview=True)
     cl = convert_objects.candles(rom, area["stage"], area["section"], width)
     convert_objects.write_candles(os.path.join(out_dir, "candles.bin"), cl)
 
+    st = stairs(rom, area["stage"], area["section"])
+    data = bytearray([len(st)])
+    for fx, fy, tx, ty, d in st:
+        data += bytes([fx & 0xFF, fx >> 8, fy, tx & 0xFF, tx >> 8, ty, d & 0xFF])
+    with open(os.path.join(out_dir, "stairs.bin"), "wb") as f:
+        f.write(data)
+
     params = msx_area.write_area(out_dir, pixels, msx_pal, solid, sx, sy, area["name"])
     params.update(dir=f"area_{index}", obj_patterns=n_obj_patterns,
                   exit_x=area.get("exit_x"), next_area=area.get("next_area", 0))
@@ -164,7 +206,7 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, preview=True)
     kinds = ["brazier", "candle"]
     print(f"area {index} {area['name']}: {width} px, tiles per band {params['tiles']}, "
           f"{params['lossy_rows']}/{params['total_rows']} tile rows reduced, "
-          f"start ({sx},{sy}), {len(cl)} candles "
+          f"start ({sx},{sy}), {len(st)} stairs {st}, {len(cl)} candles "
           f"({', '.join(f'{kinds[k]}@{x + 8}' for x, _, _, k in cl[:6])}{', ...' if len(cl) > 6 else ''})")
     return params
 

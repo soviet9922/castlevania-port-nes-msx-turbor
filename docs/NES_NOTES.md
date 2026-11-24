@@ -64,6 +64,26 @@ Collision is derived from the background tiles: when a column is drawn,
 is kept at `$0600-$06FF`. The port applies the same rule per 8x8 tile
 when converting (`tools/convert_stage.py`).
 
+## Stairs
+
+Stairs are not part of the tile collision. They have their own table, read by
+`$9CBD` in bank 6 when UP or DOWN is held (`$93EF`, `$9C10`):
+
+- a word at `$FBF3 + 2*stage` points (into bank 6) to a list of 2-byte
+  staircase ends, ending with 0;
+- byte 0: y in the high nibble, section in bit 2, and the type in bits 0-1
+  (bit 1 = top end, needs DOWN; bit 0 = the staircase rises to the left);
+- byte 1: x/8 in bits 7-3, screen page in bits 0-2; a per-type adjustment
+  (`$9D47`: 0, -1, +5, +2) is added;
+- the ends come in pairs (foot, top). The entrance hall has 4 staircases.
+
+Measured (`tools/nes_probe/record_stairs.lua`, run on a local ROM copy with the hall's
+enemy groups zeroed so zombies don't interrupt): with UP pressed within a few
+pixels of a foot, Simon walks to it (1 px per frame) and climbs one pixel
+across and one up on alternating frames. The pose alternates every 8 frames
+between a stair pose (`14 12` / `38 36`) and walk1. Simon lines up 2 px right of the
+table's x. The game sets `$3D`/`$2D` while he is on the stairs.
+
 ## Stage 1 = two internal stages
 
 The HUD always says STAGE 01, but the game switches the internal stage number `$28` from 0
@@ -142,7 +162,8 @@ Measured with `tools/nes_probe/record_courtyard.lua`, which walks through the co
 
 ## Still unknown
 
-- Stairs (not part of the tile collision; probably their own data per stage).
+- The descending stair pose and the whip poses on stairs (the port reuses the
+  climbing and standing poses).
 - The candle drop rule (codes other than 4 and 8, and code 0 on wall candles).
 - Stages 2 and up (`$81A2`, `$8202`, `$8292` in bank 4; other banks for later blocks).
 - Wall candles (object `$27`), enemy groups, Simon's sprite assembly table, the whip's exact
@@ -165,6 +186,7 @@ Measured with `tools/nes_probe/record_courtyard.lua`, which walks through the co
 | `tools/nes_probe/record_simon.lua` | FCEUX script: record RAM/OAM every frame while Simon acts |
 | `tools/nes_probe/record_courtyard.lua` | FCEUX script: walk the courtyard whipping every brazier |
 | `tools/nes_probe/record_hall.lua` | FCEUX script: walk through the gate into the entrance hall |
+| `tools/nes_probe/record_stairs.lua` | FCEUX script: walk to the hall's first staircase and climb it |
 
 To run the probe (needs FCEUX; writes to `build/nes/probe`):
 

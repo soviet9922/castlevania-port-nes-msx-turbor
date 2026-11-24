@@ -163,6 +163,15 @@ As on the NES, collision is decided per 8x8 tile: the converter marks the
 tiles the NES treats as solid (`$60-$6B`). The area stores one byte per
 tile in `level_coll` (22 bytes per 8-px column).
 
+### Stairs
+
+Each area's header points to its staircases (foot x/y, top x/y, direction),
+converted from the NES stair table with Simon's measured alignment and an exact
+45° slope. UP within 8 px of a foot (or DOWN near a top) makes Simon walk
+to the exact spot and get on. On the stairs, gravity and collision are off.
+He moves one pixel across and one up or down on alternating frames while the stick
+points along the stairs, and gets off at either end.
+
 ## Areas and ROM banks
 
 Each area (courtyard, entrance hall, …) is one 16 KB ROM bank (area n =

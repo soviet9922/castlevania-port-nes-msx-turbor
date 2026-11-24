@@ -51,7 +51,17 @@ AH_OBJFRAMES    equ 40
 AH_EXITX        equ 42                  ; 0xFFFF = no exit
 AH_NEXT         equ 44
 AH_BLANK        equ 45
-AH_SIZE         equ 46
+AH_STAIRS       equ 46                  ; count, then 7 bytes per staircase
+AH_SIZE         equ 48
+
+; Stair records (tools/convert_stage.py): foot x, foot y, top x, top y, dir
+ST_FOOTX        equ 0
+ST_FOOTY        equ 2
+ST_TOPX         equ 3
+ST_TOPY         equ 5
+ST_DIR          equ 6                   ; +1 rises to the right, -1 to the left
+ST_SIZE         equ 7
+STAIR_REACH     equ 8                   ; UP/DOWN this close to an end takes the stairs
 
 ; Player movement (same model as the NES game)
 WALK_SPEED      equ 1                   ; px per frame
@@ -66,8 +76,10 @@ CROUCH_Y        equ 8                   ; crouching pose is drawn this much lowe
 
 ; Player metasprites (see tools/msx_sprites.py)
 PLAYER_SPRITES  equ 12                  ; hardware sprites / pattern slots reserved
-NPOSES          equ 12                  ; poses per facing direction
+NPOSES          equ 13                  ; poses per facing direction
+POSE_WALK1      equ 1
 POSE_TUCK       equ 3
+POSE_STAIR      equ 12                  ; climbing (alternates with walk1)
 POSE_WHIP       equ 4                   ; whip1..whip4, then +4 for the crouched set
 SAT_END_Y       equ 216                 ; sprite mode 2 "end of list" Y value
 MAX_SPRITES     equ 32                  ; hardware sprites in total

@@ -13,7 +13,8 @@ collision rule. **Simon** is converted too:
 his graphics, walk animation, jump arc and whip (timing identical to the NES,
 frame by frame). **Braziers and wall candles** are placed from the ROM's data. Whip them
 and they burst and drop their items (hearts, whip upgrade, dagger), which you can collect.
-Stairs and enemies come next.
+Simon can climb the hall's **stairs**, which come from the ROM's stair table.
+Enemies come next.
 The screenshot above shows the ROM-free build, which uses only original
 placeholder art. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -76,7 +77,7 @@ make run-nes
 | fMSX 6.0 | runs, but the playfield doesn't scroll: fMSX ignores the V9958 horizontal scroll registers in Screen 4, so Simon appears to hit an invisible wall |
 
 Controls: cursor keys or joystick to walk, DOWN to crouch, SPACE or button A to jump,
-M, X or button B to whip.
+M, X or button B to whip. UP at the foot of a staircase climbs it, and DOWN at its top goes down.
 Jumps are committed, like in the original: you can't steer in mid-air.
 
 ## Testing

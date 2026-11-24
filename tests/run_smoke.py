@@ -25,7 +25,7 @@ WATCH = {"frame_count": 2, "line_irq_count": 2, "px": 2, "py": 2, "cam_x": 2,
          "on_ground": 1, "facing": 1, "scroll_r26": 1, "scroll_r27": 1,
          "pframe": 1, "whip_active": 1, "whip_x1": 2, "whip_x2": 2,
          "hearts": 1, "obj_table": 1,     # obj_table = type of object slot 0
-         "cur_area": 1}
+         "cur_area": 1, "stair_state": 1}
 
 
 def load_symbols():
@@ -55,13 +55,27 @@ def tcl_script(syms, result_file):
     irq_vbl, vbl_done, load = syms["irq_vblank"], syms["vblank_done"], syms["load_area"]
     px_a, fa, obj = syms["px"], syms["facing"], syms["obj_table"]
     exit_x = syms["area_hdr"] + 42      # AH_EXITX
+    stairs = syms["area_hdr"] + 46      # AH_STAIRS
     areas = syms.get("AREA_COUNT", 1)
     # with more than one area: walk into the exit (courtyard gate) and on
     hall = f"""
     after time 9.0  {{ poke {px_a} [peek {exit_x}]; poke {px_a + 1} [peek {exit_x + 1}] }}
     after time 9.4  {{ {dump('09_next_area')}; keymatrixdown 8 0x80 }}
-    after time 11.4 {{ {dump('10_next_area_walk')}; keymatrixup 8 0x80 }}
-    after time 11.5 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; close $f; exit }}
+    after time 11.4 {{ {dump('10_next_area_walk')}; keymatrixup 8 0x80
+                       # first staircase of the area (if any): stand 6 px right of its foot
+                       set sp [expr {{[peek {stairs}] + 256*[peek {stairs + 1}]}}]
+                       set ::nst [peek $sp]
+                       if {{$::nst > 0}} {{
+                           set fx [expr {{[peek [expr {{$sp+1}}]] + 256*[peek [expr {{$sp+2}}]] + 6}}]
+                           poke {px_a} [expr {{$fx & 255}}]; poke {px_a + 1} [expr {{$fx >> 8}}]
+                           set f [open "{result_file}" a]
+                           puts $f "stair foot=[expr {{[peek [expr {{$sp+1}}]] + 256*[peek [expr {{$sp+2}}]]}}],[peek [expr {{$sp+3}}]] top=[expr {{[peek [expr {{$sp+4}}]] + 256*[peek [expr {{$sp+5}}]]}}],[peek [expr {{$sp+6}}]]"
+                           close $f
+                       }} }}
+    after time 11.6 {{ keymatrixdown 8 0x20 }}
+    after time 14.6 {{ keymatrixup 8 0x20; {dump('11_stairs_up')}; keymatrixdown 8 0x40 }}
+    after time 17.6 {{ keymatrixup 8 0x40; {dump('12_stairs_down')} }}
+    after time 17.7 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; close $f; exit }}
 """ if areas > 1 else f"""
     after time 9.0  {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; close $f; exit }}
 """
@@ -182,11 +196,15 @@ def run():
     whip_seq = []
     vblank_us = 10 ** 9
     hud_hearts = ""
+    stair = None
     with open(result_file) as f:
         for line in f:
             tag, *kv = line.split()
             if tag == "jumpy":
                 jump_y = [int(v) for v in kv]
+                continue
+            if tag == "stair":
+                stair = {k: tuple(int(v) for v in val.split(",")) for k, val in (x.split("=") for x in kv)}
                 continue
             if tag == "hud_hearts":
                 hud_hearts = kv[0] if kv else ""
@@ -265,6 +283,13 @@ def run():
             and snaps["10_next_area_walk"]["py"] == snaps["09_next_area"]["py"]
             and snaps["10_next_area_walk"]["on_ground"] == 1)]
           if "09_next_area" in snaps else []),
+        *([("UP at a staircase's foot climbs it to the top",
+            (snaps["11_stairs_up"]["px"], snaps["11_stairs_up"]["py"]) == stair["top"]
+            and snaps["11_stairs_up"]["stair_state"] == 0 and snaps["11_stairs_up"]["on_ground"] == 1),
+           ("DOWN at its top walks back down to the foot",
+            (snaps["12_stairs_down"]["px"], snaps["12_stairs_down"]["py"]) == stair["foot"]
+            and snaps["12_stairs_down"]["stair_state"] == 0)]
+          if stair else []),
         ("walking left turns the player", left["facing"] == 1
          and left["px"] < land["px"]),
     ]

@@ -21,7 +21,8 @@
 - [x] Real collision rule from the ROM (tiles $60-$6B), per 8x8 tile
 - [x] Areas in their own ROM banks; the courtyard gate leads into the entrance hall
 - [x] Entrance hall: graphics, layout, collision, wall candles
-- [ ] Stairs (needed to reach the hall's upper floor and its exit)
+- [x] Stairs from the ROM's stair table: get on/off, climb and descend, whip on stairs
+- [ ] The exit door at the end of the hall (into stage 2)
 - [ ] Palette selection table, stages 2 and up
 
 ## Milestone 2: Simon (in progress)
@@ -33,7 +34,8 @@
 - [ ] Knock-back arc, falling speed after the arc
 - [x] Whip: standing, crouching and jumping, NES timing (checked by the test), hit box
 - [x] Metasprites with double-buffered sprite pages (VBLANK work stays under 3 ms)
-- [ ] Stairs, whip upgrades (chain, morning star), sub-weapons
+- [x] Stairs (climbing pose recorded from the NES; descending reuses it)
+- [ ] Whip upgrades (chain, morning star), sub-weapons, whip poses on stairs
 - [ ] Sub-weapons
 - [ ] Hearts, score, timer, life bar in the HUD
 

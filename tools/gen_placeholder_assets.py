@@ -263,7 +263,7 @@ assert len(PLACEHOLDER_JUMP) == 20
 
 WHIP_SLOT = 14
 POSE_NAMES = ["stand", "walk1", "walk2", "tuck", "whip1", "whip2", "whip3", "whip4",
-              "whip1c", "whip2c", "whip3c", "whip4c"]
+              "whip1c", "whip2c", "whip3c", "whip4c", "stair"]
 
 PLAYER_COLOR_A = 2
 PLAYER_COLOR_B = 4
@@ -482,6 +482,7 @@ def player_sprites():
             px = dict(placeholder_whip(n))
             px.update(base)
             poses.append(px)
+    poses.append(walk2)                 # placeholder stair pose
     bank = msx_sprites.SpriteBank()
     names = []
     for facing in ("right", "left"):
@@ -556,6 +557,8 @@ def main():
         cdata += bytes([x & 0xFF, x >> 8, y, item, kind])
     with open(os.path.join(area_dir, "candles.bin"), "wb") as f:
         f.write(cdata)
+    with open(os.path.join(area_dir, "stairs.bin"), "wb") as f:
+        f.write(bytes([0]))             # the placeholder level has no stairs
     stats.update(dir="area_0", obj_patterns=n_obj, exit_x=None)
     areas_asm.write(out_dir, [stats])
 

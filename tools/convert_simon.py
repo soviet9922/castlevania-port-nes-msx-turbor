@@ -26,6 +26,8 @@ POSES = {
     "walk1": ([(0x0C, 0, 0), (0x0A, 8, 0), (0x10, 0, 16), (0x0E, 8, 16)], []),
     "walk2": ([(0x14, 0, 0), (0x12, 8, 0), (0x18, 0, 16), (0x16, 8, 16)], []),
     "tuck": ([(0x04, 0, 0), (0x02, 8, 0)] + LEGS_TUCK, []),
+    # climbing: alternates with walk1 every 8 frames (recorded on the hall stairs)
+    "stair": ([(0x14, 0, 0), (0x12, 8, 0), (0x38, 0, 16), (0x36, 8, 16)], []),
 }
 WHIP_TOPS = {
     "whip1": ([(0x1C, -8, 0), (0x1A, 0, 0)], [(0x1E, -16, 0), (0x20, -16, 16)]),
@@ -42,7 +44,7 @@ for name, (top, whip) in WHIP_TOPS.items():
 # engine pose numbers (src/player.asm)
 POSE_ORDER = ["stand", "walk1", "walk2", "tuck",
               "whip1", "whip2", "whip3", "whip4",
-              "whip1c", "whip2c", "whip3c", "whip4c"]
+              "whip1c", "whip2c", "whip3c", "whip4c", "stair"]
 
 SIMON_PALETTE = 0xCDE9          # fixed bank: $3F $10, then the sprite palettes
 JUMP_TABLE = (6, 0x9B90)        # 20 signed bytes: dy per frame while rising
