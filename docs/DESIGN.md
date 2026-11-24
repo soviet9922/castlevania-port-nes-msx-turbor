@@ -150,7 +150,13 @@ Braziers, their bursts and the items they drop live in 8 object slots
 slots 12 and up of both sprite pages, after Simon's 12 streamed slots. Their sprites are
 appended after Simon's in the attribute table each frame. Their hardware sprite
 numbers change with Simon's sprite count, so their colour columns are rewritten
-into the hidden page every frame (16 bytes per sprite). Object colours use the stage
+into the hidden page every frame (16 bytes per sprite).
+
+That leaves 64 - 12 = 52 pattern slots for objects. The converter only includes
+the frames an area can show (the courtyard has no enemies, the hall no braziers),
+and stops the build if an area still needs more than 52 patterns. If one does, it first
+folds the least visible frames into others (the hall's panthers use their first
+running frame in place of the third). Object colours use the stage
 palette: the exact colour where it exists, otherwise the nearest one.
 
 The hardware shows at most 8 sprites per scanline. Simon uses up to 6 on a line
@@ -175,16 +181,20 @@ points along the stairs, and gets off at either end.
 ### Enemies and getting hit
 
 Enemies are objects too. Each area lists its zombie spawners (from the
-NES enemy groups). While one is within the camera window, a zombie appears
-every 32 frames at alternating screen edges (at most 3). Simon has 64 HP,
+NES enemy groups). While one is within the camera window, zombies come in
+waves, like on the NES: three, 32 frames apart, at alternating screen edges. The
+next wave starts only when the whole wave is gone (killed or walked off the
+screen), after a pause of 96 + 32 frames. Simon has 64 HP,
 shown as 8 HUD tiles. A hit freezes him, then the knock-back uses the same arc
 code as the jump, with the NES knock-back table instead of the jump table. He
 lands crouched, then blinks for 140 frames. Running out of health restarts the area.
 
 Black panthers are placed enemies: the converter adds them to the area's
 candle list as a third kind, so they spawn near the screen and stay dead
-once killed, exactly like candles. Each runs a small state machine (wait, run, leap
-with gravity, run).
+once killed, exactly like candles. A panther that wakes up is marked dead at
+once, so it doesn't come back after running off the screen. Each runs a small
+state machine (wait, run, leap with gravity, run). Whenever there is no floor
+under a running panther it leaps again, so it never runs through the air.
 
 With more than 8 sprites on a line, the VDP drops the extras. The order of
 objects in the sprite list rotates every frame (Simon always comes first), so

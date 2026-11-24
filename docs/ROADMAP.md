@@ -50,7 +50,9 @@
 - [x] Zombies from the ROM's enemy groups: spawn at the screen edges, walk across, die to the whip
 - [x] Health, getting hit: freeze, knock-back arc from the ROM, crouched landing, blinking invincibility
 - [x] Sprite priority rotation (flicker instead of missing sprites past 8 per line)
-- [x] Black panthers: wait, run, leap off the platform, run along the floor
+- [x] Black panthers: wait, run, leap off the platform, run along the floor, never come back
+- [x] Zombies in waves of 3, like the NES
+- [x] Object sprite patterns per area, checked against the 52 free pattern slots
 - [ ] Bats (enemy type $04 never appeared in the recordings), fishmen …;
       enemy drops; score, lives, timer, death animation
 - [ ] Zombie, panther, bat, fishman, …

@@ -173,13 +173,17 @@ Recorded in the entrance hall (`tools/nes_probe/record_hall.lua`):
 - Zombies (16x32, tiles `80 82` over `88 8A` / `84 86`, sprite palette 1):
   - they appear at the screen edges (screen x 248 / 8), alternating sides, 32 frames
     apart, at most 3 at a time, while their spawner is near;
+  - they come in waves: in two hall recordings, 3 appear (frames 1520, 1552, 1584),
+    then nothing until the wave is gone; the next wave starts about 100-140 frames
+    after the last zombie of the previous one left (1921 after 1815, 2272 after 2135);
   - they walk straight across at 7 px every 8 frames and vanish off-screen;
   - one whip hit destroys one (burst).
 - Black panther (object id `$11`, enemy record type `$51`; one per record,
   centre x = (chunk-1)*64 + x - 1, y = centre line). States in `$04C0+slot`:
   `$51` waiting, `$52` running, `$1E` leaping.
   - It waits until Simon is within about 64 px, then runs at him (2 px per frame)
-    until the platform ends, and leaps.
+    until the platform ends, and leaps. A woken panther that leaves the screen
+    doesn't come back.
   - The leap is 2 px across per frame; the arc fits a start speed of -1.5 px and
     gravity of 1/8 px per frame, capped at 4 px. Measured, not yet found in the ROM.
   - After landing it runs (2 px per frame) towards the side Simon is on.

@@ -167,12 +167,13 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, preview=True)
         rgb = nes_to_msx_rgb(nes_rgb[nes])
         return min(range(1, 16), key=lambda s: (sum((a - b) ** 2 for a, b in
                                                     zip(msx_pal[s], rgb)), s))
-    obj_bank, obj_names = convert_objects.sprite_frames(rom, slot_for_nes)
+    cl = convert_objects.candles(rom, area["stage"], area["section"], width)
+    en = convert_objects.enemy_spawners(rom, area["stage"], area["section"], width)
+    obj_bank, obj_names = convert_objects.sprite_frames(
+        rom, slot_for_nes, convert_objects.needed_frames(cl, en))
     n_obj_patterns, _ = msx_sprites.write_bank(out_dir, obj_bank, obj_names,
                                                prefix=f"a{index}_obj")
-    cl = convert_objects.candles(rom, area["stage"], area["section"], width)
     convert_objects.write_candles(os.path.join(out_dir, "candles.bin"), cl)
-    en = convert_objects.enemy_spawners(rom, area["stage"], area["section"], width)
     convert_objects.write_enemies(os.path.join(out_dir, "enemies.bin"), en)
 
     st = stairs(rom, area["stage"], area["section"])

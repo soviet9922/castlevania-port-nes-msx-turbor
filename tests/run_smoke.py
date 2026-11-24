@@ -61,6 +61,7 @@ def tcl_script(syms, result_file):
     eoff, hurt, objt = syms["enemies_off"], syms["hurt_state"], syms["obj_table"]
     obj_size = 12                       # OBJ_SIZE in src/config.inc
     cand = syms["area_hdr"] + 32        # AH_CANDLES
+    cdead = syms["candle_dead"]
     areas = syms.get("AREA_COUNT", 1)
     # with more than one area: walk into the exit (courtyard gate) and on
     hall = f"""
@@ -191,20 +192,21 @@ proc panther_test {{}} {{
         if {{[peek [expr {{$r+4}}]] == 2}} {{
             set x [expr {{[peek $r] + 256*[peek [expr {{$r+1}}]] + 16 - 8 - 55}}]
             poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
-            after time 0.5 {{ panther_state }}
+            after time 0.5 [list panther_state $i]
             after time 0.6 {{ set ::hunting 1 }}
             after time 3.6 {{ set ::hunting 0; {dump('17_panther_whipped')} }}
             return
         }}
     }}
 }}
-proc panther_state {{}} {{
+proc panther_state {{idx}} {{
     set s 0
+    set dead [expr {{([peek [expr {{{cdead} + $idx/8}}]] >> ($idx%8)) & 1}}]
     for {{set i 0}} {{$i < 8}} {{incr i}} {{
         set b [expr {{{objt} + $i*{obj_size}}}]
         if {{[peek $b] == 6}} {{ set s [expr {{[peek [expr {{$b+9}}]] + 1}}] }}
     }}
-    set f [open "{result_file}" a]; puts $f "panther $s"; close $f
+    set f [open "{result_file}" a]; puts $f "panther $s $dead"; close $f
 }}
 proc zombie_watch {{}} {{
     if {{$::wait_hit && [peek {hurt}] != 0}} {{
@@ -274,6 +276,7 @@ def run():
     hud_hearts = ""
     overruns = (0, 0)
     panther = None
+    panther_dead = 0
     stair = None
     with open(result_file) as f:
         for line in f:
@@ -289,6 +292,7 @@ def run():
                 continue
             if tag == "panther":
                 panther = int(kv[0])
+                panther_dead = int(kv[1])
                 continue
             if tag == "overruns":
                 overruns = (int(kv[0]), int(kv[1]))
@@ -384,6 +388,7 @@ def run():
            ("the whip kills zombies", snaps["15_whipped"]["kills"] >= 1)]
           if "13_hit" in snaps else []),
         *([("a black panther wakes up when Simon comes near", panther >= 2),
+           ("a woken panther never respawns (marked dead at once)", panther_dead == 1),
            ("the whip kills the panther",
             snaps["17_panther_whipped"]["kills"] > snaps["15_whipped"]["kills"])]
           if panther is not None else []),

@@ -95,7 +95,9 @@ HURT_STUN       equ 3
 
 ; Zombies (spawn at the screen edges while a zombie spawner is near)
 ZOMBIE_INTERVAL equ 32                  ; frames between spawns
-ZOMBIE_MAX      equ 3
+ZOMBIE_MAX      equ 3                   ; per wave
+ZOMBIE_PAUSE    equ 96                  ; frames after a wave is gone, then
+                                        ; ZOMBIE_INTERVAL more to the next one
 SPAWNER_LEFT    equ 64                  ; spawner active within camera-64 .. camera+320
 SPAWNER_RIGHT   equ 320
 

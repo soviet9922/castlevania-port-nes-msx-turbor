@@ -84,7 +84,8 @@ arc_ptr         equ hurt_t+1            ; 2  arc table in use (jump or knock-bac
 arc_len         equ arc_ptr+2           ; 1  its rising length
 zombie_spawn_t  equ arc_len+1           ; 1
 zombie_side     equ zombie_spawn_t+1    ; 1  alternates the screen edge
-enemies_off     equ zombie_side+1       ; 1  test hook: bit 0 = no zombies, bit 1 = no panthers
+zombie_wave     equ zombie_side+1    ; 1  zombies spawned in this wave
+enemies_off     equ zombie_wave+1       ; 1  test hook: bit 0 = no zombies, bit 1 = no panthers
 player_dead     equ enemies_off+1       ; 1  set when health runs out
 spr_hide        equ player_dead+1       ; 1  Simon blinks this frame
 kills           equ spr_hide+1          ; 1  enemies defeated (for the score later)

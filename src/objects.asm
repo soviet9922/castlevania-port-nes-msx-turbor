@@ -71,6 +71,9 @@ objects_reset:
         ldir
         ld hl,0xFFFF
         ld (spawn_last),hl
+        xor a
+        ld (zombie_wave),a
+        ld (zombie_spawn_t),a
         ret
 
 ; A = candle index -> HL = byte in candle_dead, B = bit mask (DE, C clobbered)
@@ -693,6 +696,13 @@ panther_update:
 .dir_set:
         ld (ix+9),1
         ld (ix+4),0
+        ld a,(ix+8)                     ; once awake it never comes back,
+        cp 0xFF                         ; even if it leaves the screen
+        jr z,.awake
+        call candle_bit
+        ld a,(hl)
+        or b
+        ld (hl),a
 
 .awake:
         inc (ix+4)                      ; move 2 px in the running direction
@@ -711,10 +721,9 @@ panther_update:
         ld a,(ix+9)
         cp 2
         jr z,.leaping
-        cp 1
-        jp nz,.check_hits               ; 3: just runs
-        ld l,(ix+1)                     ; 1: ground under its front?
-        ld h,(ix+2)
+        ld l,(ix+1)                     ; 1, 3: ground under it? If not, leap
+        ld h,(ix+2)                     ; (off a platform, or again at the
+                                        ; next edge, so it never runs on air)
         ld de,16
         add hl,de
         ld e,(ix+3)
@@ -911,7 +920,9 @@ simon_dx:
 
 ; ---------------------------------------------------------------------------
 ; Zombie spawners: while one is near the camera, a zombie appears every
-; ZOMBIE_INTERVAL frames at alternating screen edges, at most ZOMBIE_MAX.
+; ZOMBIE_INTERVAL frames at alternating screen edges, in waves of ZOMBIE_MAX.
+; Like the NES, the next wave starts only after the last one is gone
+; (killed or walked off screen) plus a pause.
 ; ---------------------------------------------------------------------------
 enemies_update:
         ld a,(enemies_off)
@@ -955,29 +966,38 @@ enemies_update:
         pop hl
         ld hl,zombie_spawn_t
         inc (hl)
+        ld a,(zombie_wave)
+        cp ZOMBIE_MAX
+        jr c,.in_wave
+        push bc                         ; wave complete: wait until its
+        call count_zombies              ; zombies are all gone, then pause
+        pop bc
+        ld hl,zombie_spawn_t
+        jr z,.all_gone
+        ld (hl),0
+        ret
+.all_gone:
+        ld a,(hl)
+        cp ZOMBIE_PAUSE
+        ret c
+        xor a
+        ld (hl),a
+        ld (zombie_wave),a
+        ret
+.in_wave:
         ld a,(hl)
         cp ZOMBIE_INTERVAL
         ret c
         ld (hl),0
         push bc
-        ld ix,obj_table                 ; how many zombies are there?
-        ld de,OBJ_SIZE
-        ld b,OBJ_MAX
-        ld c,0
-.count:
-        ld a,(ix+0)
-        cp OBJ_ZOMBIE
-        jr nz,.not_one
-        inc c
-.not_one:
-        add ix,de
-        djnz .count
-        ld a,c
+        call count_zombies
         pop bc
         cp ZOMBIE_MAX
         ret nc
         call obj_free_slot
         ret c
+        ld hl,zombie_wave
+        inc (hl)
         ld hl,(cam_x)
         ld a,(zombie_side)
         xor 1
@@ -998,6 +1018,24 @@ enemies_update:
         ld (ix+7),KIND_BRAZIER          ; 16x32 box for the whip
         ld (ix+8),0xFF
         ld (ix+9),0
+        ret
+
+; -> A = number of zombies alive, Z if none (BC, DE, IX clobbered)
+count_zombies:
+        ld ix,obj_table
+        ld de,OBJ_SIZE
+        ld b,OBJ_MAX
+        ld c,0
+.lp:
+        ld a,(ix+0)
+        cp OBJ_ZOMBIE
+        jr nz,.not_one
+        inc c
+.not_one:
+        add ix,de
+        djnz .lp
+        ld a,c
+        or a
         ret
 
 ; Carry set if the item (sprite y+8..y+23) rests on solid ground.

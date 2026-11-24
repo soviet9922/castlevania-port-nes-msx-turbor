@@ -125,8 +125,52 @@ def candles(rom, stage, section, level_px):
     return out
 
 
-def sprite_frames(rom, slot_for_nes):
-    """-> (SpriteBank, names) for the object frames, colours mapped to MSX slots."""
+# Hardware limit: 64 sprite patterns, the first 12 streamed for Simon.
+MAX_OBJ_PATTERNS = 64 - 12
+
+ITEM_FRAMES = {ITEM_WHIPUP: "whipup", ITEM_HEART: "heart",
+               ITEM_DAGGER: "dagger", ITEM_SMALLHEART: "smallheart"}
+
+# Frames to fold into another one when an area is over the pattern budget,
+# least visible loss first.
+FOLDS = [("panther_run3_l", "panther_run1_l"), ("panther_run3_r", "panther_run1_r"),
+         ("panther_sit_r", "panther_sit_l")]
+
+
+def needed_frames(candle_list, spawners):
+    """-> set of frame names an area can show (others are left empty)."""
+    need = {"burst1", "burst2", "burst3", "burst4"}
+    for _, _, item, kind in candle_list:
+        if kind == KIND_BRAZIER:
+            need |= {"brazier1", "brazier2"}
+        elif kind == KIND_CANDLE:
+            need |= {"candle1", "candle2"}
+        else:
+            need |= {n for n in OBJ_FRAMES if n.startswith("panther")}
+        if item in ITEM_FRAMES:
+            need.add(ITEM_FRAMES[item])
+    if spawners:
+        need |= {n for n in OBJ_FRAMES if n.startswith("zombie")}
+    return need
+
+
+def sprite_frames(rom, slot_for_nes, need=None):
+    """-> (SpriteBank, names) for the object frames, colours mapped to MSX slots.
+    Frames not in `need` are empty. If the patterns don't fit in the hardware's
+    free pattern slots, frames from FOLDS reuse another frame's sprites."""
+    need = set(OBJ_FRAMES) if need is None else set(need)
+    alias = {}
+    for drop, keep in [(None, None)] + FOLDS:
+        if drop is not None and drop in need:
+            alias[drop] = keep
+        bank = _build_bank(rom, slot_for_nes, need, alias)
+        if len(bank.patterns) <= MAX_OBJ_PATTERNS:
+            return bank, list(OBJ_FRAMES)
+    raise SystemExit(f"object sprites need {len(bank.patterns)} patterns, "
+                     f"only {MAX_OBJ_PATTERNS} available")
+
+
+def _build_bank(rom, slot_for_nes, need, alias):
     chr_ram = rom.chr_ram()
     pals = [[rom.fixed(SPRITE_PALETTES + p * 4 + v) for v in range(4)] for p in range(4)]
     from msx_sprites import mirror
@@ -134,6 +178,10 @@ def sprite_frames(rom, slot_for_nes):
     frames.update(PANTHER_LEFT)
     bank = SpriteBank()
     for name in OBJ_FRAMES:
+        if name not in need:
+            bank.add_frame({}, name)
+            continue
+        name = alias.get(name, name)
         if name.startswith("panther") and name.endswith("_r"):
             src = name[:-2] + "_l"
             pixels = mirror(_frame_pixels(chr_ram, pals, frames[src], slot_for_nes), width=32)
@@ -150,7 +198,7 @@ def sprite_frames(rom, slot_for_nes):
                         if v:
                             pixels[(dx + x, dy + half * 8 + y)] = slot_for_nes(pals[pal][v])
         bank.add_frame(pixels, name)
-    return bank, list(OBJ_FRAMES)
+    return bank
 
 
 def _frame_pixels(chr_ram, pals, sprites, slot_for_nes):
