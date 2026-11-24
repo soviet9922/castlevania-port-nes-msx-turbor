@@ -73,6 +73,10 @@ make run-nes
 
 ### Emulator compatibility
 
+The ROM is an ASCII16 MegaROM. Emulators and flash-cartridge loaders detect
+this automatically (the code is written so that the detection is unambiguous),
+but if one asks, choose **ASCII16**.
+
 | Emulator | Status |
 |---|---|
 | openMSX | works (recommended; used by the automated tests) |

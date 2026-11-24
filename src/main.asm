@@ -30,6 +30,8 @@ init:
         di
         call select_cpu
         call enable_page2
+        ld a,1
+        ld (ASCII16_PAGE2),a            ; also makes the mapper easy to detect
 
         ; clear engine RAM
         ld hl,RAM_BASE

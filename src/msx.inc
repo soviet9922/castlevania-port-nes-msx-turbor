@@ -28,7 +28,10 @@ VDP_IND         equ 0x9B
 
 ; ASCII16 MegaROM mapper bank select registers
 ASCII16_PAGE1   equ 0x6000      ; selects the bank seen at 0x4000-0x7FFF
-ASCII16_PAGE2   equ 0x7000      ; selects the bank seen at 0x8000-0xBFFF
+ASCII16_PAGE2   equ 0x77FF      ; selects the bank seen at 0x8000-0xBFFF (0x7000-0x77FF)
+; Emulators and flash-cartridge loaders guess the mapper by scanning the ROM
+; for LD (nnnn),A instructions. 0x7000 also counts for Konami SCC and ASCII8,
+; while 0x77FF counts for ASCII16 only, so we always use 0x77FF.
 
 ; Keyboard matrix / GTTRIG ids
 TRIG_SPACE      equ 0

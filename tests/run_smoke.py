@@ -218,8 +218,9 @@ def run():
     with open(script, "w") as f:
         f.write(tcl_script(syms, result_file))
 
-    cmd = ["openmsx", "-machine", MACHINE, "-cart", ROM, "-romtype", "ASCII16",
-           "-script", script]
+    # no -romtype: the ROM must be detected as ASCII16 automatically, as it
+    # is when a user simply opens it in an emulator
+    cmd = ["openmsx", "-machine", MACHINE, "-cart", ROM, "-script", script]
     if not os.environ.get("DISPLAY") and shutil.which("xvfb-run"):
         cmd = ["xvfb-run", "-a"] + cmd
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
