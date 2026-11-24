@@ -172,6 +172,27 @@ to the exact spot and get on. On the stairs, gravity and collision are off.
 He moves one pixel across and one up or down on alternating frames while the stick
 points along the stairs, and gets off at either end.
 
+### Enemies and getting hit
+
+Enemies are objects too. Each area lists its zombie spawners (from the
+NES enemy groups). While one is within the camera window, a zombie appears
+every 32 frames at alternating screen edges (at most 3). Simon has 64 HP,
+shown as 8 HUD tiles. A hit freezes him, then the knock-back uses the same arc
+code as the jump, with the NES knock-back table instead of the jump table. He
+lands crouched, then blinks for 140 frames. Running out of health restarts the area.
+
+With more than 8 sprites on a line, the VDP drops the extras. The order of
+objects in the sprite list rotates every frame (Simon always comes first), so
+crowded lines flicker instead of losing sprites, as on the NES.
+
+### Performance
+
+On the 3.58 MHz Z80 test machine, a normal frame needs about 6 ms of logic
+plus 2.7 ms of VBLANK work. Most of the logic is building the sprite list (2.5 ms) and
+writing it to the hidden page (2.4 ms). Busy hall scenes (5 candles, 3 zombies,
+Simon changing pose) occasionally need more than a frame: the smoke test reports
+how often (about 3%). The turbo R's R800 runs the logic several times faster.
+
 ## Areas and ROM banks
 
 Each area (courtyard, entrance hall, …) is one 16 KB ROM bank (area n =

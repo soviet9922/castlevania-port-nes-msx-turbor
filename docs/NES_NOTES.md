@@ -160,13 +160,39 @@ Measured with `tools/nes_probe/record_courtyard.lua`, which walks through the co
 - An item hangs for 4 frames, then falls 1 px/frame (2 px from the 8th
   frame) until it lands.
 
+## Enemies: zombies, health, getting hit
+
+Recorded in the entrance hall (`tools/nes_probe/record_hall.lua`):
+
+- Object id per slot: `$0434+slot` (`$01` zombie, `$28` candle); `$04C0+slot`
+  is a per-object type/state (the object spawner `$EF10` stores it).
+- Each 64-px chunk's first byte is an **enemy group**. It indexes the same pointer
+  tables as the candle groups, and the record is `type, x, y`, loaded into one of
+  6 spawner slots (`$0160-$018F`). Hall types: `$01` zombie (floor,
+  y 192), `$04` bat, `$51` black panther. Zombie spawners are at chunks 1, 5, 20 and 22.
+- Zombies (16x32, tiles `80 82` over `88 8A` / `84 86`, sprite palette 1):
+  - they appear at the screen edges (screen x 248 / 8), alternating sides, 32 frames
+    apart, at most 3 at a time, while their spawner is near;
+  - they walk straight across at 7 px every 8 frames and vanish off-screen;
+  - one whip hit destroys one (burst).
+- Simon's health: `$45`, 64 at the start (16 bar segments of 4). A zombie takes 8.
+- Getting hit:
+  - frozen for 6 frames, then knocked back 1 px per frame away from the enemy,
+    facing it, in the "hurt" pose (`3A 3C / 4C 34`);
+  - the knock-back arc is the table at bank 6 `$9BA8` (17 signed steps,
+    `$81`-terminated, mirrored for the fall), the same format as the jump table;
+  - he lands crouched for about 17 frames, then blinks (invincible) until about
+    140 frames after the hit.
+
 ## Still unknown
 
 - The descending stair pose and the whip poses on stairs (the port reuses the
   climbing and standing poses).
 - The candle drop rule (codes other than 4 and 8, and code 0 on wall candles).
 - Stages 2 and up (`$81A2`, `$8202`, `$8292` in bank 4; other banks for later blocks).
-- Wall candles (object `$27`), enemy groups, Simon's sprite assembly table, the whip's exact
+- Bats, panthers and the other enemy types; enemy item drops; the score
+  values; lives, death and the timer;
+- Simon's sprite assembly table, the whip's exact
   hit box and damage rules, the crouching whip pose (the port draws the
   standing whip pose with the crouched legs), music.
 - Falling speed after the jump arc ends, and the exact arc used when

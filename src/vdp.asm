@@ -225,15 +225,36 @@ write_player_sprites:
         ld b,a
         call vram_out_slow
 
-        ; colour columns of the object sprites (their sprite numbers change
-        ; with Simon's sprite count, so they are written every frame)
+        ; colour columns of the object sprites. Their sprite numbers change
+        ; with Simon's sprite count, so each page remembers which column
+        ; every hardware sprite has (sct_cache) and only changes are written.
+        ld a,(spr_back)
+        ld hl,sct_cache
+        or a
+        jr z,.cache0
+        ld hl,sct_cache+MAX_SPRITES
+.cache0:
+        ld (tmp_w),hl                   ; this page's cache
         ld a,(spr_player_n)
         ld c,a
         ld a,(spr_total)
         sub c
         jr z,.no_objects
         ld b,a
-        ld l,c
+.obj_lp:
+        push bc
+        ld e,c
+        ld d,0
+        ld hl,obj_sct_list
+        add hl,de
+        ld a,(hl)                       ; wanted column
+        ld hl,(tmp_w)
+        add hl,de
+        cp (hl)
+        jr z,.obj_same
+        ld (hl),a
+        push af
+        ld l,c                          ; VRAM_SCT + sprite * 16
         ld h,0
         add hl,hl
         add hl,hl
@@ -245,14 +266,8 @@ write_player_sprites:
         ld a,(spr_back)
         call vram_set_write_far
         ei
-        ld e,c
-        ld d,0
-        ld hl,obj_sct_list
-        add hl,de
-.obj_lp:
-        push bc
-        push hl
-        ld l,(hl)
+        pop af
+        ld l,a
         ld h,0
         add hl,hl
         add hl,hl
@@ -262,9 +277,9 @@ write_player_sprites:
         add hl,de
         ld b,16
         call vram_out_slow
-        pop hl
-        inc hl
+.obj_same:
         pop bc
+        inc c
         djnz .obj_lp
 .no_objects:
         call vram_r14_zero
@@ -274,6 +289,17 @@ write_player_sprites:
 
 ; Copy the patterns and colour columns of cur_frame into the hidden page.
 stream_frame:
+        ld a,(spr_back)                 ; Simon's colours replace these entries
+        ld hl,sct_cache
+        or a
+        jr z,.inval
+        ld hl,sct_cache+MAX_SPRITES
+.inval:
+        ld b,PLAYER_SPRITES
+.inv_lp:
+        ld (hl),0xFF
+        inc hl
+        djnz .inv_lp
         ld a,(cur_frame)
         call frame_address
         ld b,(ix+0)

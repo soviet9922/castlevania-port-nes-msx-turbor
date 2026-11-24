@@ -33,7 +33,8 @@ SPRITE_PALETTES = 0xCDEB         # 4 x 4 colours after the $3F $10 header
 
 # engine object frame numbers (src/objects.asm)
 OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
-              "heart", "whipup", "dagger", "candle1", "candle2", "smallheart"]
+              "heart", "whipup", "dagger", "candle1", "candle2", "smallheart",
+              "zombie_l1", "zombie_l2", "zombie_r1", "zombie_r2"]
 
 KIND_BRAZIER, KIND_CANDLE = 0, 1
 ITEM_WHIPUP, ITEM_HEART, ITEM_DAGGER, ITEM_SMALLHEART = 0, 1, 2, 3
@@ -53,7 +54,14 @@ FRAME_SPRITES = {
     "candle1": [(0x40, 4, 8, 3, 0)],
     "candle2": [(0x50, 4, 8, 3, 0)],
     "smallheart": [(0x9F, 4, 8, 3, 0)],
+    # zombie: 16x32 like Simon, palette 1; art faces left, flipped for right
+    "zombie_l1": [(0x80, 0, 0, 1, 0), (0x82, 8, 0, 1, 0), (0x88, 0, 16, 1, 0), (0x8A, 8, 16, 1, 0)],
+    "zombie_l2": [(0x80, 0, 0, 1, 0), (0x82, 8, 0, 1, 0), (0x84, 0, 16, 1, 0), (0x86, 8, 16, 1, 0)],
+    "zombie_r1": [(0x82, 0, 0, 1, 1), (0x80, 8, 0, 1, 1), (0x8A, 0, 16, 1, 1), (0x88, 8, 16, 1, 1)],
+    "zombie_r2": [(0x82, 0, 0, 1, 1), (0x80, 8, 0, 1, 1), (0x86, 0, 16, 1, 1), (0x84, 8, 16, 1, 1)],
 }
+
+ENEMY_ZOMBIE = 0x01             # spawner type in the enemy group records
 
 
 def candles(rom, stage, section, level_px):
@@ -109,6 +117,35 @@ def sprite_frames(rom, slot_for_nes):
                             pixels[(dx + x, dy + half * 8 + y)] = slot_for_nes(pals[pal][v])
         bank.add_frame(pixels, name)
     return bank, list(OBJ_FRAMES)
+
+
+def enemy_spawners(rom, stage, section, level_px):
+    """Zombie spawners of the area -> list of (world x, box y). The enemy
+    group (first byte of each chunk) indexes the same pointer tables as the
+    candle groups; record: type, x, y. Only zombies are converted so far."""
+    def w7(a):
+        return rom.fixed(a) | rom.fixed(a + 1) << 8
+    table = w7(w7(STAGE_TABLE + 2 * stage) + 2 * section)
+    out = []
+    for chunk in range(level_px // 64 + 2):
+        group = rom.fixed(table + 2 * chunk)
+        if group == 0:
+            continue
+        p = w7(CANDLE_GROUPS[group >> 7] + ((group << 1) & 0xFF))
+        if rom.fixed(p) != ENEMY_ZOMBIE:
+            continue
+        x = (chunk - 1) * 64 + rom.fixed(p + 1)
+        if 0 <= x < level_px:
+            out.append((x, rom.fixed(p + 2) - 64))
+    return out
+
+
+def write_enemies(path, spawners):
+    data = bytearray([len(spawners)])
+    for x, y in spawners:
+        data += bytes([x & 0xFF, x >> 8, y & 0xFF, ENEMY_ZOMBIE])
+    with open(path, "wb") as f:
+        f.write(data)
 
 
 def write_candles(path, items):

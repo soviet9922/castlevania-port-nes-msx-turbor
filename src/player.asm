@@ -16,6 +16,8 @@ player_reset:
         xor a
         ld (jump_idx),a
         ld (stair_state),a
+        ld (hurt_state),a
+        ld (invuln_t),a
         ld (crouching),a
         ld (pyoff),a
         ld (facing),a
@@ -31,10 +33,118 @@ player_reset:
 
 ; Fell into a pit: restart at the beginning of the level.
 respawn:
+        ld a,HP_MAX
+        ld (hp),a
+        ld a,1
+        ld (hud_dirty),a
         ld a,(cur_area)
         jp load_area
 
+; Main loop: health ran out -> restart the area (lives are not counted yet)
+check_death:
+        ld a,(player_dead)
+        or a
+        ret z
+        xor a
+        ld (player_dead),a
+        jr respawn
+
+arc_jump:
+        ld hl,jump_table
+        ld (arc_ptr),hl
+        ld a,JUMP_LEN
+        ld (arc_len),a
+        ret
+
+; ---------------------------------------------------------------------------
+; Getting hit. B = direction to knock Simon (+1 right, -1 left).
+; Frozen HIT_FREEZE frames, then knocked back along the NES knock-back arc
+; (facing the enemy, moving away from it), stunned STUN_FRAMES after landing,
+; and invincible (blinking) for INVULN_FRAMES. On the stairs he only takes
+; the damage, as on the NES.
+; ---------------------------------------------------------------------------
+simon_hurt:
+        ld a,(invuln_t)
+        or a
+        ret nz
+        ld a,(hurt_state)
+        or a
+        ret nz
+        ld a,(hp)
+        sub ZOMBIE_DAMAGE
+        jr c,.dead
+        jr z,.dead
+        ld (hp),a
+        ld a,1
+        ld (hud_dirty),a
+        ld a,INVULN_FRAMES
+        ld (invuln_t),a
+        xor a
+        ld (whip_t),a
+        ld (whip_active),a
+        ld (crouching),a
+        ld a,(stair_state)
+        cp 2
+        ret z                           ; on the stairs: no knock-back
+        xor a
+        ld (stair_state),a
+        ld a,b
+        ld (air_dx),a
+        rlca                            ; knocked right -> face left
+        and 1
+        xor 1
+        ld (facing),a
+        ld a,HURT_FREEZE
+        ld (hurt_state),a
+        ld a,HIT_FREEZE
+        ld (hurt_t),a
+        ret
+.dead:
+        xor a
+        ld (hp),a
+        inc a
+        ld (player_dead),a
+        ld (hud_dirty),a
+        ret
+
+; Count down the freeze (then start the knock-back) or the stun.
+hurt_tick:
+        ld hl,hurt_t
+        dec (hl)
+        ret nz
+        ld a,(hurt_state)
+        cp HURT_FREEZE
+        jr nz,.stun_over
+        ld a,HURT_FLY
+        ld (hurt_state),a
+        xor a
+        ld (jump_idx),a
+        ld (on_ground),a
+        ld hl,kb_table
+        ld (arc_ptr),hl
+        ld a,KB_LEN
+        ld (arc_len),a
+        ret
+.stun_over:
+        xor a
+        ld (hurt_state),a
+        ret
+
 player_update:
+        ld a,(invuln_t)
+        or a
+        jr z,.not_invuln
+        dec a
+        ld (invuln_t),a
+.not_invuln:
+        ld a,(hurt_state)               ; hit: frozen, knocked back or stunned
+        or a
+        jr z,.not_hurt
+        cp HURT_FLY
+        jp z,.in_air                    ; the knock-back arc carries him
+        call hurt_tick
+        jp player_animate
+.not_hurt:
         ld a,(stair_state)
         or a
         jp nz,stairs_update
@@ -97,6 +207,7 @@ player_update:
         ld a,(jump_pressed)
         or a
         jr z,.move_h
+        call arc_jump
         xor a
         ld (jump_idx),a
         ld (on_ground),a
@@ -155,31 +266,39 @@ player_update:
         ld c,32                         ; anything under the feet?
         call foot_probe
         jp c,player_animate
+        call arc_jump
         xor a                           ; walked off a ledge
         ld (on_ground),a
         ld (air_dx),a
         ld a,FALL_START
         ld (jump_idx),a
 
-.airborne:
+.airborne:                              ; arc: jump or knock-back table
+        ld a,(arc_len)
+        ld b,a
         ld a,(jump_idx)
         ld c,a
-        cp JUMP_LEN
+        cp b
         jr nc,.descend
         ld e,a                          ; rising: dy = table[idx]
         ld d,0
-        ld hl,jump_table
+        ld hl,(arc_ptr)
         add hl,de
         ld a,(hl)
         jr .step
 .descend:
-        cp JUMP_LEN*2
+        ld a,b
+        add a,a
+        ld b,a                          ; 2 * length
+        ld a,c
+        cp b
         jr nc,.terminal
-        ld a,JUMP_LEN*2-1               ; falling: dy = -table[2*LEN-1-idx]
+        ld a,b                          ; falling: dy = -table[2*LEN-1-idx]
+        dec a
         sub c
         ld e,a
         ld d,0
-        ld hl,jump_table
+        ld hl,(arc_ptr)
         add hl,de
         ld a,(hl)
         neg
@@ -202,8 +321,11 @@ player_update:
         add hl,de
         ld (py),hl
 
+        ld a,(arc_len)
+        ld b,a
         ld a,(jump_idx)
-        cp JUMP_LEN+1
+        dec a
+        cp b
         jr c,.rising
 
         ld c,31                         ; falling: feet inside something solid?
@@ -222,6 +344,13 @@ player_update:
         ld (on_ground),a
         xor a
         ld (jump_idx),a
+        ld a,(hurt_state)               ; landing from a knock-back: stunned
+        cp HURT_FLY
+        jp nz,player_animate
+        ld a,HURT_STUN
+        ld (hurt_state),a
+        ld a,STUN_FRAMES
+        ld (hurt_t),a
         jp player_animate
 
 .rising:
@@ -237,7 +366,8 @@ player_update:
         ld (py),hl
         ld a,(jump_idx)                 ; continue with the mirrored fall
         ld b,a
-        ld a,JUMP_LEN*2
+        ld a,(arc_len)
+        add a,a
         sub b
         ld (jump_idx),a
 
@@ -265,6 +395,15 @@ player_animate:
         ld a,POSE_STAIR
         jr .set_frame
 .not_stairs:
+        ld a,(hurt_state)
+        or a
+        jr z,.not_hurt_pose
+        cp HURT_STUN
+        ld a,CROUCH_Y
+        jr z,.tucked                    ; stunned: crouched
+        ld a,POSE_HURT
+        jr .set_frame
+.not_hurt_pose:
         ld a,(on_ground)
         or a
         jr nz,.ground_anim
@@ -452,6 +591,18 @@ build_sat:
         add a,NPOSES
 .right:
         ld (cur_frame),a
+        ld a,(invuln_t)                 ; invincible: blink (not while flying back)
+        or a
+        jr z,.no_blink
+        ld a,(hurt_state)
+        cp HURT_FLY
+        ld a,0
+        jr z,.no_blink
+        ld a,(frame_count)
+        and 1
+.no_blink:
+        ld (spr_hide),a
+        ld a,(cur_frame)
         call frame_address
         ld b,(ix+0)
         inc ix
@@ -481,6 +632,9 @@ build_sat:
         jr c,.hide                      ; more than 16 lines above
 .y_ok:
         ld c,a
+        ld a,(spr_hide)
+        or a
+        jr nz,.hide
         ld a,(ix+1)                     ; x = base + dx
         ld e,a
         rla

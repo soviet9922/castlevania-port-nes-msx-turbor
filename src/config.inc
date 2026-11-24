@@ -52,7 +52,8 @@ AH_EXITX        equ 42                  ; 0xFFFF = no exit
 AH_NEXT         equ 44
 AH_BLANK        equ 45
 AH_STAIRS       equ 46                  ; count, then 7 bytes per staircase
-AH_SIZE         equ 48
+AH_ENEMIES      equ 48                  ; count, then 4 bytes per spawner (x, y, type)
+AH_SIZE         equ 50
 
 ; Stair records (tools/convert_stage.py): foot x, foot y, top x, top y, dir
 ST_FOOTX        equ 0
@@ -76,10 +77,27 @@ CROUCH_Y        equ 8                   ; crouching pose is drawn this much lowe
 
 ; Player metasprites (see tools/msx_sprites.py)
 PLAYER_SPRITES  equ 12                  ; hardware sprites / pattern slots reserved
-NPOSES          equ 13                  ; poses per facing direction
+NPOSES          equ 14                  ; poses per facing direction
 POSE_WALK1      equ 1
 POSE_TUCK       equ 3
 POSE_STAIR      equ 12                  ; climbing (alternates with walk1)
+POSE_HURT       equ 13                  ; knocked back
+
+; Health and getting hit (measured in the NES entrance hall)
+HP_MAX          equ 64                  ; 16 bar segments of 4 on the NES, 8 HUD tiles here
+ZOMBIE_DAMAGE   equ 8
+HIT_FREEZE      equ 6                   ; frames frozen when hit
+STUN_FRAMES     equ 16                  ; crouched after landing from the knock-back
+INVULN_FRAMES   equ 140                 ; blinking, cannot be hit again
+HURT_FREEZE     equ 1                   ; hurt_state values
+HURT_FLY        equ 2
+HURT_STUN       equ 3
+
+; Zombies (spawn at the screen edges while a zombie spawner is near)
+ZOMBIE_INTERVAL equ 32                  ; frames between spawns
+ZOMBIE_MAX      equ 3
+SPAWNER_LEFT    equ 64                  ; spawner active within camera-64 .. camera+320
+SPAWNER_RIGHT   equ 320
 POSE_WHIP       equ 4                   ; whip1..whip4, then +4 for the crouched set
 SAT_END_Y       equ 216                 ; sprite mode 2 "end of list" Y value
 MAX_SPRITES     equ 32                  ; hardware sprites in total

@@ -28,6 +28,8 @@ POSES = {
     "tuck": ([(0x04, 0, 0), (0x02, 8, 0)] + LEGS_TUCK, []),
     # climbing: alternates with walk1 every 8 frames (recorded on the hall stairs)
     "stair": ([(0x14, 0, 0), (0x12, 8, 0), (0x38, 0, 16), (0x36, 8, 16)], []),
+    # knocked back by a hit (faces the enemy; recorded in the hall)
+    "hurt": ([(0x3C, 0, 0), (0x3A, 8, 0), (0x34, 0, 16), (0x4C, 8, 16)], []),
 }
 WHIP_TOPS = {
     "whip1": ([(0x1C, -8, 0), (0x1A, 0, 0)], [(0x1E, -16, 0), (0x20, -16, 16)]),
@@ -44,11 +46,12 @@ for name, (top, whip) in WHIP_TOPS.items():
 # engine pose numbers (src/player.asm)
 POSE_ORDER = ["stand", "walk1", "walk2", "tuck",
               "whip1", "whip2", "whip3", "whip4",
-              "whip1c", "whip2c", "whip3c", "whip4c", "stair"]
+              "whip1c", "whip2c", "whip3c", "whip4c", "stair", "hurt"]
 
 SIMON_PALETTE = 0xCDE9          # fixed bank: $3F $10, then the sprite palettes
 JUMP_TABLE = (6, 0x9B90)        # 20 signed bytes: dy per frame while rising
 JUMP_LEN = 20
+KNOCKBACK_TABLE = (6, 0x9BA8)   # same format, $81-terminated (17 entries)
 
 BODY_KIND = {1: "C", 2: "B", 3: "A"}
 SIMON_SLOT_FOR_VALUE = {1: 6, 2: 4, 3: 2}
@@ -76,7 +79,7 @@ def frame_pixels(chr_ram, pose):
 
 
 def convert(rom, nes_rgb, to_msx_rgb):
-    """-> (SpriteBank, frame names, {slot: msx rgb}, jump table bytes)"""
+    """-> (SpriteBank, frame names, {slot: msx rgb}, jump table, knock-back table)"""
     chr_ram = rom.chr_ram()
     bank = SpriteBank()
     names = []
@@ -99,4 +102,10 @@ def convert(rom, nes_rgb, to_msx_rgb):
     jump = bytes(rom.rd(b, addr + i) for i in range(JUMP_LEN))
     if sum(v - 256 if v >= 128 else v for v in jump) >= 0:
         raise SystemExit("jump table not found where expected")
-    return bank, names, slots, jump
+    b, addr = KNOCKBACK_TABLE
+    kb = bytearray()
+    while rom.rd(b, addr + len(kb)) != 0x81 and len(kb) < 32:
+        kb.append(rom.rd(b, addr + len(kb)))
+    if not 8 <= len(kb) < 32 or sum(v - 256 if v >= 128 else v for v in kb) >= 0:
+        raise SystemExit("knock-back table not found where expected")
+    return bank, names, slots, jump, bytes(kb)

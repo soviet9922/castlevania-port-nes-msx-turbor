@@ -11,6 +11,7 @@ The engine maps an area's bank at 0x8000 and copies its header to RAM
   +38 object colours     +40 object frame table
   +42 exit x (0xFFFF = none)   +44 next area   +45 blank tile
   +46 stairs (count, then 7 bytes each: foot x, foot y, top x, top y, dir)
+  +48 enemy spawners (count, then 4 bytes each: x, y, type)
 """
 
 import os
@@ -40,7 +41,7 @@ def write(gen_dir, areas):
             f"        dw {p}candles, {p}obj_spt, {a['obj_patterns'] * 32}, {p}obj_sct, {p}obj_frame_table",
             f"        dw {exit_x if exit_x is not None else 0xFFFF}",
             f"        db {a.get('next_area', 0)}, 0x{a['blank']:02X}",
-            f"        dw {p}stairs",
+            f"        dw {p}stairs, {p}enemies",
             f'{p}palette: INCBIN "{d}/palette.bin"',
         ]
         for b in range(3):
@@ -51,6 +52,7 @@ def write(gen_dir, areas):
             f'{p}coll:    INCBIN "{d}/level_coll.bin"',
             f'{p}candles: INCBIN "{d}/candles.bin"',
             f'{p}stairs:  INCBIN "{d}/stairs.bin"',
+            f'{p}enemies: INCBIN "{d}/enemies.bin"',
             f'{p}obj_spt: INCBIN "{d}/{p}obj_spt.bin"',
             f'{p}obj_sct: INCBIN "{d}/{p}obj_sct.bin"',
             f'{p}obj_frames: INCBIN "{d}/{p}obj_frames.bin"',

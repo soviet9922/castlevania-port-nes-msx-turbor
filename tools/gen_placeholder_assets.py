@@ -263,7 +263,9 @@ assert len(PLACEHOLDER_JUMP) == 20
 
 WHIP_SLOT = 14
 POSE_NAMES = ["stand", "walk1", "walk2", "tuck", "whip1", "whip2", "whip3", "whip4",
-              "whip1c", "whip2c", "whip3c", "whip4c", "stair"]
+              "whip1c", "whip2c", "whip3c", "whip4c", "stair", "hurt"]
+# Placeholder knock-back arc (dy per frame while rising; the fall mirrors it)
+PLACEHOLDER_KNOCKBACK = [-4, -3, -2, -2, -1, -1, -1, 0, -1, 0, 0, 0, 0, 0, 0, 0]
 
 PLAYER_COLOR_A = 2
 PLAYER_COLOR_B = 4
@@ -406,6 +408,14 @@ _DAGGER = _EMPTY16 + [
     "................"] * 5 + [
     "..22.....7......", "..2277777777....", "22227777777777f.", "..2277777777....",
     "..22.....7......"] + ["................"] * 6
+_ZOMBIE_TOP = [
+    "................", "......eeee......", ".....eeeeee.....", ".....e1ee1e.....",
+    ".....eeeeee.....", "......e11e......", ".......ee.......", "....33333333....",
+    "...3333333333...", "..ee33333333....", "..ee.333333.....", "......3333......",
+    "......3333......", "......3333......", ".....333333.....", ".....33..33.....",
+]
+_ZOMBIE_LEGS_1 = [".....33..33....."] * 4 + [".....ee..ee....."] * 10 + ["....eee..eee...."] * 2
+_ZOMBIE_LEGS_2 = [".....33..33....."] * 4 + ["....ee....ee...."] * 10 + ["...eee....eee..."] * 2
 _CANDLE_A = _EMPTY16 + [
     "................", ".......b........", "......bcb.......", ".......c........",
     "......ffff......", "......ffff......", "......ffff......", "......ffff......",
@@ -423,12 +433,17 @@ _SMALL_HEART = _EMPTY16 + [
 ]
 PLACEHOLDER_OBJECTS = {
     "candle1": _CANDLE_A, "candle2": _CANDLE_B, "smallheart": _SMALL_HEART,
+    "zombie_l1": _ZOMBIE_TOP + _ZOMBIE_LEGS_1, "zombie_l2": _ZOMBIE_TOP + _ZOMBIE_LEGS_2,
+    "zombie_r1": [r[::-1] for r in _ZOMBIE_TOP + _ZOMBIE_LEGS_1],
+    "zombie_r2": [r[::-1] for r in _ZOMBIE_TOP + _ZOMBIE_LEGS_2],
     "brazier1": _FLAME_A + _BOWL, "brazier2": _FLAME_B + _BOWL,
     "burst1": _BURSTS[0], "burst2": _BURSTS[1], "burst3": _BURSTS[2], "burst4": _BURSTS[3],
     "heart": _HEART, "whipup": _WHIPUP, "dagger": _DAGGER,
 }
 OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
-              "heart", "whipup", "dagger", "candle1", "candle2", "smallheart"]
+              "heart", "whipup", "dagger", "candle1", "candle2", "smallheart",
+              "zombie_l1", "zombie_l2", "zombie_r1", "zombie_r2"]
+PLACEHOLDER_SPAWNERS = [(900, 128)]     # one zombie spawner near the end
 # placeholder candles: (box x, box y, item id, kind) - see tools/convert_objects.py
 # item ids: 0 whip upgrade, 1 big heart, 2 dagger, 3 small heart; kind 0 brazier, 1 candle
 PLACEHOLDER_CANDLES = [(88, 128, 1, 0), (216, 128, 0, 0),     # braziers on the floor (y 160)
@@ -483,6 +498,7 @@ def player_sprites():
             px.update(base)
             poses.append(px)
     poses.append(walk2)                 # placeholder stair pose
+    poses.append(tuck)                  # placeholder hurt pose
     bank = msx_sprites.SpriteBank()
     names = []
     for facing in ("right", "left"):
@@ -559,11 +575,17 @@ def main():
         f.write(cdata)
     with open(os.path.join(area_dir, "stairs.bin"), "wb") as f:
         f.write(bytes([0]))             # the placeholder level has no stairs
+    edata = bytearray([len(PLACEHOLDER_SPAWNERS)])
+    for x, y in PLACEHOLDER_SPAWNERS:
+        edata += bytes([x & 0xFF, x >> 8, y, 1])
+    with open(os.path.join(area_dir, "enemies.bin"), "wb") as f:
+        f.write(edata)
     stats.update(dir="area_0", obj_patterns=n_obj, exit_x=None)
     areas_asm.write(out_dir, [stats])
 
     files = {
         "player_jump.bin": bytes(v & 0xFF for v in PLACEHOLDER_JUMP),
+        "player_kb.bin": bytes(v & 0xFF for v in PLACEHOLDER_KNOCKBACK),
         "hud_pgt.bin": bytes(hud_pgt),
         "hud_ct.bin": bytes(hud_ct),
     }

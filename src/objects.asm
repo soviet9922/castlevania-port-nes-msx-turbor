@@ -27,6 +27,7 @@ OBJ_BRAZIER     equ 1
 OBJ_BURST       equ 2
 OBJ_ITEM        equ 3
 OBJ_CANDLE      equ 4
+OBJ_ZOMBIE      equ 5
 
 KIND_BRAZIER    equ 0
 KIND_CANDLE     equ 1
@@ -39,11 +40,13 @@ OBJF_WHIPUP     equ 7
 OBJF_DAGGER     equ 8
 OBJF_CANDLE     equ 9
 OBJF_SMALLHEART equ 11
+OBJF_ZOMBIE     equ 12                  ; left 1/2, right 1/2
 
 ITEM_WHIPUP     equ 0
 ITEM_HEART      equ 1
 ITEM_DAGGER     equ 2
 ITEM_SMALLHEART equ 3
+ITEM_NONE       equ 0xFF                ; burst of an enemy: nothing drops
 
 SPAWN_LEFT      equ 16                  ; spawn when -16 <= box x - camera <= 272
 SPAWN_RIGHT     equ 272
@@ -281,6 +284,11 @@ objects_update:
         call burst_update
         jr .next
 .not_burst:
+        cp OBJ_ZOMBIE
+        jr nz,.not_zombie
+        call zombie_update
+        jr .next
+.not_zombie:
         cp OBJ_ITEM
         call z,item_update
 .next:
@@ -346,6 +354,12 @@ burst_update:
         inc c
         cp 21
         jr c,.frame                     ; 19-20
+        ld a,(ix+5)
+        cp ITEM_NONE
+        jr nz,.item
+        ld (ix+0),OBJ_NONE              ; an enemy's burst: gone
+        ret
+.item:
         ld (ix+0),OBJ_ITEM              ; the item appears
         ld (ix+4),0
         ld (ix+9),0
@@ -495,6 +509,211 @@ item_update:
         ld (ix+0),OBJ_NONE
         ret
 
+; ---------------------------------------------------------------------------
+; Zombie (measured in the NES entrance hall): walks straight across at
+; 7 px every 8 frames, legs alternate every 8 frames, one whip hit kills
+; it, touching it hurts Simon (ZOMBIE_DAMAGE). +5 = direction (+1 / -1).
+; ---------------------------------------------------------------------------
+zombie_update:
+        inc (ix+4)
+        ld a,(ix+4)
+        and 7
+        jr z,.no_step                   ; rests 1 frame in 8
+        ld a,(ix+5)
+        ld e,a
+        rla
+        sbc a,a
+        ld d,a
+        ld l,(ix+1)
+        ld h,(ix+2)
+        add hl,de
+        ld (ix+1),l
+        ld (ix+2),h
+.no_step:
+        ld a,(ix+4)
+        rrca
+        rrca
+        rrca
+        and 1
+        ld c,a
+        ld a,(ix+5)
+        or a
+        ld a,OBJF_ZOMBIE
+        jp m,.left
+        add a,2
+.left:
+        add a,c
+        ld (ix+6),a
+
+        ld l,(ix+1)                     ; walked off the screen: gone
+        ld h,(ix+2)
+        ld de,(cam_x)
+        or a
+        sbc hl,de
+        ld de,16
+        add hl,de
+        bit 7,h
+        jp nz,.gone
+        ld de,256+16+1
+        or a
+        sbc hl,de
+        jr nc,.gone
+
+        ld a,(whip_active)              ; whipped
+        or a
+        jr z,.touch
+        call whip_hits_object
+        jr nc,.touch
+        ld (ix+0),OBJ_BURST
+        ld (ix+4),0
+        ld (ix+6),OBJF_BURST
+        ld (ix+5),ITEM_NONE
+        ld hl,kills
+        inc (hl)
+        ret
+
+.touch:                                 ; zombie x+2..x+13 vs Simon px+3..px+12
+        ld a,(invuln_t)
+        or a
+        ret nz
+        ld a,(hurt_state)
+        or a
+        ret nz
+        ld hl,(px)
+        ld de,3
+        add hl,de
+        ex de,hl                        ; DE = Simon left
+        ld l,(ix+1)
+        ld h,(ix+2)
+        ld bc,13
+        add hl,bc                       ; zombie right
+        or a
+        sbc hl,de
+        ret c
+        ld hl,(px)
+        ld de,12
+        add hl,de                       ; Simon right
+        ld e,(ix+1)
+        ld d,(ix+2)
+        inc de
+        inc de                          ; zombie left
+        or a
+        sbc hl,de
+        ret c
+        ld a,(py+1)
+        or a
+        ret nz
+        ld a,(py)                       ; vertical overlap
+        sub (ix+3)
+        jr nc,.dy
+        neg
+.dy:
+        cp 28
+        ret nc
+        ld hl,(px)                      ; knocked away from the zombie
+        ld e,(ix+1)
+        ld d,(ix+2)
+        or a
+        sbc hl,de
+        ld b,1
+        jp nc,simon_hurt
+        ld b,-1
+        jp simon_hurt
+.gone:
+        ld (ix+0),OBJ_NONE
+        ret
+
+; ---------------------------------------------------------------------------
+; Zombie spawners: while one is near the camera, a zombie appears every
+; ZOMBIE_INTERVAL frames at alternating screen edges, at most ZOMBIE_MAX.
+; ---------------------------------------------------------------------------
+enemies_update:
+        ld a,(enemies_off)
+        or a
+        ret nz
+        ld hl,(area_hdr+AH_ENEMIES)
+        ld a,(hl)
+        inc hl
+        or a
+        ret z
+        ld b,a
+.lp:
+        ld e,(hl)
+        inc hl
+        ld d,(hl)                       ; DE = spawner x
+        inc hl
+        ld c,(hl)                       ; C = y
+        inc hl
+        inc hl
+        push hl
+        push bc
+        ex de,hl
+        ld de,(cam_x)
+        or a
+        sbc hl,de
+        ld de,SPAWNER_LEFT
+        add hl,de
+        bit 7,h
+        jr nz,.next
+        ld de,SPAWNER_RIGHT+SPAWNER_LEFT+1
+        or a
+        sbc hl,de
+        jr c,.active
+.next:
+        pop bc
+        pop hl
+        djnz .lp
+        ret
+.active:
+        pop bc
+        pop hl
+        ld hl,zombie_spawn_t
+        inc (hl)
+        ld a,(hl)
+        cp ZOMBIE_INTERVAL
+        ret c
+        ld (hl),0
+        push bc
+        ld ix,obj_table                 ; how many zombies are there?
+        ld de,OBJ_SIZE
+        ld b,OBJ_MAX
+        ld c,0
+.count:
+        ld a,(ix+0)
+        cp OBJ_ZOMBIE
+        jr nz,.not_one
+        inc c
+.not_one:
+        add ix,de
+        djnz .count
+        ld a,c
+        pop bc
+        cp ZOMBIE_MAX
+        ret nc
+        call obj_free_slot
+        ret c
+        ld hl,(cam_x)
+        ld a,(zombie_side)
+        xor 1
+        ld (zombie_side),a
+        jr z,.left_edge
+        ld de,240                       ; right edge, walking left
+        add hl,de
+        ld (ix+5),-1
+        jr .place
+.left_edge:
+        ld (ix+5),1                     ; left edge, walking right
+.place:
+        ld (ix+1),l
+        ld (ix+2),h
+        ld (ix+3),c
+        ld (ix+0),OBJ_ZOMBIE
+        ld (ix+4),0
+        ld (ix+7),KIND_BRAZIER          ; 16x32 box for the whip
+        ld (ix+8),0xFF
+        ld (ix+9),0
+        ret
+
 ; Carry set if the item (sprite y+8..y+23) rests on solid ground.
 item_on_ground:
         ld l,(ix+1)
@@ -573,7 +792,31 @@ whip_hits_object:
 ; write_player_sprites copies those into the hidden page's colour table.
 ; ---------------------------------------------------------------------------
 objects_draw:
+        ld (spr_sat_ptr),iy
+        ld a,(spr_total)                ; alternate HL: next obj_sct_list entry
+        ld e,a
+        ld d,0
+        ld hl,obj_sct_list
+        add hl,de
+        push hl
+        exx
+        pop hl
+        exx
+        ; Rotate which object comes first every frame: with more than 8
+        ; sprites on a line, the hardware drops the last ones, so rotating
+        ; turns a permanently missing sprite into flicker (as on the NES).
+        ld a,(frame_count)
+        and OBJ_MAX-1
+        ld e,a
+        add a,a
+        add a,a
+        add a,e                         ; * 5
+        add a,a                         ; * 10 = OBJ_SIZE
+        ASSERT OBJ_SIZE == 10 && OBJ_MAX == 8
+        ld e,a
+        ld d,0
         ld ix,obj_table
+        add ix,de
         ld b,OBJ_MAX
 .obj:
         push bc
@@ -585,73 +828,101 @@ objects_draw:
         ld de,(cam_x)
         or a
         sbc hl,de
-        ld (spr_bx),hl
         ld a,h                          ; visible if -32 <= box x <= 255
         or a
         jr z,.on_screen
         inc a
-        jr nz,.next_obj
+        jp nz,.next_obj
         ld a,l
         cp 0xE0
-        jr c,.next_obj
+        jp c,.next_obj
 .on_screen:
+        ld (spr_bx),hl
         ld a,(ix+3)
         add a,PF_TOP_PX-1
-        ld (spr_by),a
+        ld c,a                          ; C = sprite y of the box
         ld a,(ix+6)
         push ix
-        call obj_frame_address          ; IX = frame data
-        ld b,(ix+0)
-        inc ix
+        call obj_frame_address
+        push ix
+        pop de                          ; DE = frame data
+        ld a,(de)
+        inc de
+        ld b,a                          ; B = sprites in the frame
+        ld hl,(spr_sat_ptr)
 .spr:
         ld a,(spr_total)
         cp MAX_SPRITES
         jr nc,.frame_done               ; hardware limit: 32 sprites
-        ld hl,(spr_bx)                  ; x = box x + dx (16-bit)
-        ld a,(ix+1)
-        ld e,a
+        ld a,(de)                       ; y = box y + dy
+        add a,c
+        cp 192
+        jr nc,.skip_dy                  ; below the screen (and never Y = 216)
+        ld (hl),a
+        inc de
+        ld a,(de)                       ; x = box x + dx (16-bit)
+        push hl
+        push de
+        ld l,a
         rla
         sbc a,a
-        ld d,a
+        ld h,a
+        ld de,(spr_bx)
         add hl,de
         ld a,h
         or a
-        jr nz,.skip                     ; off the left or right edge
-        ld a,(spr_by)
-        add a,(ix+0)
-        cp 192
-        jr nc,.skip                     ; below the screen (and never Y = 216)
-        ld (iy+0),a
-        ld (iy+1),l
-        ld a,(ix+2)
-        add a,PLAYER_SPRITES            ; object patterns follow Simon's slots
-        add a,a
-        add a,a
-        ld (iy+2),a
-        ld a,(spr_total)                ; remember the colour column
-        ld e,a
-        ld d,0
-        ld hl,obj_sct_list
-        add hl,de
-        ld a,(ix+3)
+        ld a,l
+        pop de
+        pop hl
+        jr nz,.skip_dx                  ; off the left or right edge
+        inc hl
         ld (hl),a
+        inc hl
+        inc de
+        ld a,(de)                       ; pattern: after Simon's slots
+        add a,PLAYER_SPRITES
+        add a,a
+        add a,a
+        ld (hl),a
+        inc hl
+        inc hl
+        inc de
+        ld a,(de)                       ; colour column
+        inc de
+        exx
+        ld (hl),a
+        inc hl
+        exx
         ld a,(spr_total)
         inc a
         ld (spr_total),a
-        ld de,4
-        add iy,de
-.skip:
-        ld de,4
-        add ix,de
+        djnz .spr
+        jr .frame_done
+.skip_dy:
+        inc de
+.skip_dx:
+        inc de
+        inc de
+        inc de
         djnz .spr
 .frame_done:
+        ld (spr_sat_ptr),hl
         pop ix
 .next_obj:
         ld de,OBJ_SIZE
         add ix,de
+        push ix                         ; wrap around the table
+        pop hl
+        ld de,obj_table+OBJ_MAX*OBJ_SIZE
+        or a
+        sbc hl,de
+        jr c,.no_wrap
+        ld ix,obj_table
+.no_wrap:
         pop bc
         dec b
         jp nz,.obj
+        ld iy,(spr_sat_ptr)
         ret
 
 ; A = object frame -> IX = frame data (the area's object frame table)
@@ -695,6 +966,7 @@ objects_load_patterns:
 ; HUD: hearts counter (row 1, columns 25-26), written during VBLANK
 ; ---------------------------------------------------------------------------
 HUD_HEARTS_ADDR equ VRAM_PNT + 32 + 25
+HUD_HP_ADDR     equ VRAM_PNT + 32 + 3
 
 hud_update:
         ld a,(hud_dirty)
@@ -702,6 +974,22 @@ hud_update:
         ret z
         xor a
         ld (hud_dirty),a
+        ld hl,HUD_HP_ADDR               ; health bar: one tile per 8 HP
+        call vram_set_write
+        ld a,(hp)
+        ld c,a
+        ld b,8
+.bar:
+        ld a,c
+        sub 8
+        ld c,a
+        ld a,HUDT_BAR_PLAYER
+        jr nc,.full
+        ld a,HUDT_BAR_EMPTY
+        ld c,0
+.full:
+        out (VDP_DATA),a
+        djnz .bar
         ld hl,HUD_HEARTS_ADDR
         call vram_set_write
         ld a,(hearts)

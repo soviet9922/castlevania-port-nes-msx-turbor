@@ -172,6 +172,8 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, preview=True)
                                                prefix=f"a{index}_obj")
     cl = convert_objects.candles(rom, area["stage"], area["section"], width)
     convert_objects.write_candles(os.path.join(out_dir, "candles.bin"), cl)
+    en = convert_objects.enemy_spawners(rom, area["stage"], area["section"], width)
+    convert_objects.write_enemies(os.path.join(out_dir, "enemies.bin"), en)
 
     st = stairs(rom, area["stage"], area["section"])
     data = bytearray([len(st)])
@@ -206,7 +208,7 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, preview=True)
     kinds = ["brazier", "candle"]
     print(f"area {index} {area['name']}: {width} px, tiles per band {params['tiles']}, "
           f"{params['lossy_rows']}/{params['total_rows']} tile rows reduced, "
-          f"start ({sx},{sy}), {len(st)} stairs {st}, {len(cl)} candles "
+          f"start ({sx},{sy}), {len(st)} stairs, {len(en)} zombie spawners {en}, {len(cl)} candles "
           f"({', '.join(f'{kinds[k]}@{x + 8}' for x, _, _, k in cl[:6])}{', ...' if len(cl) > 6 else ''})")
     return params
 
@@ -217,10 +219,12 @@ def convert(rom_path, out_dir, nes_pal_path=None):
     os.makedirs(out_dir, exist_ok=True)
 
     # Simon (common to all areas): sprites, colours for slots 2/4/6/14, jump arc
-    bank, frame_names, simon_slots, jump = convert_simon.convert(rom, nes_rgb, nes_to_msx_rgb)
+    bank, frame_names, simon_slots, jump, kb = convert_simon.convert(rom, nes_rgb, nes_to_msx_rgb)
     msx_sprites.write_bank(out_dir, bank, frame_names)
     with open(os.path.join(out_dir, "player_jump.bin"), "wb") as f:
         f.write(jump)
+    with open(os.path.join(out_dir, "player_kb.bin"), "wb") as f:
+        f.write(kb)
 
     areas = [convert_area(rom, a, i, out_dir, nes_rgb, simon_slots) for i, a in enumerate(AREAS)]
     areas_asm.write(out_dir, areas)

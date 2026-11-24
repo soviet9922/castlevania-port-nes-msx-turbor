@@ -25,7 +25,8 @@ WATCH = {"frame_count": 2, "line_irq_count": 2, "px": 2, "py": 2, "cam_x": 2,
          "on_ground": 1, "facing": 1, "scroll_r26": 1, "scroll_r27": 1,
          "pframe": 1, "whip_active": 1, "whip_x1": 2, "whip_x2": 2,
          "hearts": 1, "obj_table": 1,     # obj_table = type of object slot 0
-         "cur_area": 1, "stair_state": 1}
+         "cur_area": 1, "stair_state": 1, "hp": 1, "hurt_state": 1, "invuln_t": 1,
+         "kills": 1}
 
 
 def load_symbols():
@@ -53,13 +54,15 @@ def tcl_script(syms, result_file):
     py = syms["py"]
     pf, wa = syms["pframe"], syms["whip_active"]
     irq_vbl, vbl_done, load = syms["irq_vblank"], syms["vblank_done"], syms["load_area"]
+    waitf = syms["wait_frame"]
     px_a, fa, obj = syms["px"], syms["facing"], syms["obj_table"]
     exit_x = syms["area_hdr"] + 42      # AH_EXITX
     stairs = syms["area_hdr"] + 46      # AH_STAIRS
+    eoff, hurt, objt = syms["enemies_off"], syms["hurt_state"], syms["obj_table"]
     areas = syms.get("AREA_COUNT", 1)
     # with more than one area: walk into the exit (courtyard gate) and on
     hall = f"""
-    after time 9.0  {{ poke {px_a} [peek {exit_x}]; poke {px_a + 1} [peek {exit_x + 1}] }}
+    after time 9.0  {{ poke {eoff} 1; poke {px_a} [peek {exit_x}]; poke {px_a + 1} [peek {exit_x + 1}] }}
     after time 9.4  {{ {dump('09_next_area')}; keymatrixdown 8 0x80 }}
     after time 11.4 {{ {dump('10_next_area_walk')}; keymatrixup 8 0x80
                        # first staircase of the area (if any): stand 6 px right of its foot
@@ -74,10 +77,12 @@ def tcl_script(syms, result_file):
                        }} }}
     after time 11.6 {{ keymatrixdown 8 0x20 }}
     after time 14.6 {{ keymatrixup 8 0x20; {dump('11_stairs_up')}; keymatrixdown 8 0x40 }}
-    after time 17.6 {{ keymatrixup 8 0x40; {dump('12_stairs_down')} }}
-    after time 17.7 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; close $f; exit }}
+    after time 17.6 {{ keymatrixup 8 0x40; {dump('12_stairs_down')}
+                       # zombies on: stand near the hall's start and wait to be hit
+                       poke {eoff} 0; poke {px_a} 200; poke {px_a + 1} 0; set ::wait_hit 1 }}
+    after time 27.0 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """ if areas > 1 else f"""
-    after time 9.0  {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; close $f; exit }}
+    after time 9.0  {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
     # keyboard matrix row 8: bit0 SPACE, bit4 LEFT, bit7 RIGHT
     # Times are relative to the moment the game's main loop is running.
@@ -143,13 +148,22 @@ set ::vbl_t0 0
 set ::vbl_worst 0
 set ::vbl_on 0
 set ::vbl_fc 0
-proc vbl_start {{}} {{ set ::vbl_t0 [machine_info time]; set ::vbl_fc [peek {fc}] }}
+# frames whose logic was still running when the next VBLANK came (overruns)
+set ::waiting 0
+set ::frames 0
+set ::overruns 0
+proc vbl_start {{}} {{
+    set ::vbl_t0 [machine_info time]; set ::vbl_fc [peek {fc}]
+    if {{$::vbl_on}} {{ incr ::frames; if {{!$::waiting}} {{ incr ::overruns; set ::vbl_t0 -1 }} }}
+}}
+debug set_bp {waitf} {{}} {{ set ::waiting 1 }}
 proc vbl_end {{}} {{
     if {{!$::vbl_on}} return
     # area loading spans several frames with the display off: not VBLANK work
     # skip loads (display off) and the first frames after one
     if {{$::vbl_skip > 0}} {{ incr ::vbl_skip -1; return }}
-    if {{(([peek {fc}] - $::vbl_fc) & 255) > 1}} return
+    set ::waiting 0
+    if {{(([peek {fc}] - $::vbl_fc) & 255) > 1 || $::vbl_t0 < 0}} return
     set dt [expr {{([machine_info time] - $::vbl_t0) * 1e6}}]
     if {{$dt > $::vbl_worst}} {{ set ::vbl_worst $dt }}
 }}
@@ -157,6 +171,28 @@ debug set_bp {irq_vbl} {{}} vbl_start
 debug set_bp {vbl_done} {{}} vbl_end
 set ::vbl_skip 0
 debug set_bp {load} {{}} {{ set ::vbl_skip 4 }}
+# zombie test: snapshot when hit, then whip any zombie that comes in reach
+set ::wait_hit 0
+set ::hunting 0
+proc zombie_watch {{}} {{
+    if {{$::wait_hit && [peek {hurt}] != 0}} {{
+        set ::wait_hit 0
+        {dump('13_hit')}
+        after time 1.4 {{ {dump('14_after_knockback')}; set ::hunting 1 }}
+        after time 6.0 {{ set ::hunting 0; {dump('15_whipped')} }}
+    }}
+    if {{$::hunting && [peek {hurt}] == 0}} {{
+        set px [expr {{[peek {px_a}] + 256*[peek {px_a + 1}]}}]
+        for {{set i 0}} {{$i < 8}} {{incr i}} {{
+            set b [expr {{{objt} + $i*10}}]
+            if {{[peek $b] != 5}} continue
+            set d [expr {{[peek [expr {{$b+1}}]] + 256*[peek [expr {{$b+2}}]] - $px}}]
+            if {{$d >= 14 && $d <= 36}} {{ poke {fa} 0; keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
+            if {{$d <= -14 && $d >= -36}} {{ poke {fa} 1; keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
+        }}
+    }}
+}}
+debug set_watchpoint write_mem {fc} {{}} zombie_watch
 proc wait_game {{}} {{
     # wait until the main loop has run ~30 frames (C-BIOS logo comes first)
     if {{[peek {fc}] + 256*[peek {fc + 1}] < 30 || [peek {fc + 1}] > 0x20}} {{
@@ -196,6 +232,7 @@ def run():
     whip_seq = []
     vblank_us = 10 ** 9
     hud_hearts = ""
+    overruns = (0, 0)
     stair = None
     with open(result_file) as f:
         for line in f:
@@ -208,6 +245,9 @@ def run():
                 continue
             if tag == "hud_hearts":
                 hud_hearts = kv[0] if kv else ""
+                continue
+            if tag == "overruns":
+                overruns = (int(kv[0]), int(kv[1]))
                 continue
             if tag == "vblank_us":
                 vblank_us = int(kv[0])
@@ -290,6 +330,15 @@ def run():
             (snaps["12_stairs_down"]["px"], snaps["12_stairs_down"]["py"]) == stair["foot"]
             and snaps["12_stairs_down"]["stair_state"] == 0)]
           if stair else []),
+        *([("a zombie hits Simon: 64 -> 56 health, hurt",
+            snaps["13_hit"]["hp"] == 56 and snaps["13_hit"]["hurt_state"] in (1, 2)),
+           ("knocked back away from it, then back on his feet and invincible",
+            snaps["14_after_knockback"]["hurt_state"] == 0
+            and snaps["14_after_knockback"]["on_ground"] == 1
+            and snaps["14_after_knockback"]["invuln_t"] > 0
+            and abs(snaps["14_after_knockback"]["px"] - snaps["13_hit"]["px"]) >= 20),
+           ("the whip kills zombies", snaps["15_whipped"]["kills"] >= 1)]
+          if "13_hit" in snaps else []),
         ("walking left turns the player", left["facing"] == 1
          and left["px"] < land["px"]),
     ]
@@ -297,6 +346,7 @@ def run():
     for name, ok in checks:
         print(("PASS " if ok else "FAIL ") + name)
         failed += not ok
+    print(f"frames over budget on this {MACHINE} (3.58 MHz Z80): {overruns[0]} of {overruns[1]}")
     print(f"screenshots in {OUT}")
     sys.exit(1 if failed else 0)
 

@@ -76,8 +76,22 @@ stair_dir       equ stair_tx+2          ; 1  +1 / -1: which way the stairs rise
 stair_going     equ stair_dir+1         ; 1  +1 up / -1 down
 stair_phase     equ stair_going+1       ; 1  alternates x and y steps
 stair_anim      equ stair_phase+1       ; 1  climbing animation counter
+hp              equ stair_anim+1        ; 1  Simon's health (0..HP_MAX)
+invuln_t        equ hp+1                ; 1  frames left of invincibility (blinking)
+hurt_state      equ invuln_t+1          ; 1  0, HURT_FREEZE, HURT_FLY, HURT_STUN
+hurt_t          equ hurt_state+1        ; 1  frames left in the hurt state
+arc_ptr         equ hurt_t+1            ; 2  arc table in use (jump or knock-back)
+arc_len         equ arc_ptr+2           ; 1  its rising length
+zombie_spawn_t  equ arc_len+1           ; 1
+zombie_side     equ zombie_spawn_t+1    ; 1  alternates the screen edge
+enemies_off     equ zombie_side+1       ; 1  test hook: 1 = no new enemies
+player_dead     equ enemies_off+1       ; 1  set when health runs out
+spr_hide        equ player_dead+1       ; 1  Simon blinks this frame
+kills           equ spr_hide+1          ; 1  enemies defeated (for the score later)
+sct_cache       equ kills+1             ; 2*MAX_SPRITES: colour column per sprite, per page
+spr_sat_ptr     equ sct_cache+2*MAX_SPRITES ; 2  next sat_buf entry (objects_draw)
 
-sat_buf         equ stair_anim+1        ; (MAX_SPRITES+1)*4
+sat_buf         equ spr_sat_ptr+2       ; (MAX_SPRITES+1)*4
 
 RAM_END         equ sat_buf+(MAX_SPRITES+1)*4
         ASSERT RAM_END < 0xF380

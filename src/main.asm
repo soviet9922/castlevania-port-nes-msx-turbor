@@ -43,6 +43,8 @@ init:
         call hud_draw
         ld a,5
         ld (hearts),a                   ; the game starts with 5 hearts
+        ld a,HP_MAX
+        ld (hp),a
         call install_irq
         xor a
         call load_area                  ; area 0: Stage 1 courtyard
@@ -67,7 +69,9 @@ vblank_done:                            ; (tests measure VBLANK work up to here)
         call player_update
         call check_area_exit
         call objects_spawn
+        call enemies_update
         call objects_update
+        call check_death
         call camera_update
         call build_sat
         call write_player_sprites       ; into the hidden sprite page
@@ -138,6 +142,9 @@ player_sct:     INCBIN "player_sct.bin"         ; 16 colour bytes per sprite
 player_frames:  INCBIN "player_frames.bin"      ; count, then (dy, dx, pattern, colour)
         INCLUDE "player_frames.inc"             ; player_frame_table
 jump_table:     INCBIN "player_jump.bin"        ; JUMP_LEN signed dy, rising half
+kb_table:       INCBIN "player_kb.bin"          ; knock-back arc, same format
+kb_table_end:
+KB_LEN          equ kb_table_end - kb_table
 hud_pgt:        INCBIN "hud_pgt.bin"
 hud_ct:         INCBIN "hud_ct.bin"
 

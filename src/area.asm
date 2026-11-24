@@ -58,6 +58,11 @@ load_area:
         ld a,0xFF
         ld (loaded_frames),a            ; Simon's patterns must be streamed again
         ld (loaded_frames+1),a
+        ld hl,sct_cache                 ; and all object colours rewritten
+        ld de,sct_cache+1
+        ld bc,2*MAX_SPRITES-1
+        ld (hl),a
+        ldir
         call objects_spawn
         call build_sat
         call write_player_sprites       ; (enables interrupts)

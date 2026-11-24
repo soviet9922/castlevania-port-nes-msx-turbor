@@ -47,7 +47,10 @@
 - [ ] Use the whip upgrade (chain whip graphics and reach) and the dagger (throwing, heart cost)
 - [x] Wall candles and small hearts; candles spawn by camera position like the NES
 - [ ] The NES item drop rule, money bags, enemy drops
-- [ ] Enemies: zombies first (the hall's enemy groups are in the same table as the candles)
+- [x] Zombies from the ROM's enemy groups: spawn at the screen edges, walk across, die to the whip
+- [x] Health, getting hit: freeze, knock-back arc from the ROM, crouched landing, blinking invincibility
+- [x] Sprite priority rotation (flicker instead of missing sprites past 8 per line)
+- [ ] Bats, black panthers, fishmen …; enemy drops; score, lives, timer, death animation
 - [ ] Zombie, panther, bat, fishman, …
 - [ ] Sprite multiplexing and flicker when more than 8 sprites share a line
 - [ ] Vertical transitions between sections (V9958 vertical scroll)
@@ -59,6 +62,9 @@
 - [ ] Sound effects on the PSG, samples on the turbo R PCM
 
 ## Milestone 5: performance and polish
+
+- [ ] Keep busy scenes within one frame on a 3.58 MHz Z80 too (about 3% of frames in
+      the hall go over today; the turbo R's R800 is several times faster)
 
 - [ ] Own the interrupt vector (RAM in page 0), drop the BIOS
 - [ ] Copy hot code to RAM for the R800
