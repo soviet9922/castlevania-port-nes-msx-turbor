@@ -99,7 +99,9 @@ HP_MAX          equ 64                  ; 16 bar segments of 4 on the NES, 8 HUD
 ZOMBIE_DAMAGE   equ 8
 ENEMY_ZOMBIE    equ 0x01                ; spawner types (NES enemy records)
 ENEMY_BAT       equ 0x02
-BAT_DELAY       equ 64                  ; frames before a bat appears
+BAT_DELAY       equ 192                 ; frames before a bat appears (the NES
+                                        ; varies from about 60 to 320)
+CROUCH_TOP      equ 20                  ; top of crouching Simon, for fireballs
 ENEMY_FISH      equ 0x03
 FISH_MAX        equ 2                   ; fishmen about at once
 FISH_DELAY      equ 32                  ; frames before the next one jumps out

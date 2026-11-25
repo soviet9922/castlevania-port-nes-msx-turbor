@@ -106,7 +106,8 @@ def tcl_script(syms, result_file):
     after time 31.5 {{ keymatrixup 8 0x40; {dump('19_section_below')}; keymatrixdown 8 0x20 }}
     after time 33.5 {{ keymatrixup 8 0x20; {dump('20_section_above')}
                        # bats: enemies on, wait for one and whip it
-                       set ::bat_seen 0; poke {eoff} 0; set ::hunting 1 }}
+                       set ::bat_seen 0; poke {eoff} 0; set ::hunting 1
+                       poke {syms["bat_spawn_t"]} 150 }}
     after time 37.5 {{ set ::hunting 0; poke {eoff} 3; {dump('21_bat')}
                        set f [open "{result_file}" a]; puts $f "bat $::bat_seen"; close $f
                        # back down into the waterway
@@ -146,8 +147,15 @@ def tcl_script(syms, result_file):
                            poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
                            poke {py} [expr {{[peek {exit_x + 8}] - 8}}]; poke {py + 1} 0
                            keymatrixdown 8 0x80 }} }}
-    after time 51.0 {{ keymatrixup 8 0x80; {dump('24_stage3')} }}
-    after time 51.5 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
+    after time 51.0 {{ keymatrixup 8 0x80; {dump('24_stage3')}
+                       # a fishman's fireball at standing height, flying at crouching Simon
+                       # (back at the area's start, away from the stairs)
+                       poke {eoff} 3; poke {px_a} 40; poke {px_a + 1} 0
+                       keymatrixdown 8 0x40; fireball_at_simon }}
+    after time 52.5 {{ {dump('25_crouched_fireball')}; keymatrixup 8 0x40 }}
+    after time 54.0 {{ fireball_at_simon }}
+    after time 55.3 {{ {dump('26_standing_fireball')} }}
+    after time 55.8 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """ if areas > 1 else f"""
     after time 9.0  {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
@@ -264,6 +272,14 @@ proc panther_test {{}} {{
             return
         }}
     }}
+}}
+proc fireball_at_simon {{}} {{
+    set b [expr {{{objt} + 7*{obj_size}}}]
+    set x [expr {{[peek {px_a}] + 256*[peek {px_a + 1}] + 40}}]
+    poke [expr {{$b+1}}] [expr {{$x & 255}}]; poke [expr {{$b+2}}] [expr {{$x >> 8}}]
+    poke [expr {{$b+3}}] [expr {{[peek {py}] + 8}}]
+    poke [expr {{$b+4}}] 0; poke [expr {{$b+5}}] 255; poke [expr {{$b+6}}] 36
+    poke [expr {{$b+7}}] 4; poke [expr {{$b+8}}] 255; poke $b 9
 }}
 proc panther_state {{idx}} {{
     set s 0
@@ -475,6 +491,12 @@ def run():
             and snaps["24_stage3"]["cur_area"] == 4
             and snaps["24_stage3"]["on_ground"] == 1)]
           if syms.get("AREA_COUNT", 1) > 4 and "24_stage3" in snaps else []),
+        *([("a fishman's fireball passes over Simon when he crouches",
+            snaps["25_crouched_fireball"]["hp"] == snaps["24_stage3"]["hp"]
+            and snaps["25_crouched_fireball"]["hurt_state"] == 0),
+           ("and hits him when he stands",
+            snaps["26_standing_fireball"]["hp"] < snaps["25_crouched_fireball"]["hp"])]
+          if "26_standing_fireball" in snaps else []),
         *([("UP at a staircase's foot climbs it to the top",
             (snaps["11_stairs_up"]["px"], snaps["11_stairs_up"]["py"]) == stair["top"]
             and snaps["11_stairs_up"]["stair_state"] == 0 and snaps["11_stairs_up"]["on_ground"] == 1),

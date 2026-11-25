@@ -1664,6 +1664,14 @@ fireball_update:
         ret c
         cp 32+7
         ret nc
+        ld c,a                          ; crouching: his head is down at py+20,
+        ld a,(crouching)                ; so a fireball at standing height
+        or a                            ; passes over him
+        ld a,c
+        jr z,.hit
+        cp CROUCH_TOP
+        ret c
+.hit:
         ld b,(ix+5)
         call simon_hurt
 .gone:

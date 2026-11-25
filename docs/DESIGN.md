@@ -197,14 +197,16 @@ state machine (wait, run, leap with gravity, run). Whenever there is no floor
 under a running panther it leaps again, so it never runs through the air.
 
 Bats are spawned like zombies, from the area's spawner list (type 2): one at a time,
-64 frames after the last one is gone, at the screen edge Simon faces. A bat flies
+192 frames after the last one is gone (slower than the NES's quickest, so the way to
+stage 2's door is fair), at the screen edge Simon faces. A bat flies
 straight at him with a 96-frame vertical wave read from a table, and dies when it
 hits him.
 
 Fishmen come from the waterway's spawners (type 3, one per 64-px chunk): at most
 two at a time, each jumping out of the water at a spawner on the screen but not
 right under Simon. They use a small state machine like the panther's (in the air,
-walking, shooting) and fire fireballs, which are objects of their own.
+walking, shooting) and fire fireballs, which are objects of their own. A fireball
+flies at standing height: crouching Simon ducks under it.
 
 With more than 8 sprites on a line, the VDP drops the extras. The order of
 objects in the sprite list rotates every frame (Simon always comes first), so
