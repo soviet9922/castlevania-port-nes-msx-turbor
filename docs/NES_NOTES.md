@@ -243,10 +243,15 @@ Recorded with a variant of `record_exit.lua` that also dumps the PPU nametables.
   stopped; then the hall loads.
 - **The doors** (mode 8; the hall's at world x 1528, stage 2's at x 504): Simon stands
   while the screen scrolls 128 px further, 1 px per frame (into the next stage's first
-  columns, which follow the area's map in the ROM). The door is a 1x6-tile column of
-  the background (nametable rows 8-13): it opens (the column goes dark, and the opened
-  door shows beside it), Simon walks through at 1 px per frame, it closes behind him,
-  and he walks on about 118 px with the screen following. Then the next stage loads.
+  columns, which follow the area's map in the ROM). The shut door is a 1x6-tile column
+  of the background (nametable rows 8-13). It opens in two steps drawn with sprites
+  (palette 3, mirrored): half open for 16 frames (the column goes dark; tiles `77 7B 7B`
+  and `75 79 79` on the 2 columns to its right), then open (`87 7B 7B`, `87 7B 7B`,
+  `85 7B 7B` over 3 columns) while Simon walks through at 1 px per frame; half open for
+  8 frames, then shut. He walks on about 118 px with the screen following, and the
+  next stage loads.
+- At the castle gate Simon walks into the dark archway and goes behind the gate's right
+  pillar (sprites behind the background), a player's NES video shows.
 
 ## Stage 2 enemies
 

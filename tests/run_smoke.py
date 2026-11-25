@@ -96,7 +96,7 @@ def tcl_script(syms, result_file):
                            keymatrixdown 8 0x80 }} }}
     after time 36.5 {{ keymatrixup 8 0x80; {dump('18_through_the_door')}
                        set f [open "{result_file}" a]
-                       puts $f "seqs gate=$::gate_seen,$::gate_px0,$::gate_pxmax door=$::door_cam,$::door_opened,$::door_closed ys=[join $::seq_ys ,]"
+                       puts $f "seqs gate=$::gate_seen,$::gate_px0,$::gate_pxmax door=$::door_cam ys=[join $::seq_ys ,] doorstates=[join $::door_states /] gatehidden=$::gate_hidden"
                        close $f
                        # a staircase that leads to the section below (foot off the playfield)
                        set sp [expr {{[peek {stairs}] + 256*[peek {stairs + 1}]}}]
@@ -476,12 +476,16 @@ set ::gate_pxmax 0
 set ::door_cam 0
 set ::door_opened 0
 set ::door_closed 0
+set ::door_states {{}}
+set ::door_first ""
+set ::gate_hidden 0
 set ::seq_ys {{}}
 proc seq_watch {{}} {{
     set k [peek {syms["seq_kind"]}]
     set x [expr {{[peek {px_a}] + 256*[peek {px_a + 1}]}}]
     set y [peek {py}]
     if {{$k == 1}} {{
+        if {{[peek {syms["seq_hidden"]}]}} {{ set ::gate_hidden 1 }}
         if {{!$::gate_seen}} {{ set ::gate_seen 1; set ::gate_px0 $x }}
         set ::gate_pxmax $x
         if {{[lsearch $::seq_ys "g$y"] < 0}} {{ lappend ::seq_ys "g$y" }}
@@ -491,11 +495,14 @@ proc seq_watch {{}} {{
         set c [expr {{[peek {syms["cam_x"]}] + 256*[peek {syms["cam_x"] + 1}]}}]
         if {{$c > $::door_cam}} {{ set ::door_cam $c }}
         set col [expr {{[peek {syms["area_hdr"] + 56}] & 31}}]
-        set t [vpeek [expr {{0x1800 + 6*32 + $col}}]]
-        if {{$t == [peek {syms["area_hdr"] + 45}]}} {{
-            if {{!$::door_opened && [peek {cur}] == 1}} {{ after time 0.3 {{ {dump('18a_door_open')} }} }}
-            set ::door_opened 1
-        }} elseif {{$::door_opened}} {{ set ::door_closed 1 }}
+        set t "[vpeek [expr {{0x1800 + 7*32 + $col}}]].[vpeek [expr {{0x1800 + 7*32 + (($col + 1) & 31)}}]]"
+        if {{[peek {cur}] == 1}} {{
+            if {{$::door_first == ""}} {{ set ::door_first $t }}
+            if {{[lindex $::door_states end] != $t}} {{
+                lappend ::door_states $t
+                if {{[llength $::door_states] == 3}} {{ after time 0.3 {{ {dump('18a_door_open')} }} }}
+            }}
+        }}
     }}
 }}
 debug set_watchpoint write_mem {fc} {{}} seq_watch
@@ -578,6 +585,22 @@ proc wait_game {{}} {{
 after time 0.1 wait_game
 after time 135 {{ exit }}
 """
+
+
+def door_ok(states):
+    """door tiles seen at the door's column (row 5) and the next: ... half open,
+    open, half open, shut, where shut is the map's own door (the first entry
+    can be a column the test's teleport left on screen)"""
+    st = states.split("/")
+    if len(st) < 4:
+        return False
+    half, opened, half2, shut = st[-4:]
+    tiles_path = os.path.join(os.path.dirname(ROM), "gen", "converted", "area_1", "level_tiles.bin")
+    if not os.path.exists(tiles_path):
+        return False
+    t = open(tiles_path, "rb").read()
+    door = f"{t[191 * 22 + 5]}.{t[192 * 22 + 5]}"    # the hall's door column (see convert_stage.py)
+    return half == half2 and opened not in (half, shut) and shut == door
 
 
 def axe_ok(track):
@@ -760,8 +783,9 @@ def run():
             sorted(seqs["ys"].split(",")) == ["d32", "g112"]),
            ("at the hall's door the screen scrolls on to the door (camera 1408)",
             seqs["door"].split(",")[0] == "1408" or int(seqs["door"].split(",")[0]) > 1408),
-           ("the door opens, and closes again behind Simon",
-            seqs["door"].split(",")[1:] == ["1", "1"])]
+           ("the door opens (half open, then open), and closes again behind Simon",
+            door_ok(seqs["doorstates"])),
+           ("Simon goes inside the castle gate (behind its pillar)", seqs["gatehidden"] == "1")]
           if seqs else []),
         *([("the hall's door on the upper floor leads to stage 2",
             snaps["18_through_the_door"]["cur_area"] == 2

@@ -193,6 +193,21 @@ seq_tick:
         inc hl
         ld (px),hl
 .no_step:
+        ld hl,(area_hdr+AH_DOOR_COL)    ; behind the gate's pillar: out of sight
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        ld de,-8
+        add hl,de
+        ex de,hl
+        ld hl,(px)
+        or a
+        sbc hl,de
+        ld a,0
+        jr c,.visible
+        inc a
+.visible:
+        ld (seq_hidden),a
         ld a,(seq_t)
         rrca                            ; walk cycle at a third of the speed
         and 0x18
@@ -202,59 +217,73 @@ seq_tick:
         or a
         sbc hl,de
         ret c
-        jr seq_next_area
+        jp seq_next_area
 
 door_tick:
         ld a,(seq_phase)
         or a
-        jr nz,.walking
-        xor a                           ; standing while the screen scrolls
+        jr nz,.phase1
+        xor a                           ; 0: standing while the screen scrolls
         ld (pframe),a
         ld hl,(cam_x)
         ld de,(area_hdr+AH_DOOR_CAM)
         or a
         sbc hl,de
-        jr nc,.open
+        jr nc,.half_open
         ld hl,(cam_x)
         inc hl
         jp camera_goto
-.open:
-        ld a,1
-        ld (seq_phase),a
-        ld (door_pending),a             ; open the door (VBLANK)
-        ld hl,0
-        ld (seq_t),hl
-        ret
-.walking:
-        ld hl,(px)                      ; walks right, 1 px per frame
-        inc hl
-        ld (px),hl
-        ld a,(seq_t)
-        rlca
-        and 0x18
-        call walk_pose
+.half_open:
+        ld a,1                          ; the door swings: half open
+        jr .next_phase
+.phase1:
+        cp 1
+        jr nz,.phase2
+        ld hl,(seq_t)                   ; 1: half open, still standing
+        ld a,l
+        cp DOOR_HALF_OPEN
+        ret c
+        ld a,2                          ; open
+        jr .next_phase
+.phase2:
+        call door_walk
         ld a,(seq_phase)
         cp 2
-        jr z,.after
-        ld hl,(area_hdr+AH_DOOR_COL)    ; past the door? close it behind him
+        jr nz,.phase3
+        ld hl,(area_hdr+AH_DOOR_COL)    ; 2: open, he walks through
         add hl,hl
         add hl,hl
         add hl,hl
-        ld de,8
+        ld de,24
         add hl,de
         ex de,hl
         ld hl,(px)
         or a
         sbc hl,de
         ret c
-        ld a,2
+        ld a,1                          ; past it: half open again
+        ld (door_pending),a
+        ld a,3
         ld (seq_phase),a
-        ld (door_pending),a             ; close the door (VBLANK)
         ld hl,0
         ld (seq_t),hl
         ret
-.after:
-        ld hl,(cam_x)                   ; the screen follows him
+.phase3:
+        cp 3
+        jr nz,.phase4
+        ld hl,(seq_t)                   ; 3: half open, he walks on
+        ld a,l
+        cp DOOR_HALF_SHUT
+        ret c
+        ld a,3                          ; shut
+        ld (door_pending),a
+        ld a,4
+        ld (seq_phase),a
+        ld hl,0
+        ld (seq_t),hl
+        ret
+.phase4:
+        ld hl,(cam_x)                   ; 4: walks on, the screen following
         inc hl
         call camera_goto
         ld hl,(seq_t)
@@ -262,9 +291,29 @@ door_tick:
         or a
         sbc hl,de
         ret c
+        jr seq_next_area
+.next_phase:
+        ld (door_pending),a             ; door tiles: 1 half open, 2 open
+        ld hl,seq_phase
+        inc (hl)
+        ld hl,0
+        ld (seq_t),hl
+        ret
+
+; Simon walks right, 1 px per frame
+door_walk:
+        ld hl,(px)
+        inc hl
+        ld (px),hl
+        ld a,(seq_t)
+        rlca
+        and 0x18
+        jp walk_pose
+
 seq_next_area:
         xor a
         ld (seq_kind),a
+        ld (seq_hidden),a
         ld a,(area_hdr+AH_NEXT)
         jp load_area
 
@@ -285,15 +334,46 @@ walk_pose:
         ld (pyoff),a
         ret
 
-; VBLANK: open (blank tiles) or close (the map's tiles) the door's column
+; VBLANK: draw the door's 3 tile columns (DOOR_ROWS high): 1 half open, 2 open
+; (from the area's extra columns at AH_DOOR_VCOL), 3 shut (the map's own)
 door_vram:
         ld a,(door_pending)
         or a
         ret z
-        ld (door_mode),a
+        ld c,a
         xor a
         ld (door_pending),a
-        ld hl,(area_hdr+AH_DOOR_COL)    ; map column: AH_TILES + col * PF_ROWS
+        ld hl,(area_hdr+AH_DOOR_COL)
+        ld a,c
+        cp 3
+        jr z,.src
+        ld hl,(area_hdr+AH_DOOR_VCOL)
+        dec a
+        jr z,.src
+        inc hl                          ; open: the second three
+        inc hl
+        inc hl
+.src:
+        ld (door_src),hl
+        ld hl,(area_hdr+AH_DOOR_COL)
+        ld (door_dst),hl
+        ld b,3
+.col:
+        push bc
+        call door_column
+        ld hl,(door_src)
+        inc hl
+        ld (door_src),hl
+        ld hl,(door_dst)
+        inc hl
+        ld (door_dst),hl
+        pop bc
+        djnz .col
+        ret
+
+; one column: map column door_src (rows DOOR_ROW..) -> screen column door_dst
+door_column:
+        ld hl,(door_src)                ; AH_TILES + col * PF_ROWS + DOOR_ROW
         ld d,h
         ld e,l
         add hl,hl                       ; *2
@@ -311,8 +391,8 @@ door_vram:
         add hl,de
         ld de,DOOR_ROW
         add hl,de
-        ex de,hl                        ; DE = the door's first map tile
-        ld a,(area_hdr+AH_DOOR_COL)
+        ex de,hl                        ; DE = first map tile
+        ld a,(door_dst)
         and 31
         ld l,a
         ld h,0
@@ -323,12 +403,7 @@ door_vram:
         push bc
         push hl
         call vram_set_write
-        ld a,(door_mode)
-        cp 1
-        ld a,(area_hdr+AH_BLANK)
-        jr z,.put
         ld a,(de)
-.put:
         out (VDP_DATA),a
         inc de
         pop hl

@@ -61,13 +61,16 @@ AH_STAGE        equ 54                  ; stage number shown in the HUD (BCD)
 AH_EXIT_KIND    equ 55                  ; 0 at once, 1 castle gate, 2 door
 AH_DOOR_COL     equ 56                  ; door: tile column (2 bytes)
 AH_DOOR_CAM     equ 58                  ; door: camera x while it opens (2 bytes)
-AH_SIZE         equ 60
+AH_DOOR_VCOL    equ 60                  ; door: its 6 extra tile columns (half open, open)
+AH_SIZE         equ 62
 
 ; Exit sequences (measured on the NES)
 GATE_FRAMES     equ 120                 ; walking into the castle gate, 1 px every 3 frames
 DOOR_ROW        equ 4                   ; the door: 6 tiles from playfield row 4
 DOOR_ROWS       equ 6
 DOOR_WALK       equ 118                 ; px walked on after the door closes
+DOOR_HALF_OPEN  equ 16                  ; frames half open before it opens
+DOOR_HALF_SHUT  equ 8                   ; frames half open again after Simon
 
 ; Sections: a staircase that leaves the bottom of the playfield continues in
 ; the area below (and the other way). As on the NES, x stays, y moves by

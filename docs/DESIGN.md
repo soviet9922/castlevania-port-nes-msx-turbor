@@ -291,9 +291,13 @@ by 158 px, as measured on the NES, and he carries on along the same staircase
 there. Each area also names the area to restart in after a fall.
 
 Exits can play a sequence first, as on the NES (`AH_EXIT_KIND`). At the castle gate
-Simon walks in by himself. At a door the screen scrolls on to `AH_DOOR_CAM`, the door's
-tile column (`AH_DOOR_COL`) is blanked in the name table, he walks through, the
-column is put back from the map, and he walks on with the screen following. The hall
+Simon walks in by himself and disappears once he is behind the gate's pillar (the MSX
+can't draw sprites behind the background, so he is hidden). At a door the screen
+scrolls on to `AH_DOOR_CAM`; the door half opens, opens, half opens again and shuts.
+The NES draws the opened door with sprites; the port has no sprite patterns to spare
+in these areas, so the converter draws the half-open and open door over the wall into
+6 extra tile columns at the end of the area's map (`AH_DOOR_VCOL`, never on screen),
+and the sequence copies 3 columns of them into the name table at each step. The hall
 and stage 2's corridor include the next stage's first 8 map columns for this; their
 normal camera limit (`AH_MAXCAM`) stays where it was, so those columns only show
 during the sequence. The game logic, the timer and the enemies wait meanwhile. An exit only starts while

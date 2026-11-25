@@ -912,6 +912,9 @@ build_sat:
         ld a,(frame_count)
         and 1
 .no_blink:
+        ld b,a                          ; (or gone into the castle gate)
+        ld a,(seq_hidden)
+        or b
         ld (spr_hide),a
         ld a,(cur_frame)
         call frame_address

@@ -46,7 +46,8 @@ AREAS = [
         "start_x": 40,                  # NES: Simon at world x 48 (centre)
         "exit_x": 688,                  # walking into the gate ...
         "next_area": 1,                 # ... enters the hall
-        "exit_kind": 1,                 # (Simon walks into the gate first)
+        "exit_kind": 1,                 # (Simon walks into the gate first,
+        "door_col": 88,                 # and goes behind its right pillar here)
     },
     {
         "name": "1-hall",
@@ -244,6 +245,10 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
         rgb = nes_to_msx_rgb(nes_rgb[nes])
         return min(range(1, 16), key=lambda s: (sum((a - b) ** 2 for a, b in
                                                     zip(msx_pal[s], rgb)), s))
+    door_vcol = 0
+    if area.get("exit_kind") == 2:
+        door_vcol = len(pixels[0]) // 8
+        add_door_columns(rom, pixels, solid, area["door_col"], slot_for_nes, nes_to_slot[pal[0]])
     play_px = area.get("play_px", width)    # objects only from the area itself
     cl = convert_objects.candles(rom, area["stage"], area["section"], play_px)
     en = convert_objects.enemy_spawners(rom, area["stage"], area["section"], play_px)
@@ -268,7 +273,7 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
                   respawn=area.get("respawn", index),
                   stage_no=area["stage"] if area["stage"] >= 1 else 1,
                   exit_kind=area.get("exit_kind", 0), door_col=area.get("door_col", 0),
-                  door_cam=area.get("door_cam", 0),
+                  door_cam=area.get("door_cam", 0), door_vcol=door_vcol,
                   **({"max_cam": area["max_cam"]} if "max_cam" in area else {}),
                   next_area=area.get("next_area", 0))
 
@@ -308,6 +313,47 @@ HUD_ICONS = [
     [(0x89, 0, 2, 0), (0x8B, 8, 2, 0)],         # stopwatch
 ]
 HUD_ICON_FIRST = 4                  # HUD tile index of the first icon tile
+
+
+# The opened door (recorded: sprites over the door's wall on the NES), relative
+# to the door's tile column and DOOR_ROW: (tile, dx, dy), palette 3, mirrored.
+# Half open: the door column goes dark and the door shows on the 2 columns to its
+# right; open: 3 columns wide over the doorway.
+DOOR_HALF = [(0x77, 8, 0), (0x7B, 8, 16), (0x7B, 8, 32),
+             (0x75, 16, 0), (0x79, 16, 16), (0x79, 16, 32)]
+DOOR_OPEN = [(0x87, 0, 0), (0x7B, 0, 16), (0x7B, 0, 32),
+             (0x87, 8, 0), (0x7B, 8, 16), (0x7B, 8, 32),
+             (0x85, 16, 0), (0x7B, 16, 16), (0x7B, 16, 32)]
+DOOR_ROW = 4                        # must match DOOR_ROW in src/config.inc
+DOOR_ROWS = 6
+
+
+def add_door_columns(rom, pixels, solid, door_col, slot_for_nes, backdrop):
+    """Append 6 tile columns to the level image (never on screen): the door's 3
+    columns half open, then open, drawn over the wall. The door sequence copies
+    them into the name table (src/area.asm, door_vram)."""
+    from cv_rom import tile_pixels
+    chr_ram = rom.chr_ram()
+    pal = [rom.fixed(convert_objects.SPRITE_PALETTES + 3 * 4 + v) for v in range(4)]
+    x0 = door_col * 8
+    for sprites, dark_first in ((DOOR_HALF, True), (DOOR_OPEN, True)):
+        block = [row[x0:x0 + 24] for row in pixels]
+        if dark_first:
+            for y in range(DOOR_ROW * 8, (DOOR_ROW + DOOR_ROWS) * 8):
+                block[y][0:8] = [backdrop] * 8
+        for tile, dx, dy in sprites:
+            table, top = (tile & 1) * 0x1000, tile & 0xFE
+            for half in (0, 1):
+                px = tile_pixels(chr_ram, table, top + half)
+                for y in range(8):
+                    for x in range(8):
+                        v = px[y][7 - x]            # mirrored (NES attribute $43)
+                        if v:
+                            block[DOOR_ROW * 8 + dy + half * 8 + y][dx + x] = slot_for_nes(pal[v])
+        for y, row in enumerate(pixels):
+            row += block[y]
+    for row in solid:
+        row += [0] * 6
 
 
 def write_hud_icons(rom, out_dir):
