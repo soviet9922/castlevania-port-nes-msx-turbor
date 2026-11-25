@@ -264,14 +264,27 @@ SUB_SETS = {1: ["dagger_fly_r", "dagger_fly_l"],
             3: ["bottle", "flame1", "flame2", "flame3", "flame4", "flame5"]}
 
 
+# frames that are never on screen together share one window of patterns: an
+# area with both zombies and the boss keeps the zombies' patterns there until
+# the boss wakes (the screen locks, the zombies go), then the boss's
+SWAP_SETS = [["zombie_l1", "zombie_l2", "zombie_r1", "zombie_r2"],
+             ["boss_open", "boss_up", "orb"]]
+
+
 class ObjectSprites:
     """An area's object sprites. The main patterns are always in video memory;
     a window after them holds the patterns of the sub-weapon Simon holds (only
     one can be in the air), loaded when the area starts or the sub-weapon
     changes: subs[n] = that sub-weapon's patterns (numbered from n_main)."""
-    def __init__(self, main_spt, sct, frames, offsets, subs, n_main, window):
+    def __init__(self, main_spt, sct, frames, offsets, subs, n_main, window,
+                 swaps=None, swap_window=0):
         self.main_spt, self.sct, self.frames, self.offsets = main_spt, sct, frames, offsets
         self.subs, self.n_main, self.window = subs, n_main, window
+        self.swaps, self.swap_window = swaps or [], swap_window   # SWAP_SETS' patterns
+
+    @property
+    def sub_slot(self):
+        return self.n_main + self.swap_window
 
 
 def object_sprites(rom, slot_for_nes, need, carried_items):
@@ -283,11 +296,11 @@ def object_sprites(rom, slot_for_nes, need, carried_items):
         if drop is not None and (drop in need or any(drop in SUB_SETS[n] for n in subs)):
             alias[drop] = keep
         result = _object_sprites(rom, slot_for_nes, need, subs, alias)
-        if result.n_main + result.window <= MAX_OBJ_PATTERNS:
+        if result.sub_slot + result.window <= MAX_OBJ_PATTERNS:
             if alias:
                 print("  object frames folded to fit:", ", ".join(f"{a}->{b}" for a, b in alias.items()))
             return result
-    raise SystemExit(f"object sprites need {result.n_main} + {result.window} patterns, "
+    raise SystemExit(f"object sprites need {result.sub_slot} + {result.window} patterns, "
                      f"only {MAX_OBJ_PATTERNS} available")
 
 
@@ -296,14 +309,27 @@ def _object_sprites(rom, slot_for_nes, need, subs, alias):
     pals = [[rom.fixed(SPRITE_PALETTES + p * 4 + v) for v in range(4)] for p in range(4)]
     main = SpriteBank()
     per_frame = {}                          # name -> (bank, frame index, pattern offset)
+    swapping = all(need & set(group) for group in SWAP_SETS)
+    swapped = {n for group in SWAP_SETS for n in group} if swapping else set()
     for name in OBJ_FRAMES:
-        if name in need:
+        if name in need and name not in swapped:
             per_frame[name] = (main, main.add_frame(_pixels(chr_ram, pals, alias.get(name, name),
                                                             slot_for_nes), name))
     n_main = len(main.patterns)
+    swap_banks = []
+    if swapping:
+        for group in SWAP_SETS:
+            b = _WindowBank(main, n_main)
+            b.colors, b.col_index = main.colors, main.col_index
+            for name in group:
+                if name in need:
+                    per_frame[name] = (b, b.add_frame(_pixels(chr_ram, pals, alias.get(name, name),
+                                                              slot_for_nes), name))
+            swap_banks.append(b)
+    swap_window = max([len(b.patterns) for b in swap_banks] + [0])
     sub_banks = {}
     for n in subs:
-        b = _WindowBank(main, n_main)
+        b = _WindowBank(main, n_main + swap_window)
         b.colors, b.col_index = main.colors, main.col_index      # one colour table
         for name in SUB_SETS[n]:
             per_frame[name] = (b, b.add_frame(_pixels(chr_ram, pals, alias.get(name, name),
@@ -324,15 +350,16 @@ def _object_sprites(rom, slot_for_nes, need, subs, alias):
     if len(main.colors) > 255:
         raise SystemExit("too many sprite colour columns")
     return ObjectSprites(b"".join(main.patterns), b"".join(main.colors), bytes(frames), offsets,
-                         {n: b"".join(b.patterns) for n, b in sub_banks.items()}, n_main, window)
+                         {n: b"".join(b.patterns) for n, b in sub_banks.items()}, n_main, window,
+                         [b"".join(b.patterns) for b in swap_banks], swap_window)
 
 
 class _WindowBank(SpriteBank):
     """A sub-weapon's frames: patterns the main set already has are used from
     there; the others go into the window after the main patterns."""
-    def __init__(self, main, n_main):
+    def __init__(self, main, base):
         super().__init__()
-        self.main, self.n_main = main, n_main
+        self.main, self.n_main = main, base      # base: the window's first pattern
 
     def _pat(self, cell):
         from msx_sprites import _pattern

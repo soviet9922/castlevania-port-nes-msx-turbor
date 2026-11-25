@@ -1146,6 +1146,9 @@ enemies_update:
         jp z,bat_spawner
         cp ENEMY_FISH
         jp z,fish_spawner
+        ld a,(swap_boss)                ; (their patterns are the boss's now)
+        or a
+        ret nz
         ld hl,zombie_spawn_t
         inc (hl)
         ld a,(zombie_wave)
@@ -1944,7 +1947,7 @@ boss_update:
         cp 4
         jp z,.burning
         cp 2
-        jr z,.hovering
+        jp z,.hovering
         cp 3
         jp z,.swooping
 
@@ -1975,6 +1978,21 @@ boss_update:
         cp BOSS_WAKE
         jp c,.hits
 .wake:
+        push ix                         ; the zombies go; the boss's patterns
+        ld ix,obj_table                 ; take their place (swap window)
+        ld de,OBJ_SIZE
+        ld b,OBJ_MAX
+.no_zombies:
+        ld a,(ix+0)
+        cp OBJ_ZOMBIE
+        jr nz,.next_obj
+        ld (ix+0),OBJ_NONE
+.next_obj:
+        add ix,de
+        djnz .no_zombies
+        ld a,1
+        call load_swap_patterns
+        pop ix
         ld hl,(cam_x)                   ; the screen locks: no way back
         ld (cam_min),hl
         ld a,1
@@ -2828,6 +2846,8 @@ objects_load_patterns:
         call .page
         ld a,1
         call .page
+        xor a
+        call load_swap_patterns         ; the zombies' set
         jp load_sub_patterns
 .page:
         di
@@ -2871,12 +2891,15 @@ load_sub_patterns:
         inc hl
         ld d,(hl)
         ld (sub_src),de
+        ld a,(area_hdr+AH_SUB_SLOT)
+load_window:                            ; (sub_src) bytes (sub_len) to pattern A
+        ld (win_slot),a
         xor a
         call .page
         ld a,1
 .page:
         push af
-        ld a,(area_hdr+AH_SUB_SLOT)
+        ld a,(win_slot)
         add a,PLAYER_SPRITES
         ld l,a
         ld h,0
@@ -2901,6 +2924,31 @@ load_sub_patterns:
         or c
         jr nz,.lp
         jp vram_r14_zero                ; (enables interrupts)
+
+; Swap window set A (0: zombies, 1: the boss) into the area's swap window
+; (both sprite pages); nothing in areas without one.
+load_swap_patterns:
+        ld (swap_boss),a
+        add a,a
+        ld e,a
+        ld d,0
+        ld hl,area_hdr+AH_SWAP_SZ
+        add hl,de
+        ld c,(hl)
+        inc hl
+        ld b,(hl)
+        ld a,b
+        or c
+        ret z
+        ld (sub_len),bc
+        ld hl,area_hdr+AH_SWAP_SPT
+        add hl,de
+        ld e,(hl)
+        inc hl
+        ld d,(hl)
+        ld (sub_src),de
+        ld a,(area_hdr+AH_SWAP_SLOT)
+        jp load_window
 
 ; ---------------------------------------------------------------------------
 ; HUD: hearts counter (row 1, columns 25-26), written during VBLANK

@@ -268,7 +268,7 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
 
     params = msx_area.write_area(out_dir, pixels, msx_pal, solid, sx, sy, area["name"])
     params.update(dir=f"area_{index}", obj_patterns=n_obj_patterns, subs=sorted(objs.subs),
-                  sub_slot=objs.n_main,
+                  sub_slot=objs.sub_slot, swaps=len(objs.swaps), swap_slot=objs.n_main,
                   exit_x=area.get("exit_x"), exit_y=area.get("exit_y", 0xFF),
                   below=area.get("below", 0xFF), above=area.get("above", 0xFF),
                   respawn=area.get("respawn", index),
@@ -373,6 +373,9 @@ def write_object_sprites(out_dir, index, objs):
             f.write(data)
     for n, data in objs.subs.items():
         with open(os.path.join(out_dir, f"a{index}_sub{n}_spt.bin"), "wb") as f:
+            f.write(data)
+    for n, data in enumerate(objs.swaps):
+        with open(os.path.join(out_dir, f"a{index}_swap{n}_spt.bin"), "wb") as f:
             f.write(data)
     lines = ["; generated sprite frames - do not edit",
              f"{p.upper()}_FRAME_COUNT equ {len(objs.offsets)}",

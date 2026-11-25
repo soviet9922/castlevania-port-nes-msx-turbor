@@ -23,6 +23,8 @@ The engine maps an area's bank at 0x8000 and copies its header to RAM
   screen scrolls on to (both: where the next area starts)
   +66 patterns of the flying dagger, axe, holy water (0 = none here), +72 their
   sizes, +78 the pattern slot of the sub-weapon window (after the main ones)
+  +79 patterns of the swap window's two sets (zombies, then the boss; 0 = no
+  swapping here), +83 their sizes, +87 the swap window's pattern slot
 """
 
 import os
@@ -61,6 +63,10 @@ def write(gen_dir, areas):
             "        dw " + ", ".join(f"{p}sub{n}_end-{p}sub{n}_spt" if n in a.get("subs", []) else "0"
                                      for n in (1, 2, 3)),
             f"        db {a.get('sub_slot', 0)}",
+            "        dw " + ", ".join(f"{p}swap{n}_spt" if n < a.get("swaps", 0) else "0" for n in (0, 1)),
+            "        dw " + ", ".join(f"{p}swap{n}_end-{p}swap{n}_spt" if n < a.get("swaps", 0) else "0"
+                                     for n in (0, 1)),
+            f"        db {a.get('swap_slot', 0)}",
             f'{p}palette: INCBIN "{d}/palette.bin"',
         ]
         for b in range(3):
@@ -75,6 +81,8 @@ def write(gen_dir, areas):
             f'{p}obj_spt: INCBIN "{d}/{p}obj_spt.bin"',
             *[line for n in a.get("subs", [])
               for line in (f'{p}sub{n}_spt: INCBIN "{d}/{p}sub{n}_spt.bin"', f"{p}sub{n}_end:")],
+            *[line for n in range(a.get("swaps", 0))
+              for line in (f'{p}swap{n}_spt: INCBIN "{d}/{p}swap{n}_spt.bin"', f"{p}swap{n}_end:")],
             f'{p}obj_sct: INCBIN "{d}/{p}obj_sct.bin"',
             f'{p}obj_frames: INCBIN "{d}/{p}obj_frames.bin"',
             f'        INCLUDE "{d}/{p}obj_frames.inc"',

@@ -67,7 +67,10 @@ AH_CAM_END      equ 64                  ; door: the screen scrolls on to this x 
 AH_SUB_SPT      equ 66                  ; patterns of the flying dagger, axe, holy water
 AH_SUB_SZ       equ 72                  ; their sizes in bytes (0 = not in this area)
 AH_SUB_SLOT     equ 78                  ; first object pattern of the sub-weapon window
-AH_SIZE         equ 79
+AH_SWAP_SPT     equ 79                  ; swap window: zombies' patterns, the boss's
+AH_SWAP_SZ      equ 83                  ; their sizes in bytes (0 = no swapping here)
+AH_SWAP_SLOT    equ 87                  ; first object pattern of the swap window
+AH_SIZE         equ 88
 
 ; Exit sequences (measured on the NES)
 GATE_FRAMES     equ 120                 ; walking into the castle gate, 1 px every 3 frames
@@ -157,7 +160,7 @@ BOSS_HOVER      equ 160                 ; frames it hovers before a swoop
 BOSS_SWOOP_MAX  equ 120                 ; a swoop ends after this many frames
 BOSS_HIGH_Y     equ 26
 BOSS_FIRE_AT    equ 80                  ; hover frame when it may spit a fireball
-BOSS_FIRE_FAR   equ 128                 ; ... if Simon is at least this far away
+BOSS_FIRE_FAR   equ 80                  ; ... if Simon is at least this far away (x)
                                         ; (NES video: fireballs only from afar)                  ; box top of the spots it flies back to
 STAGE_CLEAR_FRAMES equ 180              ; after the orb, then the game restarts                  ; top of crouching Simon, for fireballs
 ENEMY_FISH      equ 0x03

@@ -137,5 +137,7 @@ clip_buf        equ clip_r+1            ; 32 a masked pattern
 holy_fire       equ clip_buf+32         ; 1  holy water's fire is burning
 sub_src         equ holy_fire+1         ; 2
 sub_len         equ sub_src+2           ; 2
-RAM_END         equ sub_len+2
+win_slot        equ sub_len+2           ; window being loaded: first pattern
+swap_boss       equ win_slot+1          ; 1 = the boss's patterns are in the swap window
+RAM_END         equ swap_boss+1
         ASSERT RAM_END < 0xF380

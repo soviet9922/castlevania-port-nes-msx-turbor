@@ -235,6 +235,12 @@ a jump). The way out only opens after the boss.
   about 100 px from it. A video of the NES fight (from the player) shows them while
   the boss hovers far from Simon (about 180 px, Simon on the ledge): a small fireball
   aimed at him, about 4 px every 3 frames. Never when he is close.
+  Later probes found no boss fireball either with Simon waiting on the ledge for
+  7,600 frames (the boss hovering up to 180 px away) or with its health held at
+  40, 24 or 8, so what makes it shoot is still unknown. The NES's fireball
+  spawner (object `$26`, 8 px above the shooter, shared with the fishmen) is
+  reached through a countdown in the enemy script. The port fires whenever the
+  boss hovers 80 px or more from Simon, tuned against the player's video.
 - Health in `$01A9`, 64 at the start, shown in the HUD's ENEMY bar. A whip hit
   (basic whip) takes 6.
 - At 0 it burns (object `$31`, flame tile `91`) for 60 frames and becomes an orb

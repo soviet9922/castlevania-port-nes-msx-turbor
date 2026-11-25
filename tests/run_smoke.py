@@ -215,6 +215,8 @@ def tcl_script(syms, result_file):
                        close $f
                        set fo [expr {{{objt} + 7*{obj_size}}}]; poke $fo 0; poke {syms["dagger_on"]} 0; poke {syms["holy_fire"]} 0 }}
     after time 79.6 {{ {dump('27c_floor_end')}; set ::boss_floor 0
+                       set f [open "{result_file}" a]; puts $f "floor_fires $::floor_fires"; close $f
+set ::floor_fires 0
                        # fireballs: boss hovering at the screen's left, Simon on the ledge far right
                        boss_place 512 1; poke {px_a} [expr {{750 & 255}}]; poke {px_a + 1} [expr {{750 >> 8}}]
                        poke {py} 64; poke {py + 1} 0 }}
@@ -453,6 +455,11 @@ proc boss_watch {{}} {{
             set b [expr {{{objt} + $i*{obj_size}}}]
             if {{$::boss_floor && [peek $b] == 10 && [peek [expr {{$b+3}}]] > $::boss_maxy}} {{ set ::boss_maxy [peek [expr {{$b+3}}]] }}
             if {{$::boss_sleepf < 0 && [peek $b] == 10 && [peek [expr {{$b+9}}]] == 0}} {{ set ::boss_sleepf [peek [expr {{$b+6}}]] }}
+            if {{$::boss_floor}} {{
+                set t [peek $b]
+                if {{$t == 9 && ![info exists ::fb_prev($i)]}} {{ incr ::floor_fires }}
+                if {{$t == 9}} {{ set ::fb_prev($i) 1 }} else {{ unset -nocomplain ::fb_prev($i) }}
+            }}
         }}
     }}
     if {{!$::boss_hunt}} return
@@ -720,6 +727,7 @@ def run():
     fish_seen = None
     boss_hp = boss_awake = boss_sleepf = None
     zfall = None
+    floor_fires = None
     boss_maxy = boss_fire = boss_near_fire = 0
     rules = {}
     weapons = {}
@@ -745,6 +753,9 @@ def run():
                 continue
             if tag == "seqs":
                 seqs = dict(x.split("=") for x in kv)
+                continue
+            if tag == "floor_fires":
+                floor_fires = int(kv[0])
                 continue
             if tag == "zfall":
                 zfall = [[int(v) for v in k.split(",")] for k in kv]
@@ -820,6 +831,16 @@ def run():
     start = next((i for i, p in enumerate(poses) if p >= 4), None)
     expected_whip = [(4, 0)] * 5 + [(5, 0)] * 7 + [(6, 1)] * 9 + [(7, 0)] * 2 + [(0, 0)]
     actual_whip = whip_seq[start:start + len(expected_whip)] if start is not None else []
+    def frame_bytes(area, name):
+        """an area's sprite list for a frame (from its frame table)"""
+        d = os.path.join(BUILD, "gen", gen, f"area_{area}")
+        inc = open(os.path.join(d, f"a{area}_obj_frames.inc")).read()
+        off = int(re.search(rf"_frames\+(\d+)\s*; {name}\n", inc).group(1))
+        data = open(os.path.join(d, f"a{area}_obj_frames.bin"), "rb").read()
+        return data[off:off + 1 + 4 * data[off]]
+    stage3_walk = (gen == "converted" and
+                   frame_bytes(4, "zombie_l1") != frame_bytes(4, "zombie_l2") and
+                   frame_bytes(4, "zombie_r1") != frame_bytes(4, "zombie_r2"))
     checks = [
         # 3 s of emulated time between boot and walk_right snapshots
         ("main loop runs at 60 fps", 170 <= walk["frame_count"] - boot["frame_count"] <= 190),
@@ -914,6 +935,10 @@ def run():
            ("and hits him when he stands",
             snaps["26_standing_fireball"]["hp"] < snaps["25_crouched_fireball"]["hp"])]
           if "26_standing_fireball" in snaps else []),
+        *([("stage 3's zombies keep both walking frames (they share patterns with the boss)",
+            stage3_walk)] if gen == "converted" else []),
+        *([("in a real fight with Simon on the floor, the boss spits fireballs at him",
+            floor_fires >= 1)] if floor_fires is not None else []),
         *([("asleep, the stage 3 boss is the small hanging bat (NES)", boss_sleepf == 55)]
           if boss_sleepf is not None else []),
         *([("a zombie walking off stage 3's upper platform falls to the floor and walks on",

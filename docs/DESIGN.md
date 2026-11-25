@@ -272,6 +272,12 @@ than the 52 free sprite patterns, the converter folds animation frames together
 first, stage 3 uses one walking frame for a zombie). A death resets the whip and the
 sub-weapon, as on the NES, so the window always matches what Simon can hold.
 
+Frames that are never on screen together share a second window (`AH_SWAP_*`):
+in stage 3 the zombies' patterns are there until the boss wakes. Then the screen
+locks, the zombies vanish, zombie spawning stops, and the boss's patterns
+(`load_swap_patterns`) take their place until the area is loaded again. This is
+what lets stage 3 keep every frame unfolded.
+
 The stopwatch (5 hearts) freezes enemies, their fireballs, the spawners and the
 timer for 178 frames, as on the NES. Frozen enemies can still be whipped. A candle
 drops a small heart instead of the sub-weapon Simon already holds, the NES rule. The
