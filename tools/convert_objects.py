@@ -369,8 +369,13 @@ class _WindowBank(SpriteBank):
         return self.n_main + super()._pat(cell)
 
 
-def _pixels(chr_ram, pals, name, slot_for_nes):
+def _pixels(chr_ram, pals, name, slot_for_nes, use_overrides=True):
     from msx_sprites import mirror
+    if use_overrides:                   # an edited frame (tools/sprite_edit.py)
+        import sprite_edit
+        edited = sprite_edit.load_override(name, slot_for_nes)
+        if edited is not None:
+            return edited
     frames = dict(FRAME_SPRITES)
     frames.update(PANTHER_LEFT)
     if name.startswith("panther") and name.endswith("_r"):

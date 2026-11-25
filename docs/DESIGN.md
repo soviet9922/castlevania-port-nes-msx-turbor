@@ -334,3 +334,12 @@ screen are freed, and a destroyed candle stays destroyed (one bit per candle)
 until the area is loaded again.
 
 ## Memory
+
+## Editing sprite frames
+
+`tools/sprite_edit.py export <rom> <frame names | --all>` writes object frames
+from your own ROM as 1:1 24-bit BMPs into `art_overrides/` (magenta is
+transparent). Edit them and rebuild: the converter uses an edited frame
+instead of the ROM's pixels, mapping each colour to the nearest NES colour.
+Delete a file to return to the ROM's pixels. `art_overrides/` is git-ignored:
+the files come from the ROM and must never be committed.

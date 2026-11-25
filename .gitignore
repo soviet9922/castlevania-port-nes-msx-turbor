@@ -3,3 +3,5 @@ build/
 *.NES
 *.sav
 __pycache__/
+# edited sprite frames (made from the ROM: never commit)
+art_overrides/

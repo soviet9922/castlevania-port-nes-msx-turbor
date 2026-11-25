@@ -13,7 +13,8 @@ NES_OUT   := $(BUILD)/cvmsx-nes.rom
 
 ASM_SRC   := $(wildcard src/*.asm src/*.inc)
 PH_TOOLS  := tools/gen_placeholder_assets.py tools/msx_area.py tools/msx_sprites.py tools/areas_asm.py
-CV_TOOLS  := $(PH_TOOLS) tools/convert_stage.py tools/cv_rom.py tools/convert_simon.py tools/convert_objects.py
+CV_TOOLS  := $(PH_TOOLS) tools/convert_stage.py tools/cv_rom.py tools/convert_simon.py tools/convert_objects.py \
+             tools/sprite_edit.py $(wildcard art_overrides/*.bmp)
 
 SJASM_FLAGS = --nologo --msg=war --fullpath --inc=src
 
