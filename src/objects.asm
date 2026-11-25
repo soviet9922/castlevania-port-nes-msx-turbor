@@ -31,11 +31,14 @@ OBJ_CANDLE      equ 4
 OBJ_ZOMBIE      equ 5
 OBJ_PANTHER     equ 6
 OBJ_BAT         equ 7
+OBJ_FISH        equ 8
+OBJ_FIREBALL    equ 9
 
 KIND_BRAZIER    equ 0
 KIND_CANDLE     equ 1
 KIND_PANTHER    equ 2                   ; 32x16 box
 KIND_BAT        equ 3                   ; 16x16 box
+KIND_FIREBALL   equ 4                   ; 8x8 box at +4,+4
 
 ; object frame numbers (OBJ_FRAMES in tools/convert_objects.py)
 OBJF_BRAZIER    equ 0
@@ -48,6 +51,8 @@ OBJF_SMALLHEART equ 11
 OBJF_ZOMBIE     equ 12                  ; left 1/2, right 1/2
 OBJF_PANTHER    equ 16                  ; sit, run1-3 facing left, then facing right
 OBJF_BAT        equ 24                  ; wings 1-3 flying left, then flying right
+OBJF_FISH       equ 30                  ; walk 1, walk 2, shoot facing left, then right
+OBJF_FIREBALL   equ 36
 
 ITEM_WHIPUP     equ 0
 ITEM_HEART      equ 1
@@ -334,6 +339,16 @@ objects_update:
         call bat_update
         jr .next
 .not_bat:
+        cp OBJ_FISH
+        jr nz,.not_fish
+        call fish_update
+        jr .next
+.not_fish:
+        cp OBJ_FIREBALL
+        jr nz,.not_fireball
+        call fireball_update
+        jr .next
+.not_fireball:
         cp OBJ_ITEM
         call z,item_update
 .next:
@@ -977,6 +992,8 @@ enemies_update:
         ld a,(spawner_type)
         cp ENEMY_BAT
         jp z,bat_spawner
+        cp ENEMY_FISH
+        jp z,fish_spawner
         ld hl,zombie_spawn_t
         inc (hl)
         ld a,(zombie_wave)
@@ -1229,6 +1246,430 @@ bat_wave:
         db 14, 13, 12, 12, 11, 11, 10, 10, 9, 8, 8, 7, 7, 6, 6, 5
         db 4, 4, 4, 3, 3, 2, 2, 2, 1, 1, 1, 0, 0, 0, 0, 0
 
+
+; ---------------------------------------------------------------------------
+; Fishman (measured in the NES stage 2 waterway). While fewer than FISH_MAX
+; are about, one jumps out of the water every FISH_DELAY frames, from a
+; spawner on the screen at least FISH_AWAY px from Simon. +9 = state:
+;   0 in the air: starts at -86/16 px per frame up, gravity 2/16, it passes
+;     through platforms going up and lands on one coming down (or falls back
+;     into the water and is gone)
+;   1 walks towards Simon, 3 px every 4 frames, legs every 24 frames; falls
+;     off the end of a platform; after FISH_WALK frames it stops and
+;   2 shoots: a fireball after 16 frames, walks again (towards Simon) after 32
+; +10 = vertical speed (1/16 px), +11 = fraction.
+; ---------------------------------------------------------------------------
+fish_spawner:
+        ld ix,obj_table                 ; fishmen about?
+        ld de,OBJ_SIZE
+        ld b,OBJ_MAX
+        ld c,0
+.count:
+        ld a,(ix+0)
+        cp OBJ_FISH
+        jr nz,.not_one
+        inc c
+.not_one:
+        add ix,de
+        djnz .count
+        ld hl,fish_spawn_t
+        ld a,c
+        cp FISH_MAX
+        jr c,.wait
+        ld (hl),0
+        ret
+.wait:
+        inc (hl)
+        ld a,(hl)
+        cp FISH_DELAY
+        ret c
+        ld (hl),0
+        ld a,(hurt_state)
+        or a
+        ret nz
+        ; try the spawners in turn, starting after the last one used
+        ld hl,(area_hdr+AH_ENEMIES)
+        ld b,(hl)                       ; B = count
+        ld c,b                          ; C = tries left
+.try:
+        ld a,(fish_pick)
+        inc a
+        cp b
+        jr c,.idx
+        xor a
+.idx:
+        ld (fish_pick),a
+        ld hl,(area_hdr+AH_ENEMIES)
+        inc hl
+        add a,a
+        add a,a
+        ld e,a
+        ld d,0
+        add hl,de                       ; HL = record (x, y, type)
+        push bc
+        call .candidate
+        pop bc
+        ret nc                          ; spawned
+        dec c
+        jr nz,.try
+        ret
+; HL = spawner record -> carry if it can't be used, else spawns (no carry)
+.candidate:
+        ld a,(hl)
+        ld (tmp_w),a
+        inc hl
+        ld a,(hl)
+        ld (tmp_w+1),a                  ; spawner x
+        inc hl
+        ld b,(hl)                       ; y
+        inc hl
+        ld a,(hl)
+        cp ENEMY_FISH
+        scf
+        ret nz
+        ld hl,(tmp_w)
+        ld de,(cam_x)
+        or a
+        sbc hl,de                       ; screen x
+        ld a,h
+        or a
+        scf
+        ret nz
+        ld a,l
+        cp 16
+        ret c
+        cp 240
+        ccf
+        ret c
+        ld hl,(tmp_w)                   ; far enough from Simon?
+        ld de,(px)
+        or a
+        sbc hl,de
+        ld de,-8
+        add hl,de                       ; spawner x - Simon centre
+        bit 7,h
+        jr z,.pos
+        ld a,l
+        neg
+        ld l,a
+        ld a,h
+        cpl
+        ld h,a
+.pos:
+        ld a,h
+        or a
+        jr nz,.ok
+        ld a,l
+        cp FISH_AWAY
+        ret c
+.ok:
+        push bc
+        call obj_free_slot
+        pop bc
+        ret c
+        ld hl,(tmp_w)
+        ld de,-8
+        add hl,de
+        ld (ix+1),l
+        ld (ix+2),h
+        ld (ix+3),b
+        ld (ix+0),OBJ_FISH
+        ld (ix+4),0
+        ld (ix+5),1
+        ld (ix+7),KIND_BRAZIER          ; 16x32 box
+        ld (ix+8),0xFF
+        ld (ix+9),0
+        ld (ix+10),FISH_VY0
+        ld (ix+11),0
+        call fish_face
+        call fish_frame
+        or a
+        ret
+
+; +5 = towards Simon
+fish_face:
+        ld hl,(px)
+        ld e,(ix+1)
+        ld d,(ix+2)
+        or a
+        sbc hl,de
+        ld (ix+5),1
+        ret nc
+        ld (ix+5),-1
+        ret
+
+fish_update:
+        inc (ix+4)
+        ld a,(ix+9)
+        or a
+        jp nz,.on_ground
+        ld a,(ix+10)                    ; in the air: vy += g (capped)
+        add a,FISH_GRAVITY
+        bit 7,a
+        jr nz,.vy_ok                    ; still going up
+        cp FISH_VMAX+1
+        jr c,.vy_ok
+        ld a,FISH_VMAX
+.vy_ok:
+        ld (ix+10),a
+        ld c,a
+        ld a,(ix+11)
+        add a,c
+        ld c,a
+        sra a
+        sra a
+        sra a
+        sra a
+        add a,(ix+3)
+        ld (ix+3),a
+        ld a,c
+        and 15
+        ld (ix+11),a
+        ld a,(ix+10)
+        or a
+        jp m,.drawn                     ; rising: through everything
+        ld a,(ix+3)
+        cp FISH_WATER_Y+8
+        jr c,.landing
+        cp 200                          ; (above the playfield top)
+        jr nc,.landing
+        ld (ix+0),OBJ_NONE              ; back into the water
+        ret
+.landing:
+        call fish_feet_solid
+        jr nc,.drawn
+        ld a,(ix+3)                     ; stand on the tile
+        add a,32
+        and 0xF8
+        sub 32
+        ld (ix+3),a
+        ld (ix+9),1
+        ld (ix+4),0
+        call fish_face
+        jr .drawn
+
+.on_ground:
+        cp 2
+        jr z,.shooting
+        ld a,(ix+4)                     ; walk: 3 px in 4 frames
+        and 3
+        jr z,.walked
+        ld a,(ix+5)
+        ld e,a
+        rla
+        sbc a,a
+        ld d,a
+        ld l,(ix+1)
+        ld h,(ix+2)
+        add hl,de
+        ld (ix+1),l
+        ld (ix+2),h
+.walked:
+        call fish_feet_solid            ; off the end of the platform: fall
+        jr c,.ground
+        ld (ix+9),0
+        ld (ix+10),0
+        ld (ix+11),0
+        jr .drawn
+.ground:
+        ld a,(ix+4)
+        cp FISH_WALK
+        jr c,.drawn
+        ld (ix+9),2
+        ld (ix+4),0
+        jr .drawn
+.shooting:
+        ld a,(ix+4)
+        cp 16
+        call z,fish_shoot
+        ld a,(ix+4)
+        cp 32
+        jr c,.drawn
+        ld (ix+9),1
+        ld (ix+4),0
+        call fish_face
+.drawn:
+        call fish_frame
+
+        ld l,(ix+1)                     ; off the screen: gone
+        ld h,(ix+2)
+        ld de,(cam_x)
+        or a
+        sbc hl,de
+        ld de,16
+        add hl,de
+        bit 7,h
+        jr nz,.gone
+        ld de,256+16+1
+        or a
+        sbc hl,de
+        jr nc,.gone
+
+        ld a,(whip_active)
+        or a
+        jp z,zombie_update.touch
+        call whip_hits_object
+        jp nc,zombie_update.touch
+        ld hl,kills
+        inc (hl)
+        ld (ix+0),OBJ_BURST
+        ld (ix+4),0
+        ld (ix+6),OBJF_BURST
+        ld (ix+5),ITEM_NONE
+        ld a,(ix+3)                     ; burst on its body
+        add a,8
+        ld (ix+3),a
+        ret
+.gone:
+        ld (ix+0),OBJ_NONE
+        ret
+
+; carry if the tile under the fishman's feet (centre, y+32) is solid
+fish_feet_solid:
+        ld l,(ix+1)
+        ld h,(ix+2)
+        ld de,8
+        add hl,de
+        ld a,(ix+3)
+        add a,32
+        ld e,a
+        ld d,0
+        jp solid_at
+
+; walk 1/2 by (timer / 24) mod 2, shoot in state 2, +3 facing right
+fish_frame:
+        ld c,2
+        ld a,(ix+9)
+        cp 2
+        jr z,.dir
+        ld c,0
+        or a
+        jr z,.dir
+        ld a,(ix+4)
+.div24:
+        sub 24
+        jr c,.dir
+        inc c
+        res 1,c
+        jr .div24
+.dir:
+        ld a,(ix+5)
+        or a
+        ld a,OBJF_FISH
+        jp m,.left
+        add a,3
+.left:
+        add a,c
+        ld (ix+6),a
+        ret
+
+; a fireball from the fishman's mouth, the way it faces
+fish_shoot:
+        push ix
+        ld l,(ix+1)
+        ld h,(ix+2)
+        ld b,(ix+3)
+        ld c,(ix+5)
+        call obj_free_slot
+        jr c,.none
+        ld (ix+1),l
+        ld (ix+2),h
+        ld a,b
+        add a,8
+        ld (ix+3),a
+        ld (ix+5),c
+        ld (ix+0),OBJ_FIREBALL
+        ld (ix+4),0
+        ld (ix+6),OBJF_FIREBALL
+        ld (ix+7),KIND_FIREBALL
+        ld (ix+8),0xFF
+.none:
+        pop ix
+        ret
+
+; Fireball: 7 px every 4 frames the way it was shot. Hurts Simon on contact;
+; the whip destroys it.
+fireball_update:
+        inc (ix+4)
+        ld a,(ix+4)
+        and 3
+        ld e,2
+        jr nz,.dx
+        ld e,1
+.dx:
+        bit 7,(ix+5)
+        jr z,.right
+        ld a,e
+        neg
+        ld e,a
+.right:
+        ld a,e
+        rla
+        sbc a,a
+        ld d,a
+        ld l,(ix+1)
+        ld h,(ix+2)
+        add hl,de
+        ld (ix+1),l
+        ld (ix+2),h
+
+        ld de,(cam_x)                   ; off the screen: gone
+        or a
+        sbc hl,de
+        ld de,8
+        add hl,de
+        bit 7,h
+        jr nz,.gone
+        ld de,256+8+1
+        or a
+        sbc hl,de
+        jr nc,.gone
+
+        ld a,(whip_active)
+        or a
+        jr z,.touch
+        call whip_hits_object
+        jr c,.gone
+.touch:                                 ; ball x+4..x+11 vs Simon px+3..px+12
+        ld a,(invuln_t)
+        or a
+        ret nz
+        ld a,(hurt_state)
+        or a
+        ret nz
+        ld hl,(px)
+        ld de,3-11
+        add hl,de                       ; Simon left - ball right
+        ld e,(ix+1)
+        ld d,(ix+2)
+        or a
+        sbc hl,de
+        bit 7,h
+        ret z                           ; Simon is right of it
+        ld e,(ix+1)
+        ld d,(ix+2)
+        ld hl,(px)
+        ld bc,12-4
+        add hl,bc
+        or a
+        sbc hl,de                       ; Simon right - ball left
+        ret c
+        ld a,(py+1)
+        or a
+        ret nz
+        ld a,(ix+3)                     ; ball y+4..y+11 vs Simon py..py+31
+        add a,11
+        ld hl,py
+        sub (hl)
+        ret c
+        cp 32+7
+        ret nc
+        ld b,(ix+5)
+        call simon_hurt
+.gone:
+        ld (ix+0),OBJ_NONE
+        ret
+
 ; -> A = number of zombies alive, Z if none (BC, DE, IX clobbered)
 count_zombies:
         ld ix,obj_table
@@ -1285,21 +1726,34 @@ whip_hits_object:
         ld b,15
         jr .box_ready
 .not_bat:
+        cp KIND_FIREBALL
+        jr nz,.not_fireball
+        ld de,7
+        ld bc,7*256 + 4
+        ld l,(ix+1)                     ; box starts 4 px in
+        ld h,(ix+2)
+        inc hl
+        inc hl
+        inc hl
+        inc hl
+        jr .box_x
+.not_fireball:
         cp KIND_CANDLE
         jr nz,.box_ready
         ld bc,15*256 + 8
 .box_ready:
         ld l,(ix+1)
         ld h,(ix+2)
+.box_x:
+        push hl                         ; box left
         add hl,de
         ld de,(whip_x1)
         or a
         sbc hl,de                       ; box right - whip left
+        pop de
         bit 7,h
         jr nz,.no
         ld hl,(whip_x2)
-        ld e,(ix+1)
-        ld d,(ix+2)
         or a
         sbc hl,de                       ; whip right - box left
         bit 7,h

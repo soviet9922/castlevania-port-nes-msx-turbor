@@ -135,8 +135,20 @@ chunks 4 and 8; section 0 has type `$03` in every chunk (y `$B8`).
   96 frames (fitted with 9 - 9 cos). Wings: tiles `90 92`, `94 96`, `98 9A`
   (sprite palette 3, art facing left), each shown 9 frames, in the order 1 2 3 2.
   When it touches Simon it takes 8 health and dies (`$31`, then a burst).
-- **Fishman** (object id `$03`, record type `$03`): jumps out of the water with a
-  splash (object `$25`, several drops). Not converted yet.
+- **Fishman** (object id `$03`, record type `$03`, one record per waterway chunk at
+  x+32, y `$B8`). Recorded standing on the walkway (a local variant of `record_stage2.lua`):
+  - two are about at a time; a new one jumps out a few frames after one is gone,
+    away from Simon, with a splash (object `$25`, several drops);
+  - the jump: 5-6 px per frame up at first, slowing (fitted: -86/16 px per frame,
+    gravity 2/16), a peak about 115 px above the water. It passes through
+    platforms going up and lands on one coming down, or falls back into the water;
+  - it walks towards Simon, 19 px every 25 frames (fitted: 3 px every 4 frames), legs
+    alternating every 25 frames (bottom tiles `A4 A6` / `A8 AA`, top `A0 A2`, sprite
+    palette 3, art facing left);
+  - after about 80 frames it stops (state 6, tiles `AC AE` over `8C 8E`) for 32
+    frames and shoots a fireball (object `$26`, tile `68`) after 16: 7 px every 4
+    frames, the way it faces. Then it turns towards Simon and walks again;
+  - it walks off the end of a platform and falls; a fireball hit takes 8 health.
 - Object id `$32` is the burst left by an enemy that dies or leaves.
 
 ## Palettes

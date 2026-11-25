@@ -97,5 +97,7 @@ sat_buf         equ spr_sat_ptr+2       ; (MAX_SPRITES+1)*4
 keep_player     equ sat_buf+(MAX_SPRITES+1)*4 ; 1  load_area keeps Simon (section change)
 spawner_type    equ keep_player+1       ; 1  type of the spawner being handled
 bat_spawn_t     equ spawner_type+1      ; 1  frames until the next bat
-RAM_END         equ bat_spawn_t+1
+fish_spawn_t    equ bat_spawn_t+1       ; 1
+fish_pick       equ fish_spawn_t+1      ; 1  last fishman spawner used
+RAM_END         equ fish_pick+1
         ASSERT RAM_END < 0xF380

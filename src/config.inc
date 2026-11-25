@@ -100,6 +100,15 @@ ZOMBIE_DAMAGE   equ 8
 ENEMY_ZOMBIE    equ 0x01                ; spawner types (NES enemy records)
 ENEMY_BAT       equ 0x02
 BAT_DELAY       equ 64                  ; frames before a bat appears
+ENEMY_FISH      equ 0x03
+FISH_MAX        equ 2                   ; fishmen about at once
+FISH_DELAY      equ 32                  ; frames before the next one jumps out
+FISH_AWAY       equ 48                  ; not right under Simon
+FISH_VY0        equ -86                 ; jump speed, 1/16 px per frame
+FISH_GRAVITY    equ 2
+FISH_VMAX       equ 64
+FISH_WALK       equ 80                  ; frames of walking between shots
+FISH_WATER_Y    equ 120                 ; box top when it leaves the water
 HIT_FREEZE      equ 6                   ; frames frozen when hit
 STUN_FRAMES     equ 16                  ; crouched after landing from the knock-back
 INVULN_FRAMES   equ 140                 ; blinking, cannot be hit again

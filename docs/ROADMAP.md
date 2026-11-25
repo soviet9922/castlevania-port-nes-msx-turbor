@@ -57,7 +57,8 @@
 - [x] Zombies in waves of 3, like the NES
 - [x] Object sprite patterns per area, checked against the 52 free pattern slots
 - [x] Bats (stage 2): appear at the screen edge, fly at Simon in a wave
-- [ ] Fishmen (stage 2 waterway); enemy type $04 (still unidentified);
+- [x] Fishmen (stage 2 waterway): jump out of the water, walk, shoot fireballs
+- [ ] The splash; enemy type $04 (still unidentified);
       enemy drops; score, lives, timer, death animation
 - [ ] Zombie, panther, bat, fishman, …
 - [ ] Sprite multiplexing and flicker when more than 8 sprites share a line

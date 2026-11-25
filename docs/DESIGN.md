@@ -201,6 +201,11 @@ Bats are spawned like zombies, from the area's spawner list (type 2): one at a t
 straight at him with a 96-frame vertical wave read from a table, and dies when it
 hits him.
 
+Fishmen come from the waterway's spawners (type 3, one per 64-px chunk): at most
+two at a time, each jumping out of the water at a spawner on the screen but not
+right under Simon. They use a small state machine like the panther's (in the air,
+walking, shooting) and fire fireballs, which are objects of their own.
+
 With more than 8 sprites on a line, the VDP drops the extras. The order of
 objects in the sprite list rotates every frame (Simon always comes first), so
 crowded lines flicker instead of losing sprites, as on the NES.
@@ -209,7 +214,7 @@ crowded lines flicker instead of losing sprites, as on the NES.
 
 On the 3.58 MHz Z80 test machine, a normal frame needs about 6 ms of logic
 plus 2.7 ms of VBLANK work. Most of the logic is building the sprite list (2.5 ms) and
-writing it to the hidden page (2.4 ms). Busy hall scenes (5 candles, 3 zombies,
+writing it to the hidden page (2.4 ms). Busy scenes (5 candles, 3 zombies, or two fishmen and a fireball, with
 Simon changing pose) occasionally need more than a frame: the smoke test reports
 how often (about 3%). The turbo R's R800 runs the logic several times faster.
 

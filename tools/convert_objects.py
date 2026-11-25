@@ -37,7 +37,9 @@ OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
               "zombie_l1", "zombie_l2", "zombie_r1", "zombie_r2",
               "panther_sit_l", "panther_run1_l", "panther_run2_l", "panther_run3_l",
               "panther_sit_r", "panther_run1_r", "panther_run2_r", "panther_run3_r",
-              "bat1_l", "bat2_l", "bat3_l", "bat1_r", "bat2_r", "bat3_r"]
+              "bat1_l", "bat2_l", "bat3_l", "bat1_r", "bat2_r", "bat3_r",
+              "fish_walk1_l", "fish_walk2_l", "fish_shoot_l",
+              "fish_walk1_r", "fish_walk2_r", "fish_shoot_r", "fireball"]
 
 # Black panther: 32x16, palette 3, art faces left (recorded in the hall).
 # Run cycle run1 -> run2 -> run3, 7 frames each; the leap shows run2.
@@ -80,9 +82,20 @@ for _n, _t in (("bat1", 0x90), ("bat2", 0x94), ("bat3", 0x98)):
     FRAME_SPRITES[_n + "_l"] = [(_t, 0, 0, 3, 0), (_t + 2, 8, 0, 3, 0)]
     FRAME_SPRITES[_n + "_r"] = [(_t + 2, 0, 0, 3, 1), (_t, 8, 0, 3, 1)]
 
+# fishman: 16x32, palette 3, art faces left (recorded in the stage 2
+# waterway); legs (bottom tiles) alternate; shooting pose; fireball 8x16
+for _n, (_top, _bot) in (("fish_walk1", (0xA0, 0xA4)), ("fish_walk2", (0xA0, 0xA8)),
+                         ("fish_shoot", (0xAC, 0x8C))):
+    FRAME_SPRITES[_n + "_l"] = [(_top, 0, 0, 3, 0), (_top + 2, 8, 0, 3, 0),
+                                (_bot, 0, 16, 3, 0), (_bot + 2, 8, 16, 3, 0)]
+    FRAME_SPRITES[_n + "_r"] = [(_top + 2, 0, 0, 3, 1), (_top, 8, 0, 3, 1),
+                                (_bot + 2, 0, 16, 3, 1), (_bot, 8, 16, 3, 1)]
+FRAME_SPRITES["fireball"] = [(0x68, 4, 0, 3, 0)]
+
 ENEMY_ZOMBIE = 0x01             # spawner types in the enemy group records
 ENEMY_BAT = 0x02
-SPAWNER_TYPES = (ENEMY_ZOMBIE, ENEMY_BAT)
+ENEMY_FISH = 0x03
+SPAWNER_TYPES = (ENEMY_ZOMBIE, ENEMY_BAT, ENEMY_FISH)
 
 
 def candles(rom, stage, section, level_px):
@@ -162,6 +175,8 @@ def needed_frames(candle_list, spawners):
         need |= {n for n in OBJ_FRAMES if n.startswith("zombie")}
     if ENEMY_BAT in kinds:
         need |= {n for n in OBJ_FRAMES if n.startswith("bat")}
+    if ENEMY_FISH in kinds:
+        need |= {n for n in OBJ_FRAMES if n.startswith("fish")} | {"fireball"}
     return need
 
 

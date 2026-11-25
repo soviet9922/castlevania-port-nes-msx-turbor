@@ -108,8 +108,26 @@ def tcl_script(syms, result_file):
                        # bats: enemies on, wait for one and whip it
                        set ::bat_seen 0; poke {eoff} 0; set ::hunting 1 }}
     after time 37.5 {{ set ::hunting 0; poke {eoff} 3; {dump('21_bat')}
-                       set f [open "{result_file}" a]; puts $f "bat $::bat_seen"; close $f }}
-    after time 38.0 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
+                       set f [open "{result_file}" a]; puts $f "bat $::bat_seen"; close $f
+                       # back down into the waterway
+                       set sp [expr {{[peek {stairs}] + 256*[peek {stairs + 1}]}}]
+                       for {{set i 0}} {{$i < [peek $sp]}} {{incr i}} {{
+                           set r [expr {{$sp + 1 + 7*$i}}]
+                           if {{[peek [expr {{$r+2}}]] > 176 && [peek [expr {{$r+5}}]] < 176}} {{
+                               set x [expr {{[peek [expr {{$r+3}}]] + 256*[peek [expr {{$r+4}}]] + 4}}]
+                               poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
+                               poke {py} [peek [expr {{$r+5}}]]; poke {py + 1} 0
+                               keymatrixdown 8 0x40
+                               break
+                           }}
+                       }} }}
+    after time 39.6 {{ keymatrixup 8 0x40
+                       # fishmen: stand on the walkway, enemies on, whip what comes
+                       set ::fish_seen 0; poke {px_a} 150; poke {px_a + 1} 0; poke {py} 48; poke {py + 1} 0
+                       poke {eoff} 0; set ::hunting 1 }}
+    after time 47.0 {{ set ::hunting 0; poke {eoff} 3; {dump('22_fishmen')}
+                       set f [open "{result_file}" a]; puts $f "fish $::fish_seen"; close $f }}
+    after time 47.5 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """ if areas > 1 else f"""
     after time 9.0  {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
@@ -204,6 +222,7 @@ debug set_bp {load} {{}} {{ set ::vbl_skip 4 }}
 set ::wait_hit 0
 set ::hunting 0
 set ::bat_seen 0
+set ::fish_seen 0
 # panther test: no more zombies; stand on the floor within the first
 # panther's wake distance and let the hunter whip it
 proc panther_test {{}} {{
@@ -254,7 +273,8 @@ proc zombie_watch {{}} {{
         for {{set i 0}} {{$i < 8}} {{incr i}} {{
             set b [expr {{{objt} + $i*{obj_size}}}]
             if {{[peek $b] == 7}} {{ set ::bat_seen 1 }}
-            if {{[peek $b] != 6 && [peek $b] != 7}} continue
+            if {{[peek $b] == 8}} {{ set ::fish_seen 1 }}
+            if {{[peek $b] < 6 || [peek $b] > 8}} continue
             set d [expr {{[peek [expr {{$b+1}}]] + 256*[peek [expr {{$b+2}}]] - $px}}]
             if {{$d >= 14 && $d <= 36}} {{ poke {fa} 0; keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
             if {{$d <= -14 && $d >= -50}} {{ poke {fa} 1; keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
@@ -305,6 +325,7 @@ def run():
     overruns = (0, 0)
     panther = None
     bat_seen = None
+    fish_seen = None
     panther_dead = 0
     stair = None
     with open(result_file) as f:
@@ -318,6 +339,9 @@ def run():
                 continue
             if tag == "hud_hearts":
                 hud_hearts = kv[0] if kv else ""
+                continue
+            if tag == "fish":
+                fish_seen = int(kv[0])
                 continue
             if tag == "bat":
                 bat_seen = int(kv[0])
@@ -421,6 +445,11 @@ def run():
             bat_seen == 1 and (snaps["21_bat"]["kills"] > snaps["20_section_above"]["kills"]
                                or snaps["21_bat"]["hp"] < snaps["20_section_above"]["hp"]))]
           if bat_seen is not None and "21_bat" in snaps else []),
+        *([("fishmen jump out of the waterway and are whipped (or hit Simon)",
+            fish_seen == 1 and snaps["22_fishmen"]["cur_area"] == 3
+            and (snaps["22_fishmen"]["kills"] > snaps["21_bat"]["kills"]
+                 or snaps["22_fishmen"]["hp"] < snaps["21_bat"]["hp"]))]
+          if fish_seen is not None and "22_fishmen" in snaps else []),
         *([("UP at a staircase's foot climbs it to the top",
             (snaps["11_stairs_up"]["px"], snaps["11_stairs_up"]["py"]) == stair["top"]
             and snaps["11_stairs_up"]["stair_state"] == 0 and snaps["11_stairs_up"]["on_ground"] == 1),
