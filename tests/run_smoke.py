@@ -159,13 +159,30 @@ def tcl_script(syms, result_file):
                        # (back at the area's start, away from the stairs)
                        poke {eoff} 3; poke {px_a} 40; poke {px_a + 1} 0
                        keymatrixdown 8 0x40; fireball_at_simon }}
-    after time 64.6 {{ {dump('25_crouched_fireball')}; keymatrixup 8 0x40 }}
+    after time 64.6 {{ {dump('25_crouched_fireball')}; keymatrixup 8 0x40
+                       # a zombie on stage 3's upper platform, walking left off its edge
+                       set z [expr {{{objt} + 6*{obj_size}}}]
+                       poke [expr {{$z+1}}] 150; poke [expr {{$z+2}}] 0; poke [expr {{$z+3}}] 64
+                       poke [expr {{$z+4}}] 0; poke [expr {{$z+5}}] 255; poke [expr {{$z+7}}] 3
+                       poke [expr {{$z+8}}] 255; poke [expr {{$z+9}}] 0; poke [expr {{$z+10}}] 0
+                       poke [expr {{$z+11}}] 0; poke $z 5 }}
+    after time 65.0 {{ set z [expr {{{objt} + 6*{obj_size}}}]
+                       set ::zfall "[peek $z],[peek [expr {{$z+1}}]],[peek [expr {{$z+3}}]],[peek [expr {{$z+9}}]]" }}
+    after time 66.0 {{ set z [expr {{{objt} + 6*{obj_size}}}]
+                       set f [open "{result_file}" a]
+                       puts $f "zfall $::zfall [peek $z],[peek [expr {{$z+1}}]],[peek [expr {{$z+3}}]],[peek [expr {{$z+9}}]]"
+                       close $f
+                       if {{[peek $z] == 5}} {{ poke $z 0 }} }}
     after time 66.1 {{ fireball_at_simon }}
     after time 67.4 {{ {dump('26_standing_fireball')}
                        # the boss: stand on the ledge at the end of stage 3
+                       # (first on the floor out of its reach, to see it asleep)
                        if {{[peek {cur}] == 4}} {{
+                           poke {px_a} [expr {{530 & 255}}]; poke {px_a + 1} [expr {{530 >> 8}}]
+                           poke {py} 128; poke {py + 1} 0; set ::boss_hunt 1 }} }}
+    after time 67.9 {{ if {{[peek {cur}] == 4}} {{
                            poke {px_a} [expr {{711 & 255}}]; poke {px_a + 1} [expr {{711 >> 8}}]
-                           poke {py} 64; poke {py + 1} 0; set ::boss_hunt 1 }} }}
+                           poke {py} 64; poke {py + 1} 0 }} }}
     after time 74.1 {{ set ::boss_hunt 0
                        # on the floor at the screen's left edge: unlocked, the camera would follow
                        poke {px_a} [expr {{524 & 255}}]; poke {px_a + 1} [expr {{524 >> 8}}]
@@ -209,7 +226,7 @@ def tcl_script(syms, result_file):
                        poke {px_a} [expr {{711 & 255}}]; poke {px_a + 1} [expr {{711 >> 8}}]
                        poke {py} 64; poke {py + 1} 0; set ::boss_hunt 1 }}
     after time 80.1 {{ {dump('27_boss')}
-                       set f [open "{result_file}" a]; puts $f "boss_hp [peek {syms["boss_hp"]}] $::boss_awake"; close $f
+                       set f [open "{result_file}" a]; puts $f "boss_hp [peek {syms["boss_hp"]}] $::boss_awake $::boss_sleepf"; close $f
                        poke {syms["boss_hp"]} 1 }}
     after time 80.3 {{ boss_place 0 0 }}
     after time 86.1 {{ set ::boss_hunt 0; {dump('28_boss_dead')}
@@ -425,6 +442,8 @@ set ::orb_seen 0
 set ::boss_maxy 0
 set ::bossb 0
 set ::stun0 ""
+set ::zfall ""
+set ::boss_sleepf -1
 set ::boss_fire 0
 set ::boss_near_fire 0
 set ::boss_floor 0
@@ -433,6 +452,7 @@ proc boss_watch {{}} {{
         for {{set i 0}} {{$i < 8}} {{incr i}} {{
             set b [expr {{{objt} + $i*{obj_size}}}]
             if {{$::boss_floor && [peek $b] == 10 && [peek [expr {{$b+3}}]] > $::boss_maxy}} {{ set ::boss_maxy [peek [expr {{$b+3}}]] }}
+            if {{$::boss_sleepf < 0 && [peek $b] == 10 && [peek [expr {{$b+9}}]] == 0}} {{ set ::boss_sleepf [peek [expr {{$b+6}}]] }}
         }}
     }}
     if {{!$::boss_hunt}} return
@@ -698,7 +718,8 @@ def run():
     panther = None
     bat_seen = None
     fish_seen = None
-    boss_hp = boss_awake = None
+    boss_hp = boss_awake = boss_sleepf = None
+    zfall = None
     boss_maxy = boss_fire = boss_near_fire = 0
     rules = {}
     weapons = {}
@@ -725,6 +746,9 @@ def run():
             if tag == "seqs":
                 seqs = dict(x.split("=") for x in kv)
                 continue
+            if tag == "zfall":
+                zfall = [[int(v) for v in k.split(",")] for k in kv]
+                continue
             if tag == "stun":
                 stun = (kv[0].split(","), kv[1].split(","))
                 continue
@@ -744,7 +768,7 @@ def run():
                 boss_maxy = int(kv[0])
                 continue
             if tag == "boss_hp":
-                boss_hp, boss_awake = int(kv[0]), int(kv[1])
+                boss_hp, boss_awake, boss_sleepf = int(kv[0]), int(kv[1]), int(kv[2])
                 continue
             if tag == "orb":
                 orb_seen, clear_t, boss_fire, boss_near_fire = (int(v) for v in kv)
@@ -890,6 +914,12 @@ def run():
            ("and hits him when he stands",
             snaps["26_standing_fireball"]["hp"] < snaps["25_crouched_fireball"]["hp"])]
           if "26_standing_fireball" in snaps else []),
+        *([("asleep, the stage 3 boss is the small hanging bat (NES)", boss_sleepf == 55)]
+          if boss_sleepf is not None else []),
+        *([("a zombie walking off stage 3's upper platform falls to the floor and walks on",
+            zfall[0][0] == 5 and zfall[1][0] == 5 and zfall[0][2] == 64
+            and zfall[1][2] == 128 and zfall[1][3] == 0 and zfall[1][1] < zfall[0][1])]
+          if zfall else []),
         *([("the stage 3 boss wakes up and the whip hurts it", boss_awake == 1 and boss_hp < 64),
            ("the screen locks at the boss: walking left doesn't scroll back",
             snaps["27a_boss_left"]["cam_x"] == 512 and snaps["27a_boss_left"]["px"] < 530),

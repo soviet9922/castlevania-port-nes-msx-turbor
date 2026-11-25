@@ -221,6 +221,8 @@ a jump). The way out only opens after the boss.
 
 - Enemy record type `$59` at chunk 10 (x `$30`, y `$40`): object `$19` hanging at
   (623, 64), asleep.
+- Asleep it is drawn as a small bat hanging under the ceiling: tile `DE` and its
+  mirror (16x16, palette 3), at the top middle of where the big bat appears.
 - It wakes when Simon arrives (about 80 px away), sinks 22 px, and then repeats:
   hover (about 120-190 frames), swoop at Simon (about 2 px across and 1 down per
   frame), fly back slowly (about 0.75 px per frame) to a new spot high up.
@@ -373,6 +375,9 @@ Recorded in the entrance hall (`tools/nes_probe/record_hall.lua`):
     after the last zombie of the previous one left (1921 after 1815, 2272 after 2135);
   - they walk straight across at 7 px every 8 frames and vanish off-screen;
   - one whip hit destroys one (burst).
+  - in stage 3 their spawners are on the floor and on the upper platform (record y
+    `$80`); one that walks off a platform's edge stops and drops straight down to
+    the floor below (64 px in about 28 frames, faster as it falls), then walks on.
 - Black panther (object id `$11`, enemy record type `$51`; one per record,
   centre x = (chunk-1)*64 + x - 1, y = centre line). States in `$04C0+slot`:
   `$51` waiting, `$52` running, `$1E` leaping.

@@ -211,3 +211,8 @@ WHIP_HIT_X1     equ 20
 WHIP_HIT_X2     equ 43
 WHIP_HIT_Y1     equ 11
 WHIP_HIT_Y2     equ 15
+
+; a zombie that walks off a platform falls (NES stage 3: 64 px in about 28
+; frames, without moving across); 1/16 px units
+ZOMBIE_GRAVITY  equ 2
+ZOMBIE_VMAX     equ 64

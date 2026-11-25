@@ -61,6 +61,7 @@ OBJF_FISH       equ 30                  ; walk 1, walk 2, shoot facing left, the
 OBJF_FIREBALL   equ 36
 OBJF_BOSS       equ 37                  ; wings open, wings up
 OBJF_ORB        equ 39
+OBJF_BOSS_SLEEP equ 55                  ; asleep: a small bat
 OBJF_DAGGER_FLY equ 40                  ; flying right, flying left
 OBJF_AXE        equ 42                  ; turning: 4 frames (also its pickup)
 OBJF_BOTTLE     equ 46                  ; holy water (also its pickup)
@@ -298,7 +299,7 @@ spawn_candle:
         ret
 .boss:
         ld (ix+0),OBJ_BOSS
-        ld (ix+6),OBJF_BOSS+1
+        ld (ix+6),OBJF_BOSS_SLEEP
         ld a,BOSS_HP
         ld (boss_hp),a
         xor a
@@ -675,6 +676,9 @@ item_update:
 ; ---------------------------------------------------------------------------
 zombie_update:
         inc (ix+4)
+        ld a,(ix+9)
+        or a
+        jr nz,.falling
         ld a,(ix+4)
         and 7
         jr z,.no_step                   ; rests 1 frame in 8
@@ -688,6 +692,43 @@ zombie_update:
         add hl,de
         ld (ix+1),l
         ld (ix+2),h
+        call zombie_ground              ; walked off a platform's edge: it
+        jr c,.no_step                   ; drops to the floor below (NES)
+        ld (ix+9),1
+        ld (ix+10),0
+        ld (ix+11),0
+        jr .no_step
+.falling:                               ; straight down, vy += g, y += vy / 16
+        ld a,(ix+10)
+        add a,ZOMBIE_GRAVITY
+        cp ZOMBIE_VMAX+1
+        jr c,.vy_ok
+        ld a,ZOMBIE_VMAX
+.vy_ok:
+        ld (ix+10),a
+        add a,(ix+11)
+        ld c,a
+        rrca
+        rrca
+        rrca
+        rrca
+        and 15
+        add a,(ix+3)
+        ld (ix+3),a
+        ld a,c
+        and 15
+        ld (ix+11),a
+        ld a,(ix+3)
+        cp MT_ROWS*16
+        jp nc,.gone                     ; fell out of the playfield
+        call zombie_ground
+        jr nc,.no_step
+        ld a,(ix+3)                     ; landed: stand on the tile, walk on
+        add a,32
+        and 0xF8
+        sub 32
+        ld (ix+3),a
+        ld (ix+9),0
 .no_step:
         ld a,(ix+4)
         rrca
@@ -1034,6 +1075,21 @@ simon_dx:
         add hl,de
         ret
 
+; Carry if there is floor under the zombie at IX (its middle, feet at y+32)
+zombie_ground:
+        ld l,(ix+1)
+        ld h,(ix+2)
+        ld de,8
+        add hl,de
+        ld a,(ix+3)
+        add a,32
+        ld e,a
+        ld d,0
+        jr nc,.in
+        inc d
+.in:
+        jp solid_at
+
 ; ---------------------------------------------------------------------------
 ; Zombie spawners: while one is near the camera, a zombie appears every
 ; ZOMBIE_INTERVAL frames at alternating screen edges, in waves of ZOMBIE_MAX.
@@ -1141,6 +1197,8 @@ enemies_update:
         ld (ix+3),c
         ld (ix+0),OBJ_ZOMBIE
         ld (ix+4),0
+        ld (ix+10),0
+        ld (ix+11),0
         ld (ix+7),KIND_BRAZIER          ; 16x32 box for the whip
         ld (ix+8),0xFF
         ld (ix+9),0
@@ -1906,7 +1964,7 @@ boss_update:
         jp .hits
 
 .asleep:
-        ld (ix+6),OBJF_BOSS+1
+        ld (ix+6),OBJF_BOSS_SLEEP
         call boss_simon_dx              ; Simon's centre - boss centre
         bit 7,h
         jp nz,.hits

@@ -514,7 +514,8 @@ OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
 # stay empty so that the engine's frame numbers match; then the flying dagger
 OBJ_FRAMES += [f"unused{i}" for i in range(24, 40)] + ["dagger_fly_r", "dagger_fly_l"]
 OBJ_FRAMES += ["axe1", "axe2", "axe3", "axe4", "bottle", "flame1", "flame2", "flame3",
-               "holy_item", "watch_item", "flame4", "flame5", "axe_item"]
+               "holy_item", "watch_item", "flame4", "flame5", "axe_item",
+               "unused55"]
 # original placeholder art: a double-bladed throwing hatchet, turning
 _HATCHET = [
     "................", "..77........77..", ".7777......7777.", ".77777....77777.",
@@ -547,6 +548,7 @@ for _n, _b in (("flame1", 0), ("flame2", 1), ("flame3", 2), ("flame4", 3), ("fla
     PLACEHOLDER_OBJECTS[_n] = _BURSTS[_b][8:24]
 for _i in range(24, 40):
     PLACEHOLDER_OBJECTS[f"unused{_i}"] = ["." * 16]
+PLACEHOLDER_OBJECTS["unused55"] = ["." * 16]
 PLACEHOLDER_OBJECTS["dagger_fly_r"] = _DAGGER
 PLACEHOLDER_OBJECTS["dagger_fly_l"] = [r[::-1] for r in _DAGGER]
 PLACEHOLDER_SPAWNERS = [(900, 128)]     # one zombie spawner near the end

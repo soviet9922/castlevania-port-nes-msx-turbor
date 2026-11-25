@@ -42,7 +42,7 @@ OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
               "fish_walk1_r", "fish_walk2_r", "fish_shoot_r", "fireball",
               "boss_open", "boss_up", "orb", "dagger_fly_r", "dagger_fly_l",
               "axe1", "axe2", "axe3", "axe4", "bottle", "flame1", "flame2", "flame3",
-              "holy_item", "watch_item", "flame4", "flame5", "axe_item"]
+              "holy_item", "watch_item", "flame4", "flame5", "axe_item", "boss_sleep"]
 
 # Black panther: 32x16, palette 3, art faces left (recorded in the hall).
 # Run cycle run1 -> run2 -> run3, 7 frames each; the leap shows run2.
@@ -108,6 +108,9 @@ FRAME_SPRITES["boss_open"] = (
 FRAME_SPRITES["boss_up"] = [(0xD8, 8, 0, 3, 0), (0xDA, 16, 0, 3, 0),
                             (0xDA, 24, 0, 3, 1), (0xD8, 32, 0, 3, 1),
                             (0xDC, 16, 16, 3, 0), (0xDC, 24, 16, 3, 1)]
+# asleep, it is a small bat hanging under the ceiling (recorded: tile DE and its
+# mirror, 16x16, at the top middle of the box)
+FRAME_SPRITES["boss_sleep"] = [(0xDE, 16, 0, 3, 0), (0xDE, 24, 0, 3, 1)]
 FRAME_SPRITES["orb"] = [(0x5C, 0, 0, 3, 0), (0x5C, 8, 0, 3, 1)]
 
 # the thrown dagger (recorded): 16x16, palette 2, flipped both ways flying
@@ -237,7 +240,7 @@ def needed_frames(candle_list, spawners, carried=()):
         elif kind == KIND_CANDLE:
             need |= {"candle1", "candle2"}
         elif kind == KIND_BOSS:
-            need |= {"boss_open", "boss_up", "orb", "fireball"}
+            need |= {"boss_sleep", "boss_open", "boss_up", "orb", "fireball"}
         else:
             need |= {n for n in OBJ_FRAMES if n.startswith("panther")}
         if item in ITEM_FRAMES:
