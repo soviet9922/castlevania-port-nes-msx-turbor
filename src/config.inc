@@ -97,6 +97,9 @@ POSE_HURT       equ 13                  ; knocked back
 ; Health and getting hit (measured in the NES entrance hall)
 HP_MAX          equ 64                  ; 16 bar segments of 4 on the NES, 8 HUD tiles here
 ZOMBIE_DAMAGE   equ 8
+ENEMY_ZOMBIE    equ 0x01                ; spawner types (NES enemy records)
+ENEMY_BAT       equ 0x02
+BAT_DELAY       equ 64                  ; frames before a bat appears
 HIT_FREEZE      equ 6                   ; frames frozen when hit
 STUN_FRAMES     equ 16                  ; crouched after landing from the knock-back
 INVULN_FRAMES   equ 140                 ; blinking, cannot be hit again

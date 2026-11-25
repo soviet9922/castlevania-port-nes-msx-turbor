@@ -104,8 +104,12 @@ def tcl_script(syms, result_file):
                            }}
                        }} }}
     after time 31.5 {{ keymatrixup 8 0x40; {dump('19_section_below')}; keymatrixdown 8 0x20 }}
-    after time 33.5 {{ keymatrixup 8 0x20; {dump('20_section_above')} }}
-    after time 34.0 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
+    after time 33.5 {{ keymatrixup 8 0x20; {dump('20_section_above')}
+                       # bats: enemies on, wait for one and whip it
+                       set ::bat_seen 0; poke {eoff} 0; set ::hunting 1 }}
+    after time 37.5 {{ set ::hunting 0; poke {eoff} 3; {dump('21_bat')}
+                       set f [open "{result_file}" a]; puts $f "bat $::bat_seen"; close $f }}
+    after time 38.0 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """ if areas > 1 else f"""
     after time 9.0  {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
@@ -199,6 +203,7 @@ debug set_bp {load} {{}} {{ set ::vbl_skip 4 }}
 # zombie test: snapshot when hit, then whip any zombie that comes in reach
 set ::wait_hit 0
 set ::hunting 0
+set ::bat_seen 0
 # panther test: no more zombies; stand on the floor within the first
 # panther's wake distance and let the hunter whip it
 proc panther_test {{}} {{
@@ -248,7 +253,8 @@ proc zombie_watch {{}} {{
         }}
         for {{set i 0}} {{$i < 8}} {{incr i}} {{
             set b [expr {{{objt} + $i*{obj_size}}}]
-            if {{[peek $b] != 6}} continue
+            if {{[peek $b] == 7}} {{ set ::bat_seen 1 }}
+            if {{[peek $b] != 6 && [peek $b] != 7}} continue
             set d [expr {{[peek [expr {{$b+1}}]] + 256*[peek [expr {{$b+2}}]] - $px}}]
             if {{$d >= 14 && $d <= 36}} {{ poke {fa} 0; keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
             if {{$d <= -14 && $d >= -50}} {{ poke {fa} 1; keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
@@ -298,6 +304,7 @@ def run():
     hud_hearts = ""
     overruns = (0, 0)
     panther = None
+    bat_seen = None
     panther_dead = 0
     stair = None
     with open(result_file) as f:
@@ -311,6 +318,9 @@ def run():
                 continue
             if tag == "hud_hearts":
                 hud_hearts = kv[0] if kv else ""
+                continue
+            if tag == "bat":
+                bat_seen = int(kv[0])
                 continue
             if tag == "panther":
                 panther = int(kv[0])
@@ -407,6 +417,10 @@ def run():
             and snaps["20_section_above"]["stair_state"] == 0
             and snaps["20_section_above"]["on_ground"] == 1)]
           if syms.get("AREA_COUNT", 1) > 3 and "19_section_below" in snaps else []),
+        *([("a bat flies at Simon in stage 2 and the whip (or Simon) stops it",
+            bat_seen == 1 and (snaps["21_bat"]["kills"] > snaps["20_section_above"]["kills"]
+                               or snaps["21_bat"]["hp"] < snaps["20_section_above"]["hp"]))]
+          if bat_seen is not None and "21_bat" in snaps else []),
         *([("UP at a staircase's foot climbs it to the top",
             (snaps["11_stairs_up"]["px"], snaps["11_stairs_up"]["py"]) == stair["top"]
             and snaps["11_stairs_up"]["stair_state"] == 0 and snaps["11_stairs_up"]["on_ground"] == 1),

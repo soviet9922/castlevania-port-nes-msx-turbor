@@ -95,5 +95,7 @@ spr_sat_ptr     equ sct_cache+2*MAX_SPRITES ; 2  next sat_buf entry (objects_dra
 sat_buf         equ spr_sat_ptr+2       ; (MAX_SPRITES+1)*4
 
 keep_player     equ sat_buf+(MAX_SPRITES+1)*4 ; 1  load_area keeps Simon (section change)
-RAM_END         equ keep_player+1
+spawner_type    equ keep_player+1       ; 1  type of the spawner being handled
+bat_spawn_t     equ spawner_type+1      ; 1  frames until the next bat
+RAM_END         equ bat_spawn_t+1
         ASSERT RAM_END < 0xF380

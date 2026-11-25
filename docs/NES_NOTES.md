@@ -123,6 +123,22 @@ exactly, and it uses the same palette.
 
 Falling into the water kills Simon, and the game restarts him at section 1's start.
 
+## Stage 2 enemies
+
+Recorded with enemies on (the probe route on a ROM copy without the hall's zombies).
+Enemy records in stage 2: section 1 has type `$02` at chunks 2 and 6 and `$04` at
+chunks 4 and 8; section 0 has type `$03` in every chunk (y `$B8`).
+
+- **Bat** (object id `$02`, record type `$02`): one at a time. It appears at the
+  screen edge Simon faces (screen x 248), at his height (+1), and flies at him:
+  9 px every 8 frames across. Vertically it dips 18 px and comes back over about
+  96 frames (fitted with 9 - 9 cos). Wings: tiles `90 92`, `94 96`, `98 9A`
+  (sprite palette 3, art facing left), each shown 9 frames, in the order 1 2 3 2.
+  When it touches Simon it takes 8 health and dies (`$31`, then a burst).
+- **Fishman** (object id `$03`, record type `$03`): jumps out of the water with a
+  splash (object `$25`, several drops). Not converted yet.
+- Object id `$32` is the burst left by an enemy that dies or leaves.
+
 ## Palettes
 
 Stored in the fixed bank as `$3F $00 <16 colour bytes> $FE` strings.

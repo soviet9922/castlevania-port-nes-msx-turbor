@@ -30,10 +30,12 @@ OBJ_ITEM        equ 3
 OBJ_CANDLE      equ 4
 OBJ_ZOMBIE      equ 5
 OBJ_PANTHER     equ 6
+OBJ_BAT         equ 7
 
 KIND_BRAZIER    equ 0
 KIND_CANDLE     equ 1
 KIND_PANTHER    equ 2                   ; 32x16 box
+KIND_BAT        equ 3                   ; 16x16 box
 
 ; object frame numbers (OBJ_FRAMES in tools/convert_objects.py)
 OBJF_BRAZIER    equ 0
@@ -45,6 +47,7 @@ OBJF_CANDLE     equ 9
 OBJF_SMALLHEART equ 11
 OBJF_ZOMBIE     equ 12                  ; left 1/2, right 1/2
 OBJF_PANTHER    equ 16                  ; sit, run1-3 facing left, then facing right
+OBJF_BAT        equ 24                  ; wings 1-3 flying left, then flying right
 
 ITEM_WHIPUP     equ 0
 ITEM_HEART      equ 1
@@ -326,6 +329,11 @@ objects_update:
         call panther_update
         jr .next
 .not_panther:
+        cp OBJ_BAT
+        jr nz,.not_bat
+        call bat_update
+        jr .next
+.not_bat:
         cp OBJ_ITEM
         call z,item_update
 .next:
@@ -941,6 +949,8 @@ enemies_update:
         inc hl
         ld c,(hl)                       ; C = y
         inc hl
+        ld a,(hl)                       ; spawner type
+        ld (spawner_type),a
         inc hl
         push hl
         push bc
@@ -964,6 +974,9 @@ enemies_update:
 .active:
         pop bc
         pop hl
+        ld a,(spawner_type)
+        cp ENEMY_BAT
+        jp z,bat_spawner
         ld hl,zombie_spawn_t
         inc (hl)
         ld a,(zombie_wave)
@@ -1020,6 +1033,202 @@ enemies_update:
         ld (ix+9),0
         ret
 
+; ---------------------------------------------------------------------------
+; Bat (measured in NES stage 2): while a bat spawner is near and no bat is
+; flying, one appears after BAT_DELAY frames at the screen edge Simon faces,
+; at his height, and flies at him: 9 px every 8 frames across, dipping 18 px
+; and back every 96 frames. Wings: 3 frames of 9 (1 2 3 2). Touching Simon
+; hurts him and kills the bat; the whip kills it.
+;   +4 timer   +5 direction   +9 start y   +10 x fraction
+; ---------------------------------------------------------------------------
+bat_spawner:
+        ld ix,obj_table                 ; a bat flying already?
+        ld de,OBJ_SIZE
+        ld b,OBJ_MAX
+.find:
+        ld a,(ix+0)
+        cp OBJ_BAT
+        jr z,.flying
+        add ix,de
+        djnz .find
+        ld hl,bat_spawn_t
+        inc (hl)
+        ld a,(hl)
+        cp BAT_DELAY
+        ret c
+        ld (hl),0
+        ld a,(hurt_state)               ; not while Simon is knocked back
+        or a
+        ret nz
+        call obj_free_slot
+        ret c
+        ld hl,(cam_x)
+        ld a,(facing)
+        or a
+        jr nz,.left_edge
+        ld de,240                       ; facing right: from the right edge
+        add hl,de
+        ld (ix+5),-1
+        jr .place
+.left_edge:
+        ld (ix+5),1
+.place:
+        ld (ix+1),l
+        ld (ix+2),h
+        ld a,(py)
+        add a,8
+        ld (ix+3),a
+        ld (ix+9),a
+        ld (ix+0),OBJ_BAT
+        ld (ix+4),0
+        ld (ix+7),KIND_BAT
+        ld (ix+8),0xFF
+        ld (ix+10),0
+        jp bat_frame
+.flying:
+        xor a
+        ld (bat_spawn_t),a
+        ret
+
+bat_update:
+        inc (ix+4)
+        ld a,(ix+10)                    ; x: 1 + 1/8 px per frame
+        add a,0x20
+        ld (ix+10),a
+        ld a,1
+        adc a,0
+        bit 7,(ix+5)
+        jr z,.dx
+        neg
+.dx:
+        ld e,a
+        rla
+        sbc a,a
+        ld d,a
+        ld l,(ix+1)
+        ld h,(ix+2)
+        add hl,de
+        ld (ix+1),l
+        ld (ix+2),h
+        ld a,(ix+4)                     ; y: start y + wave(timer mod 96)
+.mod96:
+        sub 96
+        jr nc,.mod96
+        add a,96
+        ld e,a
+        ld d,0
+        ld hl,bat_wave
+        add hl,de
+        ld a,(ix+9)
+        add a,(hl)
+        ld (ix+3),a
+        call bat_frame
+
+        ld l,(ix+1)                     ; flew off the screen: gone
+        ld h,(ix+2)
+        ld de,(cam_x)
+        or a
+        sbc hl,de
+        ld de,16
+        add hl,de
+        bit 7,h
+        jr nz,.gone
+        ld de,256+16+1
+        or a
+        sbc hl,de
+        jr nc,.gone
+
+        ld a,(whip_active)
+        or a
+        jr z,.touch
+        call whip_hits_object
+        jr nc,.touch
+        ld hl,kills
+        inc (hl)
+        jr .burst
+.touch:                                 ; bat x+2..x+13 vs Simon px+3..px+12
+        ld a,(invuln_t)
+        or a
+        ret nz
+        ld a,(hurt_state)
+        or a
+        ret nz
+        ld hl,(px)
+        ld de,3
+        add hl,de
+        ex de,hl
+        ld l,(ix+1)
+        ld h,(ix+2)
+        ld bc,13
+        add hl,bc
+        or a
+        sbc hl,de
+        ret c
+        ld hl,(px)
+        ld de,12
+        add hl,de
+        ld e,(ix+1)
+        ld d,(ix+2)
+        inc de
+        inc de
+        or a
+        sbc hl,de
+        ret c
+        ld a,(py+1)                     ; bat y+2..y+13 vs Simon py..py+31
+        or a
+        ret nz
+        ld a,(ix+3)
+        add a,13
+        ld hl,py
+        sub (hl)
+        ret c                           ; above him
+        cp 32+11
+        ret nc                          ; below him
+        ld b,(ix+5)                     ; knocked the way the bat flies
+        call simon_hurt
+.burst:
+        ld (ix+0),OBJ_BURST
+        ld (ix+4),0
+        ld (ix+6),OBJF_BURST
+        ld (ix+5),ITEM_NONE
+        ret
+.gone:
+        ld (ix+0),OBJ_NONE
+        ret
+
+; wing frame: (timer / 9) mod 4 -> 0 1 2 1, +3 flying right
+bat_frame:
+        ld a,(ix+4)
+        ld c,0
+.div9:
+        sub 9
+        jr c,.d9
+        inc c
+        jr .div9
+.d9:
+        ld a,c
+        and 3
+        cp 3
+        jr nz,.f
+        ld a,1
+.f:
+        bit 7,(ix+5)
+        jr nz,.left
+        add a,3
+.left:
+        add a,OBJF_BAT
+        ld (ix+6),a
+        ret
+
+; 9 - 9 cos(2 pi t / 96)
+bat_wave:
+        db 0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4
+        db 4, 5, 6, 6, 7, 7, 8, 8, 9, 10, 10, 11, 11, 12, 12, 13
+        db 13, 14, 14, 15, 15, 16, 16, 16, 17, 17, 17, 18, 18, 18, 18, 18
+        db 18, 18, 18, 18, 18, 18, 17, 17, 17, 16, 16, 16, 15, 15, 14, 14
+        db 14, 13, 12, 12, 11, 11, 10, 10, 9, 8, 8, 7, 7, 6, 6, 5
+        db 4, 4, 4, 3, 3, 2, 2, 2, 1, 1, 1, 0, 0, 0, 0, 0
+
 ; -> A = number of zombies alive, Z if none (BC, DE, IX clobbered)
 count_zombies:
         ld ix,obj_table
@@ -1071,6 +1280,11 @@ whip_hits_object:
         ld b,15
         jr .box_ready
 .not_wide:
+        cp KIND_BAT
+        jr nz,.not_bat
+        ld b,15
+        jr .box_ready
+.not_bat:
         cp KIND_CANDLE
         jr nz,.box_ready
         ld bc,15*256 + 8

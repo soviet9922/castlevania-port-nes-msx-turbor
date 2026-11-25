@@ -196,6 +196,11 @@ once, so it doesn't come back after running off the screen. Each runs a small
 state machine (wait, run, leap with gravity, run). Whenever there is no floor
 under a running panther it leaps again, so it never runs through the air.
 
+Bats are spawned like zombies, from the area's spawner list (type 2): one at a time,
+64 frames after the last one is gone, at the screen edge Simon faces. A bat flies
+straight at him with a 96-frame vertical wave read from a table, and dies when it
+hits him.
+
 With more than 8 sprites on a line, the VDP drops the extras. The order of
 objects in the sprite list rotates every frame (Simon always comes first), so
 crowded lines flicker instead of losing sprites, as on the NES.

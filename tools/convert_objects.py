@@ -36,7 +36,8 @@ OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
               "heart", "whipup", "dagger", "candle1", "candle2", "smallheart",
               "zombie_l1", "zombie_l2", "zombie_r1", "zombie_r2",
               "panther_sit_l", "panther_run1_l", "panther_run2_l", "panther_run3_l",
-              "panther_sit_r", "panther_run1_r", "panther_run2_r", "panther_run3_r"]
+              "panther_sit_r", "panther_run1_r", "panther_run2_r", "panther_run3_r",
+              "bat1_l", "bat2_l", "bat3_l", "bat1_r", "bat2_r", "bat3_r"]
 
 # Black panther: 32x16, palette 3, art faces left (recorded in the hall).
 # Run cycle run1 -> run2 -> run3, 7 frames each; the leap shows run2.
@@ -74,7 +75,14 @@ FRAME_SPRITES = {
     "zombie_r2": [(0x82, 0, 0, 1, 1), (0x80, 8, 0, 1, 1), (0x86, 0, 16, 1, 1), (0x84, 8, 16, 1, 1)],
 }
 
-ENEMY_ZOMBIE = 0x01             # spawner type in the enemy group records
+# bat: 16x16, palette 3, art faces left (recorded in stage 2); wings 1 2 3 2
+for _n, _t in (("bat1", 0x90), ("bat2", 0x94), ("bat3", 0x98)):
+    FRAME_SPRITES[_n + "_l"] = [(_t, 0, 0, 3, 0), (_t + 2, 8, 0, 3, 0)]
+    FRAME_SPRITES[_n + "_r"] = [(_t + 2, 0, 0, 3, 1), (_t, 8, 0, 3, 1)]
+
+ENEMY_ZOMBIE = 0x01             # spawner types in the enemy group records
+ENEMY_BAT = 0x02
+SPAWNER_TYPES = (ENEMY_ZOMBIE, ENEMY_BAT)
 
 
 def candles(rom, stage, section, level_px):
@@ -149,8 +157,11 @@ def needed_frames(candle_list, spawners):
             need |= {n for n in OBJ_FRAMES if n.startswith("panther")}
         if item in ITEM_FRAMES:
             need.add(ITEM_FRAMES[item])
-    if spawners:
+    kinds = {k for _, _, k in spawners}
+    if ENEMY_ZOMBIE in kinds:
         need |= {n for n in OBJ_FRAMES if n.startswith("zombie")}
+    if ENEMY_BAT in kinds:
+        need |= {n for n in OBJ_FRAMES if n.startswith("bat")}
     return need
 
 
@@ -216,9 +227,9 @@ def _frame_pixels(chr_ram, pals, sprites, slot_for_nes):
 
 
 def enemy_spawners(rom, stage, section, level_px):
-    """Zombie spawners of the area -> list of (world x, box y). The enemy
+    """Zombie and bat spawners of the area -> list of (world x, box y, type). The enemy
     group (first byte of each chunk) indexes the same pointer tables as the
-    candle groups; record: type, x, y. Only zombies are converted so far."""
+    candle groups; record: type, x, y."""
     def w7(a):
         return rom.fixed(a) | rom.fixed(a + 1) << 8
     table = w7(w7(STAGE_TABLE + 2 * stage) + 2 * section)
@@ -228,18 +239,19 @@ def enemy_spawners(rom, stage, section, level_px):
         if group == 0:
             continue
         p = w7(CANDLE_GROUPS[group >> 7] + ((group << 1) & 0xFF))
-        if rom.fixed(p) != ENEMY_ZOMBIE:
+        kind = rom.fixed(p)
+        if kind not in SPAWNER_TYPES:
             continue
         x = (chunk - 1) * 64 + rom.fixed(p + 1)
         if 0 <= x < level_px:
-            out.append((x, rom.fixed(p + 2) - 64))
+            out.append((x, rom.fixed(p + 2) - 64, kind))
     return out
 
 
 def write_enemies(path, spawners):
     data = bytearray([len(spawners)])
-    for x, y in spawners:
-        data += bytes([x & 0xFF, x >> 8, y & 0xFF, ENEMY_ZOMBIE])
+    for x, y, kind in spawners:
+        data += bytes([x & 0xFF, x >> 8, y & 0xFF, kind])
     with open(path, "wb") as f:
         f.write(data)
 
