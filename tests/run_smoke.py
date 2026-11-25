@@ -216,7 +216,6 @@ def tcl_script(syms, result_file):
                        set fo [expr {{{objt} + 7*{obj_size}}}]; poke $fo 0; poke {syms["dagger_on"]} 0; poke {syms["holy_fire"]} 0 }}
     after time 79.6 {{ {dump('27c_floor_end')}; set ::boss_floor 0
                        set f [open "{result_file}" a]; puts $f "floor_fires $::floor_fires"; close $f
-set ::floor_fires 0
                        # fireballs: boss hovering at the screen's left, Simon on the ledge far right
                        boss_place 512 1; poke {px_a} [expr {{750 & 255}}]; poke {px_a + 1} [expr {{750 >> 8}}]
                        poke {py} 64; poke {py + 1} 0 }}
@@ -449,13 +448,14 @@ set ::boss_sleepf -1
 set ::boss_fire 0
 set ::boss_near_fire 0
 set ::boss_floor 0
+set ::floor_fires 0
 proc boss_watch {{}} {{
     if {{$::boss_floor || $::boss_hunt}} {{
         for {{set i 0}} {{$i < 8}} {{incr i}} {{
             set b [expr {{{objt} + $i*{obj_size}}}]
             if {{$::boss_floor && [peek $b] == 10 && [peek [expr {{$b+3}}]] > $::boss_maxy}} {{ set ::boss_maxy [peek [expr {{$b+3}}]] }}
             if {{$::boss_sleepf < 0 && [peek $b] == 10 && [peek [expr {{$b+9}}]] == 0}} {{ set ::boss_sleepf [peek [expr {{$b+6}}]] }}
-            if {{$::boss_floor}} {{
+            if {{$::boss_floor || $::boss_hunt}} {{
                 set t [peek $b]
                 if {{$t == 9 && ![info exists ::fb_prev($i)]}} {{ incr ::floor_fires }}
                 if {{$t == 9}} {{ set ::fb_prev($i) 1 }} else {{ unset -nocomplain ::fb_prev($i) }}
@@ -937,7 +937,7 @@ def run():
           if "26_standing_fireball" in snaps else []),
         *([("stage 3's zombies keep both walking frames (they share patterns with the boss)",
             stage3_walk)] if gen == "converted" else []),
-        *([("in a real fight with Simon on the floor, the boss spits fireballs at him",
+        *([("in a real fight (on the ledge, then the floor), the boss spits fireballs at Simon",
             floor_fires >= 1)] if floor_fires is not None else []),
         *([("asleep, the stage 3 boss is the small hanging bat (NES)", boss_sleepf == 55)]
           if boss_sleepf is not None else []),

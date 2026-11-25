@@ -13,7 +13,9 @@ ORs with layer A into slot 6).
 Single-colour pixels (the whip) are cut into cells anchored at their own
 bounding box. MSX sprites can change colour on every line, so one sprite
 per cell carries the majority colour of each line; a second sprite is
-added only for lines that use two colours.
+added only for lines that use two colours. A line with three colours gets a
+black silhouette behind the most used other colour, so the third colour
+shows as black rather than as a hole.
 
 Outputs (bytes):
     patterns   32 bytes per unique 16x16 pattern
@@ -22,6 +24,7 @@ Outputs (bytes):
 """
 
 SLOT_A, SLOT_B = 2, 4
+BLACK = 1               # palette slot of black (NES $0F)
 CC = 0x40
 MAX_SPRITES = 12        # hardware sprites per frame (engine reserves 12 slots)
 
@@ -91,11 +94,23 @@ class SpriteBank:
                     for _, v in line:
                         counts[v] = counts.get(v, 0) + 1
                     order = sorted(counts, key=lambda v: -counts[v])
+                    if len(order) > 2:
+                        # three colours, two sprites: the back one is the whole
+                        # line in black (or the least used colour), the front
+                        # one the most used other colour; the third colour's
+                        # pixels show as the back colour instead of holes
+                        back = BLACK if BLACK in order else order[-1]
+                        front = next(v for v in order if v != back)
+                        c1[ly], c2[ly] = front, back
+                        first |= {(x, ly) for x, v in line if v == front}
+                        second |= {(x, ly) for x, _ in line}
+                        continue
                     c1[ly] = order[0]
                     first |= {(x, ly) for x, v in line if v == order[0]}
                     if len(order) > 1:
                         c2[ly] = order[1]
                         second |= {(x, ly) for x, v in line if v == order[1]}
+                # first sprite in front (lower sprite numbers have priority)
                 sprites.append((oy, ox, self._pat(first), self._col(c1)))
                 if second:
                     sprites.append((oy, ox, self._pat(second), self._col(c2)))
