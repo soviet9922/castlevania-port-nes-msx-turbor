@@ -1,10 +1,7 @@
--- FCEUX Lua probe: the stage 3 boss fight. Route as record_stage3.lua;
--- on the ledge, Simon's health is kept full and he whips at the boss.
--- waterway, then along it (jumping the gaps), up the second staircase into
--- the far side of section 1, and right to the end. Run on a ROM copy without
--- enemies. Writes PROBE_OUT/ram.bin and screenshots. Run on a
--- ROM copy without the hall's enemy groups. Writes PROBE_OUT/ram.bin
--- (2 KB of RAM per frame from FIRST) and a screenshot every 50 frames.
+-- FCEUX Lua probe: the stage 3 boss fight. Route as record_stage3.lua; on the
+-- ledge, Simon's health is kept full and he whips towards the boss. Run on a
+-- ROM copy without the hall's enemy groups. Writes PROBE_OUT/ram.bin (2 KB of
+-- RAM per frame from FIRST) and screenshots.
 local out = os.getenv("PROBE_OUT") or "."
 local FIRST, LAST = 6250, 8600
 local ram = io.open(out .. "/ram.bin", "wb")

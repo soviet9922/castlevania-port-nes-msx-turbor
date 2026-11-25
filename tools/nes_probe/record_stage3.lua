@@ -1,10 +1,7 @@
--- FCEUX Lua probe: through stages 2 and 3 to the boss (route as
--- record_stage2_end.lua, then stage 3 to its top-right ledge).
--- waterway, then along it (jumping the gaps), up the second staircase into
--- the far side of section 1, and right to the end. Run on a ROM copy without
--- enemies. Writes PROBE_OUT/ram.bin and screenshots. Run on a
--- ROM copy without the hall's enemy groups. Writes PROBE_OUT/ram.bin
--- (2 KB of RAM per frame from FIRST) and a screenshot every 50 frames.
+-- FCEUX Lua probe: through the hall, stage 2 (as record_stage2_end.lua) and
+-- stage 3 to its top-right ledge, where the boss is. Run on a ROM copy without
+-- the hall's enemy groups. Writes PROBE_OUT/ram.bin (2 KB of RAM per frame
+-- from FIRST) and screenshots.
 local out = os.getenv("PROBE_OUT") or "."
 local FIRST, LAST = 6300, 7400
 local ram = io.open(out .. "/ram.bin", "wb")
