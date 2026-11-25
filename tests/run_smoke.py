@@ -96,7 +96,7 @@ def tcl_script(syms, result_file):
                            keymatrixdown 8 0x80 }} }}
     after time 36.5 {{ keymatrixup 8 0x80; {dump('18_through_the_door')}
                        set f [open "{result_file}" a]
-                       puts $f "seqs gate=$::gate_seen,$::gate_px0,$::gate_pxmax door=$::door_cam ys=[join $::seq_ys ,] doorstates=[join $::door_states /] gatehidden=$::gate_hidden"
+                       puts $f "seqs gate=$::gate_seen,$::gate_px0,$::gate_pxmax door=$::door_cam ys=[join $::seq_ys ,] doorstates=[join $::door_states /] gatehidden=$::gate_hidden walk=$::door_pxmax,$::door_walk_end"
                        close $f
                        # a staircase that leads to the section below (foot off the playfield)
                        set sp [expr {{[peek {stairs}] + 256*[peek {stairs + 1}]}}]
@@ -479,6 +479,8 @@ set ::door_closed 0
 set ::door_states {{}}
 set ::door_first ""
 set ::gate_hidden 0
+set ::door_pxmax 0
+set ::door_walk_end 0
 set ::seq_ys {{}}
 proc seq_watch {{}} {{
     set k [peek {syms["seq_kind"]}]
@@ -491,6 +493,10 @@ proc seq_watch {{}} {{
         if {{[lsearch $::seq_ys "g$y"] < 0}} {{ lappend ::seq_ys "g$y" }}
     }}
     if {{$k == 2 && [lsearch $::seq_ys "d$y"] < 0}} {{ lappend ::seq_ys "d$y" }}
+    if {{$k == 2 && [peek {cur}] == 1}} {{
+        if {{$x > $::door_pxmax}} {{ set ::door_pxmax $x }}
+        set ::door_walk_end [expr {{[peek {syms["area_hdr"] + 62}] + 256*[peek {syms["area_hdr"] + 63}]}}]
+    }}
     if {{$k == 2}} {{
         set c [expr {{[peek {syms["cam_x"]}] + 256*[peek {syms["cam_x"] + 1}]}}]
         if {{$c > $::door_cam}} {{ set ::door_cam $c }}
@@ -787,7 +793,11 @@ def run():
             seqs["door"].split(",")[0] == "1408" or int(seqs["door"].split(",")[0]) > 1408),
            ("the door opens (half open, then open), and closes again behind Simon",
             door_ok(seqs["doorstates"])),
-           ("Simon goes inside the castle gate (behind its pillar)", seqs["gatehidden"] == "1")]
+           ("Simon goes inside the castle gate (behind its pillar)", seqs["gatehidden"] == "1"),
+           ("after the door he walks on only to the next stage's start (not off the ledge)",
+            # (the next area loads on the frame he gets there: the test sees 1 px less)
+            int(seqs["walk"].split(",")[1]) > 0
+            and 0 <= int(seqs["walk"].split(",")[1]) - int(seqs["walk"].split(",")[0]) <= 1)]
           if seqs else []),
         *([("the hall's door on the upper floor leads to stage 2",
             snaps["18_through_the_door"]["cur_area"] == 2

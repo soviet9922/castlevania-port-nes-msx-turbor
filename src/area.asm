@@ -172,7 +172,7 @@ check_area_exit:
 ;  castle gate: Simon walks into the gate, 1 px every 3 frames
 ;  door: the screen scrolls 1 px per frame to AH_DOOR_CAM while Simon stands;
 ;        the door opens, he walks through (1 px per frame), it closes, he
-;        walks on DOOR_WALK px with the screen following; then the next area
+;        walks on to AH_WALK_END with the screen following; then the next area
 ; ---------------------------------------------------------------------------
 seq_tick:
         ld hl,(seq_t)
@@ -283,11 +283,11 @@ door_tick:
         ld (seq_t),hl
         ret
 .phase4:
-        ld hl,(cam_x)                   ; 4: walks on, the screen following
-        inc hl
-        call camera_goto
-        ld hl,(seq_t)
-        ld de,DOOR_WALK
+        ld hl,(cam_x)                   ; 4: walks on, the screen following,
+        inc hl                          ; to AH_WALK_END (still on the floor
+        call camera_goto                ; at the next stage's start)
+        ld hl,(px)
+        ld de,(area_hdr+AH_WALK_END)
         or a
         sbc hl,de
         ret c

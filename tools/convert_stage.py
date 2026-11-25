@@ -274,6 +274,7 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
                   stage_no=area["stage"] if area["stage"] >= 1 else 1,
                   exit_kind=area.get("exit_kind", 0), door_col=area.get("door_col", 0),
                   door_cam=area.get("door_cam", 0), door_vcol=door_vcol,
+                  walk_end=area.get("play_px", width) + DOOR_WALK_ON,
                   **({"max_cam": area["max_cam"]} if "max_cam" in area else {}),
                   next_area=area.get("next_area", 0))
 
@@ -325,6 +326,10 @@ DOOR_OPEN = [(0x87, 0, 0), (0x7B, 0, 16), (0x7B, 0, 32),
              (0x87, 8, 0), (0x7B, 8, 16), (0x7B, 8, 32),
              (0x85, 16, 0), (0x7B, 16, 16), (0x7B, 16, 32)]
 DOOR_ROW = 2                        # playfield row (NES nametable row 8); must match src/config.inc
+# After the door shuts Simon walks on into the next stage's first columns (shown
+# at the end of the area's map) up to here: still on the floor in both doors'
+# next stages (their ledges end at x 128 and 112)
+DOOR_WALK_ON = 96
 DOOR_ROWS = 6
 
 

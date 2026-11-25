@@ -18,7 +18,8 @@ The engine maps an area's bank at 0x8000 and copies its header to RAM
   +54 stage number for the HUD (BCD)
   +55 exit kind (0 at once, 1 castle gate, 2 door), +56 door tile column,
   +58 camera x while the door opens, +60 first of the door's 6 extra tile columns
-  (half open, open; or for the castle gate, +56 is where Simon goes behind it)
+  (half open, open; or for the castle gate, +56 is where Simon goes behind it),
+  +62 the x Simon walks on to after the door shuts
 """
 
 import os
@@ -51,7 +52,8 @@ def write(gen_dir, areas):
             f"        dw {p}stairs, {p}enemies",
             f"        db {a.get('exit_y', 0xFF)}, {a.get('below', 0xFF)}, {a.get('above', 0xFF)}, "
             f"{a.get('respawn', i)}, 0x{a.get('stage_no', 1):02X}, {a.get('exit_kind', 0)}",
-            f"        dw {a.get('door_col', 0)}, {a.get('door_cam', 0)}, {a.get('door_vcol', 0)}",
+            f"        dw {a.get('door_col', 0)}, {a.get('door_cam', 0)}, {a.get('door_vcol', 0)}, "
+            f"{a.get('walk_end', 0)}",
             f'{p}palette: INCBIN "{d}/palette.bin"',
         ]
         for b in range(3):
