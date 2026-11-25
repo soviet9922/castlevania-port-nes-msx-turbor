@@ -271,8 +271,17 @@ def tcl_script(syms, result_file):
                        set b [expr {{{objt} + 7*{obj_size}}}]
                        poke [expr {{$b+1}}] 100; poke [expr {{$b+2}}] 0; poke [expr {{$b+3}}] 60
                        poke [expr {{$b+4}}] 0; poke [expr {{$b+5}}] 4; poke [expr {{$b+6}}] 2; poke $b 2 }}
-    after time 110.7 {{ sub_report "drop_rule" }}
-    after time 110.9 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
+    after time 110.7 {{ sub_report "drop_rule"
+                       # an item from a candle above the playfield's top (y -8, as the
+                       # hall's holy water candle): it must fall into view, not vanish
+                       set b [expr {{{objt} + 6*{obj_size}}}]
+                       set x [expr {{[peek {px_a}] + 256*[peek {px_a + 1}] + 60}}]
+                       poke [expr {{$b+1}}] [expr {{$x & 255}}]; poke [expr {{$b+2}}] [expr {{$x >> 8}}]
+                       poke [expr {{$b+3}}] 248; poke [expr {{$b+4}}] 10; poke [expr {{$b+5}}] 5
+                       poke [expr {{$b+6}}] 50; poke [expr {{$b+9}}] 0; poke $b 3 }}
+    after time 111.5 {{ set b [expr {{{objt} + 6*{obj_size}}}]
+                       set f [open "{result_file}" a]; puts $f "high_item [peek $b] [peek [expr {{$b+3}}]]"; close $f }}
+    after time 111.7 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """ if areas > 1 else f"""
     after time 9 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
@@ -593,7 +602,7 @@ proc wait_game {{}} {{
     }}
 }}
 after time 0.1 wait_game
-after time 140 {{ exit }}
+after time 145 {{ exit }}
 """
 
 
@@ -674,6 +683,7 @@ def run():
     weapons = {}
     subs = {}
     seqs = {}
+    high_item = None
     whip_reach = 43                     # WHIP_HIT_X2 in src/config.inc (leather whip)
     orb_seen = clear_t = None
     panther_dead = 0
@@ -692,6 +702,9 @@ def run():
                 continue
             if tag == "seqs":
                 seqs = dict(x.split("=") for x in kv)
+                continue
+            if tag == "high_item":
+                high_item = (int(kv[0]), int(kv[1]))
                 continue
             if tag == "sub":
                 subs[kv[0]] = dict(x.split("=") for x in kv[1:])
@@ -912,6 +925,9 @@ def run():
            ("a candle drops a heart instead of the sub-weapon Simon holds (NES)",
             subs["drop_rule"]["item7"] == "3")]
           if "drop_rule" in subs else []),
+        *([("an item from a candle above the playfield's top falls into view (holy water)",
+            high_item[0] == 3 and high_item[1] < 176)]
+          if high_item else []),
         *([("UP at a staircase's foot climbs it to the top",
             (snaps["11_stairs_up"]["px"], snaps["11_stairs_up"]["py"]) == stair["top"]
             and snaps["11_stairs_up"]["stair_state"] == 0 and snaps["11_stairs_up"]["on_ground"] == 1),

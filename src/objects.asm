@@ -576,7 +576,10 @@ item_update:
         inc (ix+3)
         ld a,(ix+3)
         cp MT_ROWS*16
-        jp nc,.gone                     ; fell into a pit
+        jr c,.in_view
+        cp 256-32                       ; (y 224-255: still above the top, from
+        jp c,.gone                      ; a candle high on a wall): else a pit
+.in_view:
         djnz .fall
 
 .pickup:                                ; Simon's box (px+3..px+12, py..py+31)
