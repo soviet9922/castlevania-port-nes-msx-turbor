@@ -127,8 +127,23 @@ def mirror(pixels, width=16):
     return {(width - 1 - x, y): v for (x, y), v in pixels.items()}
 
 
-def write_bank(out_dir, bank, frame_names, prefix="player"):
-    """Write <prefix>_spt.bin, _sct.bin, _frames.bin and an include with offsets."""
+def _draw_dy(bank):
+    """How far the first frame (standing) ends above the bottom of its 32 px
+    box: the engine draws it that much lower so its feet meet the floor."""
+    if not bank.frames:
+        return 0
+    bottom = -1
+    for dy, _, p, _ in bank.frames[0]:
+        pat = bank.patterns[p]
+        for row in range(16):
+            if pat[row] or pat[16 + row]:
+                bottom = max(bottom, dy + row)
+    return max(0, 31 - bottom) if bottom >= 0 else 0
+
+
+def write_bank(out_dir, bank, frame_names, prefix="player", extra_dy=0):
+    """extra_dy: lines added to <PREFIX>_DRAW_DY (the NES shows sprites one
+    line below their position). Write <prefix>_spt.bin, _sct.bin, _frames.bin and an include with offsets."""
     import os
     pats, cols, frames, offsets = bank.output()
     for suffix, data in (("spt", pats), ("sct", cols), ("frames", frames)):
@@ -138,6 +153,7 @@ def write_bank(out_dir, bank, frame_names, prefix="player"):
     lines = ["; generated sprite frames - do not edit",
              f"{up}_FRAME_COUNT equ {len(offsets)}",
              f"{up}_PATTERNS    equ {len(pats) // 32}",
+             f"{up}_DRAW_DY     equ {_draw_dy(bank) + extra_dy}",
              f"{prefix}_frame_table:"]
     for name, off in zip(frame_names, offsets):
         lines.append(f"        dw {prefix}_frames+{off:<5}  ; {name}")

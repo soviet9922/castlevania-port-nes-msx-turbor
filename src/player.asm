@@ -894,7 +894,9 @@ build_sat:
         ld d,0
         ld hl,(py)
         add hl,de
-        ld de,PF_TOP_PX-1
+        ld de,PF_TOP_PX-1+PLAYER_DRAW_DY ; (the VDP shows a sprite 1 line lower;
+                                        ; his pictures may end above his box's
+                                        ; bottom: drawn lower to stand on the floor)
         add hl,de
         ld (spr_by),hl
 

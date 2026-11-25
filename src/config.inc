@@ -219,3 +219,4 @@ WHIP_HIT_Y2     equ 15
 ; frames, without moving across); 1/16 px units
 ZOMBIE_GRAVITY  equ 2
 ZOMBIE_VMAX     equ 64
+

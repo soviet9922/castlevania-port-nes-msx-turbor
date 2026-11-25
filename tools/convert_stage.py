@@ -427,7 +427,7 @@ def convert(rom_path, out_dir, nes_pal_path=None):
 
     # Simon (common to all areas): sprites, colours for slots 2/4/6/14, jump arc
     bank, frame_names, simon_slots, jump, kb = convert_simon.convert(rom, nes_rgb, nes_to_msx_rgb)
-    msx_sprites.write_bank(out_dir, bank, frame_names)
+    msx_sprites.write_bank(out_dir, bank, frame_names, extra_dy=1)   # NES: 1 line lower
     with open(os.path.join(out_dir, "player_jump.bin"), "wb") as f:
         f.write(jump)
     with open(os.path.join(out_dir, "player_kb.bin"), "wb") as f:
