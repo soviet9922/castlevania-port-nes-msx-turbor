@@ -25,7 +25,8 @@
 - [x] The exit door at the end of the hall (upper floor) into stage 2's first section
 - [ ] The door's opening animation and camera scroll; STAGE 02 in the HUD
 - [x] Sections joined by stairs: stage 2's stairs down to the waterway and back up
-- [ ] Stage 2: the rest of the route (water, the far side of section 1, the exit)
+- [x] Stage 2: the rest of the route and its exit door, into stage 3
+- [ ] Stage 3: its end (stairs down to the boss) and the boss (Phantom Bat)
 - [ ] Palette selection table, stages 2 and up
 
 ## Milestone 2: Simon (in progress)

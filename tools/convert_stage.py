@@ -63,7 +63,9 @@ AREAS = [
         "palette": "1-courtyard",       # the hall's door; same palette
         "stage": 2, "section": 1,
         "start_x": 40,                  # NES: world x 48 (centre), upper floor
-        "exit_x": None,
+        "exit_x": 484,                  # NES: the door at the top right opens at
+        "exit_y": 40,                   # world x 492 (centre), on the ledge
+        "next_area": 4,
         "below": 3,                     # two staircases lead down to section 0
     },
     {
@@ -75,6 +77,14 @@ AREAS = [
         "exit_x": None,
         "above": 2,
         "respawn": 2,                   # the NES restarts in section 1
+    },
+    {
+        "name": "3-gallery",
+        "map": (0x821A, 0x82AA),        # stage 3, section 0 (768 px), behind
+        "palette": "1-courtyard",       # stage 2's door
+        "stage": 3, "section": 0,
+        "start_x": 40,                  # NES: world x 48 (centre), upper floor
+        "exit_x": None,
     },
 ]
 

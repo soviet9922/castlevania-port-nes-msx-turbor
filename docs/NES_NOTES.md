@@ -123,6 +123,19 @@ exactly, and it uses the same palette.
 
 Falling into the water kills Simon, and the game restarts him at section 1's start.
 
+## Stage 2's way out and stage 3
+
+Recorded with `tools/nes_probe/record_stage2_end.lua`. The corridor's floor is
+cut by a wall at world x 495, so the way on is through the waterway: along its
+walkway (jumping two gaps), up the second staircase into the far side of section 1,
+up its staircase to a ledge at y 128, then a jump onto the ledge at the top right.
+There, at world x 492 (centre), a door opens, as in the hall (`$18` = 8), and the
+game goes to stage 3, section 0 (HUD: STAGE 03). Simon starts at world x 48 on the
+upper floor (y 96).
+
+Stage 3's map is the word at `$8008` (`$8202`), so its world column 0 is at `$821A`:
+24 columns (768 px). It has zombie records (type `$01`) and three staircases.
+
 ## Stage 2 enemies
 
 Recorded with enemies on (the probe route on a ROM copy without the hall's zombies).

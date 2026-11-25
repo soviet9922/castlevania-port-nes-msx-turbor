@@ -127,7 +127,27 @@ def tcl_script(syms, result_file):
                        poke {eoff} 0; set ::hunting 1 }}
     after time 47.0 {{ set ::hunting 0; poke {eoff} 3; {dump('22_fishmen')}
                        set f [open "{result_file}" a]; puts $f "fish $::fish_seen"; close $f }}
-    after time 47.5 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
+    after time 47.2 {{ # up the stairs from the waterway (foot on the playfield, top off it)
+                       set sp [expr {{[peek {stairs}] + 256*[peek {stairs + 1}]}}]
+                       for {{set i 0}} {{$i < [peek $sp]}} {{incr i}} {{
+                           set r [expr {{$sp + 1 + 7*$i}}]
+                           if {{[peek [expr {{$r+2}}]] < 176 && [peek [expr {{$r+5}}]] > 176}} {{
+                               set x [expr {{[peek $r] + 256*[peek [expr {{$r+1}}]] + 4}}]
+                               poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
+                               poke {py} [peek [expr {{$r+2}}]]; poke {py + 1} 0
+                               keymatrixdown 8 0x20
+                               break
+                           }}
+                       }} }}
+    after time 49.5 {{ keymatrixup 8 0x20; {dump('23_back_up')}
+                       # stage 2's door: on the ledge, 24 px before the exit
+                       if {{[peek {exit_x}] != 255}} {{
+                           set x [expr {{[peek {exit_x}] + 256*[peek {exit_x + 1}] - 24}}]
+                           poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
+                           poke {py} [expr {{[peek {exit_x + 8}] - 8}}]; poke {py + 1} 0
+                           keymatrixdown 8 0x80 }} }}
+    after time 51.0 {{ keymatrixup 8 0x80; {dump('24_stage3')} }}
+    after time 51.5 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """ if areas > 1 else f"""
     after time 9.0  {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
@@ -450,6 +470,11 @@ def run():
             and (snaps["22_fishmen"]["kills"] > snaps["21_bat"]["kills"]
                  or snaps["22_fishmen"]["hp"] < snaps["21_bat"]["hp"]))]
           if fish_seen is not None and "22_fishmen" in snaps else []),
+        *([("stage 2's door on the top-right ledge leads to stage 3",
+            snaps["23_back_up"]["cur_area"] == 2
+            and snaps["24_stage3"]["cur_area"] == 4
+            and snaps["24_stage3"]["on_ground"] == 1)]
+          if syms.get("AREA_COUNT", 1) > 4 and "24_stage3" in snaps else []),
         *([("UP at a staircase's foot climbs it to the top",
             (snaps["11_stairs_up"]["px"], snaps["11_stairs_up"]["py"]) == stair["top"]
             and snaps["11_stairs_up"]["stair_state"] == 0 and snaps["11_stairs_up"]["on_ground"] == 1),
