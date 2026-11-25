@@ -1914,8 +1914,9 @@ fireball_update:
 
 
 ; ---------------------------------------------------------------------------
-; The stage 3 boss: a giant bat (measured on the NES). It hangs asleep until
-; Simon comes within BOSS_WAKE px, sinks a little, then repeats: hover for
+; The stage 3 boss: a giant bat (measured on the NES). It hangs asleep (and
+; can't be hurt) until Simon reaches the middle of the last screen, then the
+; screen locks; it sinks a little, then repeats: hover for
 ; BOSS_HOVER frames, swoop at where Simon is (2 px per frame across and down,
 ; all the way to his height),
 ; fly back to a new spot (3 px every 4 frames). A whip hit takes BOSS_DAMAGE
@@ -1966,17 +1967,16 @@ boss_update:
         ld (ix+4),0
         jp .hits
 
-.asleep:
-        ld (ix+6),OBJF_BOSS_SLEEP
-        call boss_simon_dx              ; Simon's centre - boss centre
-        bit 7,h
-        jp nz,.hits
-        ld a,h
+.asleep:                                ; asleep it can't be hurt; it wakes
+        ld (ix+6),OBJF_BOSS_SLEEP       ; when Simon's centre reaches the
+        ld hl,(area_hdr+AH_MAXCAM)      ; middle of the last screen (its own)
+        ld de,128-8
+        add hl,de
+        ex de,hl
+        ld hl,(px)
         or a
-        jr nz,.wake
-        ld a,l
-        cp BOSS_WAKE
-        jp c,.hits
+        sbc hl,de
+        ret c
 .wake:
         push ix                         ; the zombies go; the boss's patterns
         ld ix,obj_table                 ; take their place (swap window)

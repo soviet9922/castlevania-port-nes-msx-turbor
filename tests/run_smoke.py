@@ -180,6 +180,27 @@ def tcl_script(syms, result_file):
                        if {{[peek {cur}] == 4}} {{
                            poke {px_a} [expr {{530 & 255}}]; poke {px_a + 1} [expr {{530 >> 8}}]
                            poke {py} 128; poke {py + 1} 0; set ::boss_hunt 1 }} }}
+    after time 67.6 {{ # asleep it can't be hurt: a flying dagger right on it
+                       for {{set i 0}} {{$i < 8}} {{incr i}} {{
+                           set b [expr {{{objt} + $i*{obj_size}}}]
+                           if {{[peek $b] == 10}} {{
+                               set x [expr {{[peek [expr {{$b+1}}]] + 256*[peek [expr {{$b+2}}]] + 16}}]
+                               set d {syms["dagger_x1"]}
+                               poke $d [expr {{$x & 255}}]; poke [expr {{$d+1}}] [expr {{$x >> 8}}]
+                               poke [expr {{$d+2}}] [expr {{($x+16) & 255}}]; poke [expr {{$d+3}}] [expr {{($x+16) >> 8}}]
+                               poke [expr {{$d+4}}] [peek [expr {{$b+3}}]]; poke [expr {{$d+5}}] 0
+                               poke [expr {{$d+6}}] [expr {{[peek [expr {{$b+3}}]] + 16}}]; poke [expr {{$d+7}}] 0
+                               poke {syms["sub_kind"]} 1; poke {syms["dagger_on"]} 1
+                           }}
+                       }} }}
+    after time 67.85 {{ set f [open "{result_file}" a]
+                        set st -1
+                        for {{set i 0}} {{$i < 8}} {{incr i}} {{
+                            set b [expr {{{objt} + $i*{obj_size}}}]
+                            if {{[peek $b] == 10}} {{ set st [peek [expr {{$b+9}}]] }}
+                        }}
+                        puts $f "asleep_hit [peek {syms["boss_hp"]}] $st"; close $f
+                        poke {syms["dagger_on"]} 0 }}
     after time 67.9 {{ if {{[peek {cur}] == 4}} {{
                            poke {px_a} [expr {{711 & 255}}]; poke {px_a + 1} [expr {{711 >> 8}}]
                            poke {py} 64; poke {py + 1} 0 }} }}
@@ -728,6 +749,7 @@ def run():
     boss_hp = boss_awake = boss_sleepf = None
     zfall = None
     floor_fires = None
+    asleep_hit = None
     boss_maxy = boss_fire = boss_near_fire = 0
     rules = {}
     weapons = {}
@@ -753,6 +775,9 @@ def run():
                 continue
             if tag == "seqs":
                 seqs = dict(x.split("=") for x in kv)
+                continue
+            if tag == "asleep_hit":
+                asleep_hit = (int(kv[0]), int(kv[1]))
                 continue
             if tag == "floor_fires":
                 floor_fires = int(kv[0])
@@ -939,6 +964,8 @@ def run():
             stage3_walk)] if gen == "converted" else []),
         *([("in a real fight (on the ledge, then the floor), the boss spits fireballs at Simon",
             floor_fires >= 1)] if floor_fires is not None else []),
+        *([("asleep (Simon left of the screen's middle), the boss stays asleep and can't be hurt",
+            asleep_hit == (64, 0))] if asleep_hit else []),
         *([("asleep, the stage 3 boss is the small hanging bat (NES)", boss_sleepf == 55)]
           if boss_sleepf is not None else []),
         *([("a zombie walking off stage 3's upper platform falls to the floor and walks on",

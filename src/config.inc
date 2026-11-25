@@ -155,7 +155,6 @@ CROUCH_TOP      equ 20
 BOSS_HP         equ 64                  ; the boss's health (the NES's $01A9)
 BOSS_DAMAGE     equ 6                   ; per whip hit (NES: 64 -> 58 -> 52)
 BOSS_INV        equ 16                  ; frames without hits after one
-BOSS_WAKE       equ 72                  ; wakes when Simon is this close (x)
 BOSS_HOVER      equ 160                 ; frames it hovers before a swoop
 BOSS_SWOOP_MAX  equ 120                 ; a swoop ends after this many frames
 BOSS_HIGH_Y     equ 26
