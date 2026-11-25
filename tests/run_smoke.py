@@ -199,8 +199,17 @@ def tcl_script(syms, result_file):
                        }} }}
     after time 74.5 {{ {dump('29_stage_clear')}
                        set f [open "{result_file}" a]; puts $f "orb $::orb_seen [peek {syms["clear_t"]}] $::boss_fire $::boss_near_fire"; close $f }}
-    after time 78.5 {{ {dump('30_restart')} }}
-    after time 79.0 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
+    after time 78.5 {{ {dump('30_restart')}; rules "after_clear"
+                       # time runs out: death animation, then a life is lost
+                       poke {syms["time_bcd"]} 1; poke {syms["time_bcd"] + 1} 0; poke {syms["time_t"]} 60 }}
+    after time 79.2 {{ rules "dying"; {dump('31_dying')} }}
+    after time 81.5 {{ rules "after_death"
+                       # the last life: game over, then a new game
+                       poke {syms["lives"]} 0
+                       poke {syms["time_bcd"]} 1; poke {syms["time_bcd"] + 1} 0; poke {syms["time_t"]} 60 }}
+    after time 83.6 {{ rules "game_over" }}
+    after time 87.5 {{ rules "new_game" }}
+    after time 88.0 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """ if areas > 1 else f"""
     after time 9.0  {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
@@ -351,6 +360,12 @@ proc boss_watch {{}} {{
     }}
 }}
 debug set_watchpoint write_mem {fc} {{}} boss_watch
+# the game-rules state, as one result line
+proc rules {{tag}} {{
+    set f [open "{result_file}" a]
+    puts $f "rules $tag time=[format %02x%02x [peek {syms["time_bcd"] + 1}] [peek {syms["time_bcd"]}]] score=[format %02x%02x%02x [peek {syms["score"] + 2}] [peek {syms["score"] + 1}] [peek {syms["score"]}]] lives=[peek {syms["lives"]}] dying=[peek {syms["dying_t"]}] over=[peek {syms["game_over_t"]}] pose=[peek {pf}] hp=[peek {syms["hp"]}] area=[peek {cur}] hud=[string map {{" " _}} [format %c%c%c%c%c%c [vpeek {0x1800 + 7}] [vpeek {0x1800 + 8}] [vpeek {0x1800 + 9}] [vpeek {0x1800 + 10}] [vpeek {0x1800 + 11}] [vpeek {0x1800 + 12}]]]"
+    close $f
+}}
 proc count_type {{t}} {{
     set n 0
     for {{set i 0}} {{$i < 8}} {{incr i}} {{ if {{[peek [expr {{{objt} + $i*{obj_size}}}]] == $t}} {{ incr n }} }}
@@ -428,7 +443,7 @@ proc wait_game {{}} {{
     }}
 }}
 after time 0.1 wait_game
-after time 100 {{ exit }}
+after time 110 {{ exit }}
 """
 
 
@@ -465,6 +480,7 @@ def run():
     fish_seen = None
     boss_hp = boss_awake = None
     boss_maxy = boss_fire = boss_near_fire = 0
+    rules = {}
     orb_seen = clear_t = None
     panther_dead = 0
     stair = None
@@ -479,6 +495,9 @@ def run():
                 continue
             if tag == "hud_hearts":
                 hud_hearts = kv[0] if kv else ""
+                continue
+            if tag == "rules":
+                rules[kv[0]] = dict(x.split("=") for x in kv[1:])
                 continue
             if tag == "boss_maxy":
                 boss_maxy = int(kv[0])
@@ -621,6 +640,23 @@ def run():
             and snaps["29_stage_clear"]["hp"] == 64),
            ("after the stage clear the game starts again", snaps["30_restart"]["cur_area"] == 0)]
           if boss_hp is not None and "30_restart" in snaps else []),
+        *([("kills score points, shown in the HUD",
+            int(rules["after_clear"]["score"]) > 0
+            and rules["after_clear"]["hud"] == rules["after_clear"]["score"]),
+           ("the timer counts down from 300",
+            0 < int(rules["after_clear"]["time"]) < 300),
+           ("when time runs out Simon dies (death animation)",
+            int(rules["dying"]["dying"]) > 0 and int(rules["dying"]["pose"]) in (14, 15)),
+           ("then he loses a life and restarts with full health and time",
+            int(rules["after_death"]["lives"]) == int(rules["after_clear"]["lives"]) - 1
+            and rules["after_death"]["dying"] == "0" and rules["after_death"]["hp"] == "64"
+            and int(rules["after_death"]["time"]) >= 298),
+           ("dying with no lives left is game over",
+            int(rules["game_over"]["over"]) > 0),
+           ("after game over a new game starts: score 0, 3 lives",
+            rules["new_game"]["score"] == "000000" and rules["new_game"]["lives"] == "3"
+            and rules["new_game"]["area"] == "0")]
+          if "new_game" in rules else []),
         *([("UP at a staircase's foot climbs it to the top",
             (snaps["11_stairs_up"]["px"], snaps["11_stairs_up"]["py"]) == stair["top"]
             and snaps["11_stairs_up"]["stair_state"] == 0 and snaps["11_stairs_up"]["on_ground"] == 1),

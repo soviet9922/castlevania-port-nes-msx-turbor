@@ -106,5 +106,11 @@ boss_ty         equ boss_tx+2           ; 1
 clear_t         equ boss_ty+1           ; 1  stage clear countdown (0 = playing)
 cam_lock        equ clear_t+1           ; 1  camera can't go back left (boss)
 cam_min         equ cam_lock+1          ; 2  leftmost camera x while locked
-RAM_END         equ cam_min+2
+score           equ cam_min+2           ; 3  BCD, low byte first (always 00)
+time_bcd        equ score+3             ; 2  BCD, 0x0300 at the start
+time_t          equ time_bcd+2          ; 1  frames to the next timer step
+lives           equ time_t+1            ; 1
+dying_t         equ lives+1             ; 1  death animation countdown (0 = alive)
+game_over_t     equ dying_t+1           ; 1
+RAM_END         equ game_over_t+1
         ASSERT RAM_END < 0xF380

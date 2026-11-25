@@ -57,7 +57,8 @@ AH_EXITY        equ 50                  ; exit only when py <= this (0xFF = any)
 AH_BELOW        equ 51                  ; area below (stairs down), 0xFF = none
 AH_ABOVE        equ 52                  ; area above (stairs up), 0xFF = none
 AH_RESPAWN      equ 53                  ; area to restart in after a fall/death
-AH_SIZE         equ 54
+AH_STAGE        equ 54                  ; stage number shown in the HUD (BCD)
+AH_SIZE         equ 55
 
 ; Sections: a staircase that leaves the bottom of the playfield continues in
 ; the area below (and the other way). As on the NES, x stays, y moves by
@@ -88,11 +89,28 @@ CROUCH_Y        equ 8                   ; crouching pose is drawn this much lowe
 
 ; Player metasprites (see tools/msx_sprites.py)
 PLAYER_SPRITES  equ 12                  ; hardware sprites / pattern slots reserved
-NPOSES          equ 14                  ; poses per facing direction
+NPOSES          equ 16                  ; poses per facing direction
 POSE_WALK1      equ 1
 POSE_TUCK       equ 3
 POSE_STAIR      equ 12                  ; climbing (alternates with walk1)
 POSE_HURT       equ 13                  ; knocked back
+POSE_DEAD1      equ 14                  ; dying: falling down
+POSE_DEAD2      equ 15                  ; dying: lying (32 px wide)
+
+; Game rules (measured on the NES: RAM $42/$43 timer, $7FC score, $2A lives)
+TIME_START      equ 0x0300              ; BCD; restarts at a death or stage clear
+TIME_TICK       equ 64                  ; frames per timer step
+LIVES_START     equ 3                   ; shown as P-3
+DEATH_FRAMES    equ 97                  ; death animation (NES: 97 frames)
+DEATH_POSE1     equ 16                  ; frames of the falling pose, then lying
+GAME_OVER_FRAMES equ 180
+; points / 100, BCD. Zombie and panther measured on the NES; the others are
+; estimates until they are measured
+SCORE_ZOMBIE    equ 0x01
+SCORE_PANTHER   equ 0x02
+SCORE_BAT       equ 0x02
+SCORE_FISH      equ 0x03
+SCORE_BOSS      equ 0x30
 
 ; Health and getting hit (measured in the NES entrance hall)
 HP_MAX          equ 64                  ; 16 bar segments of 4 on the NES, 8 HUD tiles here

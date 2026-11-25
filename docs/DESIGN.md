@@ -231,6 +231,17 @@ writing it to the hidden page (2.4 ms). Busy scenes (5 candles, 3 zombies, or tw
 Simon changing pose) occasionally need more than a frame: the smoke test reports
 how often (about 3%). The turbo R's R800 runs the logic several times faster.
 
+### Game rules
+
+The HUD shows the score, the timer, the stage number (from the area header), the
+health bars, hearts and lives. The timer counts down in BCD, one step every 64
+frames as on the NES. Kills add points (zombie 100 and panther 200 as measured on
+the NES; bat, fishman and boss values are estimates). When health or time runs out,
+Simon plays the 97-frame death animation and loses a life: he restarts at the start
+of the section with full health, 5 hearts and a full timer. A fall into a pit costs
+the life without the animation. With no lives left it's game over: the HUD says so
+for 3 seconds and a new game starts.
+
 ## Areas and ROM banks
 
 Each area (courtyard, entrance hall, …) is one 16 KB ROM bank (area n =

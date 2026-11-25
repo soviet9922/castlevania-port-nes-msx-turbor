@@ -31,23 +31,144 @@ player_reset:
         ld (on_ground),a
         ret
 
-; Fell into a pit: restart at the beginning of the level.
+; Fell into a pit: the life is lost straight away (no death animation).
 respawn:
-        ld a,HP_MAX
-        ld (hp),a
         ld a,1
-        ld (hud_dirty),a
-        ld a,(area_hdr+AH_RESPAWN)
-        jp load_area
+        jr start_death
 
-; Main loop: health ran out -> restart the area (lives are not counted yet)
+; Main loop: health or time ran out -> the death animation, then a life is lost
 check_death:
         ld a,(player_dead)
         or a
         ret z
         xor a
         ld (player_dead),a
-        jr respawn
+        ld a,DEATH_FRAMES
+start_death:
+        ld (dying_t),a
+        xor a
+        ld (whip_t),a
+        ld (whip_active),a
+        ld (hurt_state),a
+        ld (invuln_t),a
+        ld (pyoff),a
+        ld (stair_state),a
+        ld a,POSE_DEAD1
+        ld (pframe),a
+        ret
+
+; One frame of the death animation (main loop, instead of the game logic).
+; Falling pose for DEATH_POSE1 frames, then lying; at the end a life is lost.
+dying_tick:
+        ld hl,dying_t
+        dec (hl)
+        jr z,lose_life
+        ld a,(hl)
+        cp DEATH_FRAMES-DEATH_POSE1
+        ret nc
+        ld a,POSE_DEAD2
+        ld (pframe),a
+        ret
+
+; Lose a life: restart the section (full health, 5 hearts, timer 300), or
+; game over when none are left.
+lose_life:
+        ld a,(lives)
+        or a
+        jr z,game_over
+        dec a
+        ld (lives),a
+restart_section:
+        call restart_section_vars
+        ld a,(area_hdr+AH_RESPAWN)
+        jp load_area
+
+game_over:
+        ld a,GAME_OVER_FRAMES
+        ld (game_over_t),a
+        jp hud_game_over
+
+; Start (or restart after game over) a game: score 0, 3 lives, area 0
+new_game:
+        xor a
+        ld hl,score
+        ld (hl),a
+        inc hl
+        ld (hl),a
+        inc hl
+        ld (hl),a
+        ld a,LIVES_START
+        ld (lives),a
+        ld a,BOSS_HP
+        ld (boss_hp),a
+        di
+        call hud_draw
+        ei
+        call restart_section_vars
+        xor a
+        jp load_area
+
+restart_section_vars:
+        ld a,HP_MAX
+        ld (hp),a
+        ld a,5
+        ld (hearts),a
+        ld hl,TIME_START
+        ld (time_bcd),hl
+        xor a
+        ld (time_t),a
+        inc a
+        ld (hud_dirty),a
+        ret
+
+; The timer: one step every TIME_TICK frames; at 0 Simon dies.
+timer_tick:
+        ld hl,time_t
+        inc (hl)
+        ld a,(hl)
+        cp TIME_TICK
+        ret c
+        ld (hl),0
+        ld hl,(time_bcd)
+        ld a,h
+        or l
+        ret z                           ; already out of time
+        ld a,l
+        sub 1
+        daa
+        ld l,a
+        ld a,h
+        sbc a,0
+        daa
+        ld h,a
+        ld (time_bcd),hl
+        ld a,1
+        ld (hud_dirty),a
+        ld a,h
+        or l
+        ret nz
+        ld a,1                          ; time up
+        ld (player_dead),a
+        ret
+
+; A = points / 100 (BCD): add to the score; counts the kill
+add_score:
+        push hl
+        ld hl,kills
+        inc (hl)
+        ld hl,score+1
+        add a,(hl)
+        daa
+        ld (hl),a
+        inc hl
+        ld a,(hl)
+        adc a,0
+        daa
+        ld (hl),a
+        ld a,1
+        ld (hud_dirty),a
+        pop hl
+        ret
 
 arc_jump:
         ld hl,jump_table

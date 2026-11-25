@@ -655,8 +655,8 @@ zombie_update:
         ld (ix+4),0
         ld (ix+6),OBJF_BURST
         ld (ix+5),ITEM_NONE
-        ld hl,kills
-        inc (hl)
+        ld a,SCORE_ZOMBIE
+        call add_score
         ret
 
 .touch:                                 ; zombie x+2..x+13 vs Simon px+3..px+12
@@ -906,8 +906,8 @@ panther_update:
         ld (ix+6),OBJF_BURST
         ld (ix+5),ITEM_NONE
         ld (ix+7),KIND_BRAZIER
-        ld hl,kills
-        inc (hl)
+        ld a,SCORE_PANTHER
+        call add_score
         ret
 
 .touch:                                 ; panther x+4..x+27, y..y+15
@@ -1187,8 +1187,8 @@ bat_update:
         jr z,.touch
         call whip_hits_object
         jr nc,.touch
-        ld hl,kills
-        inc (hl)
+        ld a,SCORE_BAT
+        call add_score
         jr .burst
 .touch:                                 ; bat x+2..x+13 vs Simon px+3..px+12
         ld a,(invuln_t)
@@ -1537,8 +1537,8 @@ fish_update:
         jp z,zombie_update.touch
         call whip_hits_object
         jp nc,zombie_update.touch
-        ld hl,kills
-        inc (hl)
+        ld a,SCORE_FISH
+        call add_score
         ld (ix+0),OBJ_BURST
         ld (ix+4),0
         ld (ix+6),OBJF_BURST
@@ -1952,8 +1952,8 @@ boss_update:
 .dead:
         xor a
         ld (boss_hp),a
-        ld hl,kills
-        inc (hl)
+        ld a,SCORE_BOSS
+        call add_score
         ld (ix+9),4
         ld (ix+4),0
         ld l,(ix+1)                     ; burn at its centre (16x16 bursts)
@@ -2415,6 +2415,38 @@ objects_load_patterns:
 HUD_HEARTS_ADDR equ VRAM_PNT + 32 + 25
 HUD_HP_ADDR     equ VRAM_PNT + 32 + 3
 HUD_EN_ADDR     equ VRAM_PNT + 32 + 14
+HUD_SCORE_ADDR  equ VRAM_PNT + 7
+HUD_TIME_ADDR   equ VRAM_PNT + 19
+HUD_STAGE_ADDR  equ VRAM_PNT + 29
+HUD_LIVES_ADDR  equ VRAM_PNT + 32 + 30
+
+; A = two BCD digits -> the VDP (write address already set)
+hud_bcd:
+        ld c,a
+        rrca
+        rrca
+        rrca
+        rrca
+        and 15
+        add a,"0"
+        out (VDP_DATA),a
+        ld a,c
+        and 15
+        add a,"0"
+        out (VDP_DATA),a
+        ret
+
+; Game over: the HUD's top line says so (VBLANK work done by the main loop)
+hud_game_over:
+        ld hl,game_over_text
+        ld de,VRAM_PNT
+        ld bc,32
+        di
+        call vram_copy
+        ei
+        ret
+game_over_text:
+        db "           GAME  OVER           "
 
 hud_update:
         ld a,(hud_dirty)
@@ -2454,6 +2486,29 @@ hud_update:
 .efull:
         out (VDP_DATA),a
         djnz .ebar
+        ld hl,HUD_SCORE_ADDR            ; score: 6 digits
+        call vram_set_write
+        ld a,(score+2)
+        call hud_bcd
+        ld a,(score+1)
+        call hud_bcd
+        ld a,(score)
+        call hud_bcd
+        ld hl,HUD_TIME_ADDR             ; time: 4 digits
+        call vram_set_write
+        ld a,(time_bcd+1)
+        call hud_bcd
+        ld a,(time_bcd)
+        call hud_bcd
+        ld hl,HUD_STAGE_ADDR
+        call vram_set_write
+        ld a,(area_hdr+AH_STAGE)
+        call hud_bcd
+        ld hl,HUD_LIVES_ADDR
+        call vram_set_write
+        ld a,(lives)
+        add a,"0"
+        out (VDP_DATA),a
         ld hl,HUD_HEARTS_ADDR
         call vram_set_write
         ld a,(hearts)

@@ -123,6 +123,28 @@ exactly, and it uses the same palette.
 
 Falling into the water kills Simon, and the game restarts him at section 1's start.
 
+## Game rules
+
+Recorded with `tools/nes_probe/record_rules.lua` (and a local whipping variant of the
+stage 2 route).
+
+| RAM | Contents |
+|---|---|
+| `$42`/`$43` | timer, BCD (low, high): 0300 at the start, one step every 64 frames |
+| `$7FC-$7FE` | score, BCD, low byte first (the low byte stays 00) |
+| `$2A` | lives |
+| `$45` | health (64) |
+| `$70` | whip level: 0 leather, 1 chain, 2 morning star (one step per whip pickup) |
+| `$71` | hearts (5 at the start) |
+| `$15B` | sub-weapon (8 after the dagger) |
+
+- The timer keeps running across sections and stages; it pauses at some moments.
+- Points: a zombie gives 100, a panther 200.
+- When time runs out (or health), the whip level drops to 0 at once, the death
+  animation runs for 97 frames (falling pose `3C 3A` over `34 32`, then lying, 32 px
+  wide: `6E 5E 4E 3E`), and Simon restarts at the start of the section with one life
+  fewer, full health, timer 300, 5 hearts and no sub-weapon.
+
 ## Stage 2's way out and stage 3
 
 Recorded with `tools/nes_probe/record_stage2_end.lua`. The corridor's floor is

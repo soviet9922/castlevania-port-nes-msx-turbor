@@ -42,7 +42,8 @@
 - [x] Stairs (climbing pose recorded from the NES; descending reuses it)
 - [ ] Whip upgrades (chain, morning star), sub-weapons, whip poses on stairs
 - [ ] Sub-weapons
-- [ ] Hearts, score, timer, life bar in the HUD
+- [x] Hearts, score, timer, lives, life bar and stage number in the HUD
+- [x] Death (animation, lives, restart at the section), time out, game over
 
 ## Milestone 3: objects and enemies (in progress)
 

@@ -30,6 +30,9 @@ POSES = {
     "stair": ([(0x14, 0, 0), (0x12, 8, 0), (0x38, 0, 16), (0x36, 8, 16)], []),
     # knocked back by a hit (faces the enemy; recorded in the hall)
     "hurt": ([(0x3C, 0, 0), (0x3A, 8, 0), (0x34, 0, 16), (0x4C, 8, 16)], []),
+    # dying (recorded when the timer ran out): falling, then lying (32 px wide)
+    "dead1": ([(0x3C, 0, 8), (0x3A, 8, 8), (0x34, 0, 24), (0x32, 8, 24)], []),
+    "dead2": ([(0x6E, 0, 16), (0x5E, 8, 16), (0x4E, 16, 16), (0x3E, 24, 16)], []),
 }
 WHIP_TOPS = {
     "whip1": ([(0x1C, -8, 0), (0x1A, 0, 0)], [(0x1E, -16, 0), (0x20, -16, 16)]),
@@ -46,7 +49,7 @@ for name, (top, whip) in WHIP_TOPS.items():
 # engine pose numbers (src/player.asm)
 POSE_ORDER = ["stand", "walk1", "walk2", "tuck",
               "whip1", "whip2", "whip3", "whip4",
-              "whip1c", "whip2c", "whip3c", "whip4c", "stair", "hurt"]
+              "whip1c", "whip2c", "whip3c", "whip4c", "stair", "hurt", "dead1", "dead2"]
 
 SIMON_PALETTE = 0xCDE9          # fixed bank: $3F $10, then the sprite palettes
 JUMP_TABLE = (6, 0x9B90)        # 20 signed bytes: dy per frame while rising

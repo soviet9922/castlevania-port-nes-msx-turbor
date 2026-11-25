@@ -263,7 +263,7 @@ assert len(PLACEHOLDER_JUMP) == 20
 
 WHIP_SLOT = 14
 POSE_NAMES = ["stand", "walk1", "walk2", "tuck", "whip1", "whip2", "whip3", "whip4",
-              "whip1c", "whip2c", "whip3c", "whip4c", "stair", "hurt"]
+              "whip1c", "whip2c", "whip3c", "whip4c", "stair", "hurt", "dead1", "dead2"]
 # Placeholder knock-back arc (dy per frame while rising; the fall mirrors it)
 PLACEHOLDER_KNOCKBACK = [-4, -3, -2, -2, -1, -1, -1, 0, -1, 0, 0, 0, 0, 0, 0, 0]
 
@@ -527,6 +527,9 @@ def player_sprites():
             poses.append(px)
     poses.append(walk2)                 # placeholder stair pose
     poses.append(tuck)                  # placeholder hurt pose
+    poses.append({(x, y + 8): v for (x, y), v in tuck.items() if y + 8 < 32})  # falling
+    # lying: the standing figure turned on its side, head first (32x16)
+    poses.append({(31 - y, 16 + x): v for (x, y), v in stand.items() if x < 16})
     bank = msx_sprites.SpriteBank()
     names = []
     for facing in ("right", "left"):

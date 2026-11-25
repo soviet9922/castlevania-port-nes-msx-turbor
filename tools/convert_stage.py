@@ -257,6 +257,7 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, preview=True)
                   exit_x=area.get("exit_x"), exit_y=area.get("exit_y", 0xFF),
                   below=area.get("below", 0xFF), above=area.get("above", 0xFF),
                   respawn=area.get("respawn", index),
+                  stage_no=area["stage"] if area["stage"] >= 1 else 1,
                   next_area=area.get("next_area", 0))
 
     if preview:
