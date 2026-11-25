@@ -2779,11 +2779,29 @@ game_over_text:
         db "           GAME  OVER           "
 
 hud_update:
-        ld a,(hud_dirty)
-        or a
-        ret z
+        ld a,(hud_dirty)                ; a redraw is spread over three frames
+        or a                            ; (bars; score, time, stage; lives,
+        jr z,.pending                   ; icon, hearts) to keep VBLANK short
         xor a
         ld (hud_dirty),a
+        ld a,7
+        ld (hud_parts),a
+.pending:
+        ld a,(hud_parts)
+        or a
+        ret z
+        ld hl,hud_parts
+        bit 0,a
+        jr nz,.part1
+        bit 1,a
+        jr nz,.part2
+        ld (hl),0
+        jp .part3
+.part2:
+        res 1,(hl)
+        jp .part2_draw
+.part1:
+        res 0,(hl)
         ld hl,HUD_HP_ADDR               ; health bar: one tile per 8 HP
         call vram_set_write
         ld a,(hp)
@@ -2816,6 +2834,8 @@ hud_update:
 .efull:
         out (VDP_DATA),a
         djnz .ebar
+        ret
+.part2_draw:
         ld hl,HUD_SCORE_ADDR            ; score: 6 digits
         call vram_set_write
         ld a,(score+2)
@@ -2834,6 +2854,8 @@ hud_update:
         call vram_set_write
         ld a,(area_hdr+AH_STAGE)
         call hud_bcd
+        ret
+.part3:
         ld hl,HUD_LIVES_ADDR
         call vram_set_write
         ld a,(lives)

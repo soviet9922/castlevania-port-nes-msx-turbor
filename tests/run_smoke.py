@@ -66,9 +66,12 @@ def tcl_script(syms, result_file):
     areas = syms.get("AREA_COUNT", 1)
     # with more than one area: walk into the exit (courtyard gate) and on
     hall = f"""
-    after time 9.0  {{ poke {eoff} 3; poke {px_a} [peek {exit_x}]; poke {px_a + 1} [peek {exit_x + 1}] }}
-    after time 11.6 {{ {dump('09_next_area')}; keymatrixdown 8 0x80 }}
-    after time 13.9 {{ {dump('10_next_area_walk')}; keymatrixup 8 0x80
+    after time 8.95 {{ keymatrixdown 8 0x01 }}
+    after time 9.0  {{ keymatrixup 8 0x01
+                       # in the middle of a jump at the gate: the sequence waits for the landing
+                       poke {eoff} 3; poke {px_a} [peek {exit_x}]; poke {px_a + 1} [peek {exit_x + 1}] }}
+    after time 12.4 {{ {dump('09_next_area')}; keymatrixdown 8 0x80 }}
+    after time 14.0 {{ {dump('10_next_area_walk')}; keymatrixup 8 0x80
                        # first staircase of the area (if any): stand 6 px right of its foot
                        set sp [expr {{[peek {stairs}] + 256*[peek {stairs + 1}]}}]
                        set ::nst [peek $sp]
@@ -93,7 +96,7 @@ def tcl_script(syms, result_file):
                            keymatrixdown 8 0x80 }} }}
     after time 36.5 {{ keymatrixup 8 0x80; {dump('18_through_the_door')}
                        set f [open "{result_file}" a]
-                       puts $f "seqs gate=$::gate_seen,$::gate_px0,$::gate_pxmax door=$::door_cam,$::door_opened,$::door_closed"
+                       puts $f "seqs gate=$::gate_seen,$::gate_px0,$::gate_pxmax door=$::door_cam,$::door_opened,$::door_closed ys=[join $::seq_ys ,]"
                        close $f
                        # a staircase that leads to the section below (foot off the playfield)
                        set sp [expr {{[peek {stairs}] + 256*[peek {stairs + 1}]}}]
@@ -473,13 +476,17 @@ set ::gate_pxmax 0
 set ::door_cam 0
 set ::door_opened 0
 set ::door_closed 0
+set ::seq_ys {{}}
 proc seq_watch {{}} {{
     set k [peek {syms["seq_kind"]}]
     set x [expr {{[peek {px_a}] + 256*[peek {px_a + 1}]}}]
+    set y [peek {py}]
     if {{$k == 1}} {{
         if {{!$::gate_seen}} {{ set ::gate_seen 1; set ::gate_px0 $x }}
         set ::gate_pxmax $x
+        if {{[lsearch $::seq_ys "g$y"] < 0}} {{ lappend ::seq_ys "g$y" }}
     }}
+    if {{$k == 2 && [lsearch $::seq_ys "d$y"] < 0}} {{ lappend ::seq_ys "d$y" }}
     if {{$k == 2}} {{
         set c [expr {{[peek {syms["cam_x"]}] + 256*[peek {syms["cam_x"] + 1}]}}]
         if {{$c > $::door_cam}} {{ set ::door_cam $c }}
@@ -748,6 +755,9 @@ def run():
         *([("at the castle gate Simon walks in by himself, slowly (1 px every 3 frames)",
             seqs["gate"].split(",")[0] == "1"
             and 30 <= int(seqs["gate"].split(",")[2]) - int(seqs["gate"].split(",")[1]) <= 42),
+           (f"jumping into the gate or a door: the sequence waits for the landing, "
+            f"Simon stays on the floor ({seqs['ys']})",
+            sorted(seqs["ys"].split(",")) == ["d32", "g112"]),
            ("at the hall's door the screen scrolls on to the door (camera 1408)",
             seqs["door"].split(",")[0] == "1408" or int(seqs["door"].split(",")[0]) > 1408),
            ("the door opens, and closes again behind Simon",

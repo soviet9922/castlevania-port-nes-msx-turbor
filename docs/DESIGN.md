@@ -233,7 +233,8 @@ how often (about 3%). The turbo R's R800 runs the logic several times faster.
 
 ### Game rules
 
-The HUD shows the score, the timer, the stage number (from the area header), the
+A HUD redraw is spread over three frames (the bars; score, timer and stage; lives,
+icon and hearts), so it never takes too much of one vertical blank. The HUD shows the score, the timer, the stage number (from the area header), the
 health bars, hearts and lives. The timer counts down in BCD, one step every 64
 frames as on the NES. Kills add points (zombie 100 and panther 200 as measured on
 the NES; bat, fishman and boss values are estimates). When health or time runs out,
@@ -295,7 +296,9 @@ tile column (`AH_DOOR_COL`) is blanked in the name table, he walks through, the
 column is put back from the map, and he walks on with the screen following. The hall
 and stage 2's corridor include the next stage's first 8 map columns for this; their
 normal camera limit (`AH_MAXCAM`) stays where it was, so those columns only show
-during the sequence. The game logic, the timer and the enemies wait meanwhile.
+during the sequence. The game logic, the timer and the enemies wait meanwhile. An exit only starts while
+Simon stands on the ground (not in a jump, on stairs or knocked back), so a jump into
+the gate or a door starts the sequence when he lands.
 
 `load_area` turns the display off, loads the palette, tiles and object
 patterns, resets objects and the player, redraws the screen and turns
