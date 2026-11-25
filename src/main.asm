@@ -55,10 +55,14 @@ main_loop:
 
         ; --- VBLANK work: everything that touches VRAM ---
         di
-        call upload_column
+        ld a,(col_pending)              ; a new map column this frame: the HUD
+        push af                         ; waits a frame (both at once can
+        call upload_column              ; overrun the vertical blank)
         call door_vram
         call flip_sprites
-        call hud_update
+        pop af
+        or a
+        call z,hud_update
         call calc_scroll
         ei
 vblank_done:                            ; (tests measure VBLANK work up to here)

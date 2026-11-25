@@ -339,7 +339,7 @@ def tcl_script(syms, result_file):
                        poke [expr {{$b+6}}] 50; poke [expr {{$b+9}}] 0; poke $b 3 }}
     after time 111.5 {{ set b [expr {{{objt} + 6*{obj_size}}}]
                        set f [open "{result_file}" a]; puts $f "high_item [peek $b] [peek [expr {{$b+3}}]]"; close $f }}
-    after time 111.7 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
+    after time 111.7 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}] $::vbl_worst_fc"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
 """ if areas > 1 else f"""
     after time 9 {{ snd_report; set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
@@ -421,6 +421,7 @@ proc snd_report {{}} {{
 # worst time from the VBLANK interrupt to the end of the main loop's VBLANK work
 set ::vbl_t0 0
 set ::vbl_worst 0
+set ::vbl_worst_fc 0
 set ::vbl_on 0
 set ::vbl_fc 0
 # frames whose logic was still running when the next VBLANK came (overruns)
@@ -440,7 +441,7 @@ proc vbl_end {{}} {{
     set ::waiting 0
     if {{(([peek {fc}] - $::vbl_fc) & 255) > 1 || $::vbl_t0 < 0}} return
     set dt [expr {{([machine_info time] - $::vbl_t0) * 1e6}}]
-    if {{$dt > $::vbl_worst}} {{ set ::vbl_worst $dt }}
+    if {{$dt > $::vbl_worst}} {{ set ::vbl_worst $dt; set ::vbl_worst_fc [peek16 {fc}] }}
 }}
 debug set_bp {irq_vbl} {{}} vbl_start
 debug set_bp {vbl_done} {{}} vbl_end
