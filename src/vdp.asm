@@ -301,6 +301,7 @@ stream_frame:
         inc hl
         djnz .inv_lp
         ld a,PLAYER_BANK                ; Simon's patterns: the last ROM bank,
+        ld (page2_bank),a               ; (the sound interrupt puts it back)
         ld (ASCII16_PAGE2),a            ; at 0x8000 instead of the area's
         ld a,(cur_frame)
         call frame_address
@@ -369,6 +370,7 @@ stream_frame:
         djnz .lp
         ld a,(cur_area)                 ; the area's bank again
         inc a
+        ld (page2_bank),a
         ld (ASCII16_PAGE2),a
         ret
 

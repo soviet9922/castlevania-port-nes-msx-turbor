@@ -443,3 +443,19 @@ To run the probe (needs FCEUX; writes to `build/nes/probe`):
 ```bash
 PROBE_OUT=$PWD/build/nes/probe xvfb-run -a fceux --no-config 1 --sound 0 --loadlua tools/nes_probe/dump_stage.lua build/nes/castlevania.nes
 ```
+
+
+## Sound
+
+- The sound driver is in PRG bank 0. `$8187` starts sound A (the game goes
+  through `$C1A7`, which selects bank 0 and guards against re-entry); `$838A`
+  is the per-frame update, called from the NMI. It keeps six channel slots in
+  zero page `$80-$DF`, 16 bytes each (`$02,X` non-zero = active). The sound
+  table pointer is at `$8185`.
+- Stage music comes from a table at `$FB56` indexed by `$28` (stages 0-3 share
+  `$2A`). The boss music is `$42`.
+- Logged while playing (a hook on `$C1A7`): `$0A` whip, `$08` dagger thrown,
+  `$14` whip strikes something, `$18` heart collected, `$1A` stopwatch.
+  From the code around the requests: `$17` with the whip level going up,
+  `$25` with an extra life, `$48` death. The others in
+  `tools/convert_sound.py` (`NES_SOUNDS`) are guesses still to be checked by ear.

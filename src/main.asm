@@ -31,6 +31,7 @@ init:
         call select_cpu
         call enable_page2
         ld a,1
+        ld (page2_bank),a
         ld (ASCII16_PAGE2),a            ; also makes the mapper easy to detect
 
         ; clear engine RAM
@@ -43,6 +44,7 @@ init:
         call vdp_init
         call load_graphics
         call install_irq
+        call sound_init
         call new_game                   ; score 0, 3 lives, area 0: the courtyard
 
 ; ---------------------------------------------------------------------------
@@ -60,6 +62,7 @@ main_loop:
         call calc_scroll
         ei
 vblank_done:                            ; (tests measure VBLANK work up to here)
+        call sound_tick                 ; music and effects, one step per frame
 
         ; --- game logic ---
         ld a,(game_over_t)              ; game over: wait, then a new game
@@ -171,6 +174,8 @@ enable_page2:
         INCLUDE "player.asm"
         INCLUDE "objects.asm"
         INCLUDE "area.asm"
+        INCLUDE "sound.asm"
+        INCLUDE "sound.inc"             ; generated: the sound table, SND_ numbers
 
 ; ---------------------------------------------------------------------------
 ; Data shared by all areas (stays in bank 0; Simon's sprite patterns and

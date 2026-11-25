@@ -13,6 +13,7 @@
 load_area:
         ld (cur_area),a
         inc a
+        ld (page2_bank),a               ; (for the sound interrupt)
         ld (ASCII16_PAGE2),a            ; ASCII16: bank seen at 0x8000
         ld hl,0x8000
         ld de,area_hdr
@@ -50,6 +51,8 @@ load_area:
         call load_band
 
         call objects_load_patterns      ; (enables interrupts)
+        ld a,SND_STAGE                  ; the stage's music (carries on if
+        call music_play                 ; it is already playing)
         di
         ld hl,0
         ld (cam_x),hl
@@ -246,6 +249,8 @@ door_tick:
         inc hl
         jp camera_goto
 .half_open:
+        ld a,SND_DOOR
+        call sfx_play
         ld a,1                          ; the door swings: half open
         jp .next_phase
 .phase1:

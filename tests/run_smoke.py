@@ -339,9 +339,9 @@ def tcl_script(syms, result_file):
                        poke [expr {{$b+6}}] 50; poke [expr {{$b+9}}] 0; poke $b 3 }}
     after time 111.5 {{ set b [expr {{{objt} + 6*{obj_size}}}]
                        set f [open "{result_file}" a]; puts $f "high_item [peek $b] [peek [expr {{$b+3}}]]"; close $f }}
-    after time 111.7 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
+    after time 111.7 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
 """ if areas > 1 else f"""
-    after time 9 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
+    after time 9 {{ snd_report; set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
     # keyboard matrix row 8: bit0 SPACE, bit4 LEFT, bit7 RIGHT
     # Times are relative to the moment the game's main loop is running.
@@ -402,6 +402,22 @@ proc sample_whip {{}} {{
 proc rec_whip {{n}} {{ set ::whip_left $n }}
 debug set_watchpoint write_mem {fc} {{}} sample_whip
 debug set_watchpoint write_mem {fc} {{}} sample_py
+# sound: the loudest PSG volume seen, whether music and an effect ran
+set ::psg_max 0
+set ::mus_seen 0
+set ::sfx_seen 0
+proc snd_watch {{}} {{
+    foreach r {{8 9 10}} {{
+        set v [expr {{[debug read "PSG regs" $r] & 15}}]
+        if {{$v > $::psg_max}} {{ set ::psg_max $v }}
+    }}
+    if {{[peek {syms["mus_state"]}]}} {{ set ::mus_seen 1 }}
+    if {{[peek {syms["sfx_state"]}]}} {{ set ::sfx_seen 1 }}
+}}
+debug set_watchpoint write_mem {fc} {{}} snd_watch
+proc snd_report {{}} {{
+    set f [open "{result_file}" a]; puts $f "sound $::psg_max $::mus_seen $::sfx_seen"; close $f
+}}
 # worst time from the VBLANK interrupt to the end of the main loop's VBLANK work
 set ::vbl_t0 0
 set ::vbl_worst 0
@@ -704,13 +720,30 @@ def door_ok(states):
 
 def axe_ok(track):
     """the axe's path (x:y:state, one per frame): x +2 per frame, up then down"""
-    pts = [tuple(int(v) for v in p.split(":")[:2]) for p in track.split(",") if p]
+    raw = [tuple(int(v) for v in p.split(":")[:2]) for p in track.split(",") if p]
+    # a frame the game ran late shows the same point twice, then a double
+    # step: drop the repeat and allow 4 px right after it
+    pts, steps = [], []
+    for p in raw:
+        if pts and p == pts[-1]:
+            steps.append("late")
+            continue
+        if pts:
+            steps.append(p[0] - pts[-1][0])
+        pts.append(p)
     if len(pts) < 20:
         return False
+    ok_steps, late = True, False
+    for st in steps:
+        if st == "late":
+            late = True
+            continue
+        ok_steps &= st == 2 or (late and st == 4)
+        late = False
     xs, ys = [p[0] for p in pts], [p[1] % 256 for p in pts]   # (y is a byte)
     top = ys.index(min(ys))
     falling = ys[top:]
-    return (all(b - a == 2 for a, b in zip(xs, xs[1:]))
+    return (ok_steps
             and 3 < top < len(ys) - 3 and ys[-1] > ys[top] + 20 and ys[0] > ys[top] + 20
             and all(b >= a for a, b in zip(falling, falling[1:])))   # never back up
 
@@ -749,6 +782,7 @@ def run():
     boss_hp = boss_awake = boss_sleepf = None
     zfall = None
     floor_fires = None
+    sound = None
     asleep_hit = None
     boss_maxy = boss_fire = boss_near_fire = 0
     rules = {}
@@ -775,6 +809,9 @@ def run():
                 continue
             if tag == "seqs":
                 seqs = dict(x.split("=") for x in kv)
+                continue
+            if tag == "sound":
+                sound = tuple(int(v) for v in kv)
                 continue
             if tag == "asleep_hit":
                 asleep_hit = (int(kv[0]), int(kv[1]))
@@ -867,6 +904,8 @@ def run():
                    frame_bytes(4, "zombie_l1") != frame_bytes(4, "zombie_l2") and
                    frame_bytes(4, "zombie_r1") != frame_bytes(4, "zombie_r2"))
     checks = [
+        ("the music plays on the PSG and the whip has a sound effect",
+         sound is not None and sound[0] > 0 and sound[1] == 1 and sound[2] == 1),
         # 3 s of emulated time between boot and walk_right snapshots
         ("main loop runs at 60 fps", 170 <= walk["frame_count"] - boot["frame_count"] <= 190),
         ("line interrupt split runs every frame",

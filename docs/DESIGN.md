@@ -343,3 +343,29 @@ transparent). Edit them and rebuild: the converter uses an edited frame
 instead of the ROM's pixels, mapping each colour to the nearest NES colour.
 Delete a file to return to the ROM's pixels. `art_overrides/` is git-ignored:
 the files come from the ROM and must never be committed.
+
+
+## Sound
+
+`src/sound.asm` plays one music stream and one sound-effect stream on the PSG.
+The main loop calls `sound_tick` right after its VBLANK work (the PSG needs no
+VRAM, so it stays out of the vertical blank). A stream is a list of PSG
+register changes per frame (`tools/sound_out.py` describes the bytes). Streams
+live in ROM banks 8-15, after Simon's sprite bank, and may run on into the
+next bank. The player switches the 0x8000 page to the stream's bank and puts
+back `page2_bank`, which every bank switch in the engine keeps up to date. An
+effect takes over only the PSG channels in its table mask; the music carries
+on underneath and is heard again when the effect ends.
+
+The engine asks for sounds by name (`SND_STAGE`, `SND_WHIP`, ... in the
+generated `sound.inc`). Two sets provide them:
+
+- `tools/gen_sound.py`: original placeholder effects and short tunes, used
+  by default in both builds.
+- `tools/convert_sound.py` (`make nes SOUND=rom`): the music and effects of
+  your own NES ROM, made on your machine. It runs the game's own sound
+  driver in a small 6502 interpreter (`tools/cpu6502.py`,
+  `tools/nes_sound.py`), models the NES sound chip's per-frame state and
+  maps pulse 1 / pulse 2 / triangle to PSG A / B / C and the noise channel to
+  C's noise. DPCM samples are not converted. Like everything made from the
+  ROM, the result stays in `build/` and is never committed.

@@ -46,6 +46,8 @@ check_death:
         ld a,DEATH_FRAMES
 start_death:
         ld (dying_t),a
+        ld a,SND_DEATH
+        call music_restart
         xor a
         ld (whip_t),a
         ld (whip_active),a
@@ -84,6 +86,8 @@ restart_section:
         jp load_area
 
 game_over:
+        ld a,SND_GAME_OVER
+        call music_restart
         ld a,GAME_OVER_FRAMES
         ld (game_over_t),a
         jp hud_game_over
@@ -210,6 +214,8 @@ simon_hurt:
         ld (hud_dirty),a
         ld a,INVULN_FRAMES
         ld (invuln_t),a
+        ld a,SND_HURT
+        call sfx_play
         xor a
         ld (whip_t),a
         ld (whip_active),a
@@ -290,6 +296,7 @@ player_update:
         ld a,1
         ld (whip_t),a
         call start_throw
+        call whip_sound
 .whip_busy:
         ld a,(on_ground)
         or a
@@ -718,6 +725,20 @@ walk_cycle:
 
 ; A whip action starts: UP held, the dagger, a heart and no dagger flying ->
 ; it throws the dagger instead (one heart)
+; the sound of what the B press did: stopwatch, a throw, or the whip
+whip_sound:
+        ld a,(whip_t)
+        or a
+        ld a,SND_STOPWATCH
+        jr z,.play                      ; (the stopwatch cancels the whip)
+        ld a,(throwing)
+        or a
+        ld a,SND_THROW
+        jr nz,.play
+        ld a,SND_WHIP
+.play:
+        jp sfx_play
+
 start_throw:
         xor a
         ld (throwing),a

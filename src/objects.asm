@@ -460,6 +460,8 @@ candle_whipped:
         ld a,(hl)
         or b
         ld (hl),a
+        ld a,SND_HIT                    ; (struck: candle or enemy)
+        call sfx_play
         ld (ix+0),OBJ_BURST
         ld (ix+4),0
         ld (ix+6),OBJF_BURST
@@ -630,7 +632,17 @@ item_update:
         bit 7,h
         ret nz
 
-        ld a,(ix+5)                     ; collected
+        ld a,(ix+5)                     ; collected: hearts have their own
+        cp ITEM_HEART                   ; sound, the rest share one
+        ld b,SND_HEART
+        jr z,.snd
+        cp ITEM_SMALLHEART
+        jr z,.snd
+        ld b,SND_ITEM
+.snd:
+        ld a,b
+        call sfx_play
+        ld a,(ix+5)
         ld c,5
         cp ITEM_HEART
         jr z,.add_hearts
@@ -761,6 +773,8 @@ zombie_update:
 
         call weapon_hits
         jr nc,.touch
+        ld a,SND_HIT                    ; (struck: candle or enemy)
+        call sfx_play
         ld (ix+0),OBJ_BURST
         ld (ix+4),0
         ld (ix+6),OBJF_BURST
@@ -1008,6 +1022,8 @@ panther_update:
         add hl,de
         ld (ix+1),l
         ld (ix+2),h
+        ld a,SND_HIT                    ; (struck: candle or enemy)
+        call sfx_play
         ld (ix+0),OBJ_BURST
         ld (ix+4),0
         ld (ix+6),OBJF_BURST
@@ -1530,6 +1546,8 @@ fish_spawner:
         ld (ix+0),OBJ_FISH
         ld (ix+4),0
         ld (ix+5),1
+        ld a,SND_SPLASH                 ; it leaps out of the water
+        call sfx_play
         ld (ix+7),KIND_BRAZIER          ; 16x32 box
         ld (ix+8),0xFF
         ld (ix+9),0
@@ -1663,6 +1681,8 @@ fish_update:
         jp nc,zombie_update.touch
         ld a,SCORE_FISH
         call add_score
+        ld a,SND_HIT                    ; (struck: candle or enemy)
+        call sfx_play
         ld (ix+0),OBJ_BURST
         ld (ix+4),0
         ld (ix+6),OBJF_BURST
@@ -1993,6 +2013,8 @@ boss_update:
         ld a,1
         call load_swap_patterns
         pop ix
+        ld a,SND_BOSS
+        call music_restart
         ld hl,(cam_x)                   ; the screen locks: no way back
         ld (cam_min),hl
         ld a,1
@@ -2240,7 +2262,8 @@ orb_update:
         ld (hud_dirty),a
         ld a,STAGE_CLEAR_FRAMES
         ld (clear_t),a
-        ret
+        ld a,SND_CLEAR
+        jp music_restart
 
 ; ---------------------------------------------------------------------------
 ; The dagger (sub-weapon): flies DAGGER_SPEED px per frame the way it was
@@ -2398,6 +2421,8 @@ holy_update:
         ld (ix+3),a
         ld (ix+11),1
         ld (ix+4),0
+        ld a,SND_HOLY
+        call sfx_play
 .burning:
         ld a,1
         ld (holy_fire),a
@@ -2520,6 +2545,8 @@ frozen_update:
         ld a,(hl)
         or a
         call nz,add_score
+        ld a,SND_HIT                    ; (struck: candle or enemy)
+        call sfx_play
         ld (ix+0),OBJ_BURST
         ld (ix+4),0
         ld (ix+6),OBJF_BURST

@@ -38,7 +38,8 @@ Requirements:
 make
 ```
 
-This creates `build/cvmsx.rom` (placeholder art only), a 128 KB **ASCII16** MegaROM.
+This creates `build/cvmsx.rom` (placeholder art and original placeholder sounds
+only), a 256 KB **ASCII16** MegaROM.
 
 To build with the stage converted from your own ROM, put the dump at
 `build/nes/castlevania.nes` (git-ignored) or pass `NES_ROM=`:
@@ -49,6 +50,13 @@ make nes NES_ROM=path/to/castlevania.nes
 
 This creates `build/cvmsx-nes.rom`. It contains converted Konami data, so
 it is for your own use only: don't commit or distribute it.
+
+By default it plays original placeholder sounds. To hear your ROM's own music
+and sound effects, converted to the MSX PSG on your machine:
+
+```bash
+make nes SOUND=rom
+```
 
 ## Running
 

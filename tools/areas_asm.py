@@ -103,6 +103,8 @@ def write(gen_dir, areas):
             'player_sct:     INCBIN "player_sct.bin"         ; 16 colour bytes per sprite',
             "player_bank_end:",
             "        ASSERT player_bank_end <= 0xC000",
-            "        ds 0xC000-$, 0xFF"]
+            "        ds 0xC000-$, 0xFF",
+            "",
+            '        INCLUDE "sound_banks.asm"       ; banks 8-15 (tools/sound_out.py)']
     with open(os.path.join(gen_dir, "areas.asm"), "w") as f:
         f.write("\n".join(out) + "\n")

@@ -139,5 +139,11 @@ sub_src         equ holy_fire+1         ; 2
 sub_len         equ sub_src+2           ; 2
 win_slot        equ sub_len+2           ; window being loaded: first pattern
 swap_boss       equ win_slot+1          ; 1 = the boss's patterns are in the swap window
-RAM_END         equ swap_boss+1
+page2_bank      equ swap_boss+1         ; 1  the ROM bank the game has at 0x8000
+mus_id          equ page2_bank+1        ; 1  music playing (SND_ number, 0xFF none)
+mus_state       equ mus_id+1            ; SS_SIZE  music stream (src/sound.asm)
+sfx_state       equ mus_state+20        ; SS_SIZE  sound effect stream
+snd_frame       equ sfx_state+20        ; 2  frame_count at the last sound step
+psg_buf         equ snd_frame+2         ; 11 PSG registers being written
+RAM_END         equ psg_buf+11
         ASSERT RAM_END < 0xF380
