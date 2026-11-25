@@ -99,5 +99,10 @@ spawner_type    equ keep_player+1       ; 1  type of the spawner being handled
 bat_spawn_t     equ spawner_type+1      ; 1  frames until the next bat
 fish_spawn_t    equ bat_spawn_t+1       ; 1
 fish_pick       equ fish_spawn_t+1      ; 1  last fishman spawner used
-RAM_END         equ fish_pick+1
+boss_hp         equ fish_pick+1         ; 1  shown in the HUD's enemy bar
+boss_inv        equ boss_hp+1           ; 1  frames until it can be hit again
+boss_tx         equ boss_inv+1          ; 2  where it is flying to
+boss_ty         equ boss_tx+2           ; 1
+clear_t         equ boss_ty+1           ; 1  stage clear countdown (0 = playing)
+RAM_END         equ clear_t+1
         ASSERT RAM_END < 0xF380

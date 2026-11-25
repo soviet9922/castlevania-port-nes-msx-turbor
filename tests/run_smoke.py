@@ -62,6 +62,7 @@ def tcl_script(syms, result_file):
     obj_size = 12                       # OBJ_SIZE in src/config.inc
     cand = syms["area_hdr"] + 32        # AH_CANDLES
     cdead = syms["candle_dead"]
+    cur = syms["cur_area"]
     areas = syms.get("AREA_COUNT", 1)
     # with more than one area: walk into the exit (courtyard gate) and on
     hall = f"""
@@ -154,8 +155,28 @@ def tcl_script(syms, result_file):
                        keymatrixdown 8 0x40; fireball_at_simon }}
     after time 52.5 {{ {dump('25_crouched_fireball')}; keymatrixup 8 0x40 }}
     after time 54.0 {{ fireball_at_simon }}
-    after time 55.3 {{ {dump('26_standing_fireball')} }}
-    after time 55.8 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
+    after time 55.3 {{ {dump('26_standing_fireball')}
+                       # the boss: stand on the ledge at the end of stage 3
+                       if {{[peek {cur}] == 4}} {{
+                           poke {px_a} [expr {{711 & 255}}]; poke {px_a + 1} [expr {{711 >> 8}}]
+                           poke {py} 64; poke {py + 1} 0; set ::boss_hunt 1 }} }}
+    after time 63.0 {{ {dump('27_boss')}
+                       set f [open "{result_file}" a]; puts $f "boss_hp [peek {syms["boss_hp"]}] $::boss_awake"; close $f
+                       poke {syms["boss_hp"]} 1 }}
+    after time 70.0 {{ set ::boss_hunt 0; {dump('28_boss_dead')}
+                       # walk onto the orb
+                       for {{set i 0}} {{$i < 8}} {{incr i}} {{
+                           set b [expr {{{objt} + $i*{obj_size}}}]
+                           if {{[peek $b] == 11}} {{
+                               poke {px_a} [peek [expr {{$b+1}}]]; poke {px_a + 1} [peek [expr {{$b+2}}]]
+                               poke {py} [expr {{[peek [expr {{$b+3}}]] - 16}}]; poke {py + 1} 0
+                               set ::orb_seen 1
+                           }}
+                       }} }}
+    after time 70.5 {{ {dump('29_stage_clear')}
+                       set f [open "{result_file}" a]; puts $f "orb $::orb_seen [peek {syms["clear_t"]}]"; close $f }}
+    after time 74.5 {{ {dump('30_restart')} }}
+    after time 75.0 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """ if areas > 1 else f"""
     after time 9.0  {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
@@ -273,6 +294,26 @@ proc panther_test {{}} {{
         }}
     }}
 }}
+# boss fight: whip the boss whenever its body is in the whip's reach
+set ::boss_hunt 0
+set ::boss_awake 0
+set ::orb_seen 0
+proc boss_watch {{}} {{
+    if {{!$::boss_hunt || [peek {hurt}] != 0}} return
+    set px [expr {{[peek {px_a}] + 256*[peek {px_a + 1}]}}]
+    set py [peek {py}]
+    for {{set i 0}} {{$i < 8}} {{incr i}} {{
+        set b [expr {{{objt} + $i*{obj_size}}}]
+        if {{[peek $b] != 10}} continue
+        if {{[peek [expr {{$b+9}}]] != 0}} {{ set ::boss_awake 1 }}
+        set d [expr {{[peek [expr {{$b+1}}]] + 256*[peek [expr {{$b+2}}]] + 24 - $px - 8}}]
+        set dy [expr {{[peek [expr {{$b+3}}]] + 12 - $py - 8}}]
+        if {{$dy < -20 || $dy > 20}} continue
+        if {{$d >= 16 && $d <= 52}} {{ poke {fa} 0; keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
+        if {{$d <= -16 && $d >= -52}} {{ poke {fa} 1; keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
+    }}
+}}
+debug set_watchpoint write_mem {fc} {{}} boss_watch
 proc fireball_at_simon {{}} {{
     set b [expr {{{objt} + 7*{obj_size}}}]
     set x [expr {{[peek {px_a}] + 256*[peek {px_a + 1}] + 40}}]
@@ -327,7 +368,7 @@ proc wait_game {{}} {{
     }}
 }}
 after time 0.1 wait_game
-after time 70 {{ exit }}
+after time 90 {{ exit }}
 """
 
 
@@ -362,6 +403,8 @@ def run():
     panther = None
     bat_seen = None
     fish_seen = None
+    boss_hp = boss_awake = None
+    orb_seen = clear_t = None
     panther_dead = 0
     stair = None
     with open(result_file) as f:
@@ -375,6 +418,12 @@ def run():
                 continue
             if tag == "hud_hearts":
                 hud_hearts = kv[0] if kv else ""
+                continue
+            if tag == "boss_hp":
+                boss_hp, boss_awake = int(kv[0]), int(kv[1])
+                continue
+            if tag == "orb":
+                orb_seen, clear_t = int(kv[0]), int(kv[1])
                 continue
             if tag == "fish":
                 fish_seen = int(kv[0])
@@ -497,6 +546,11 @@ def run():
            ("and hits him when he stands",
             snaps["26_standing_fireball"]["hp"] < snaps["25_crouched_fireball"]["hp"])]
           if "26_standing_fireball" in snaps else []),
+        *([("the stage 3 boss wakes up and the whip hurts it", boss_awake == 1 and boss_hp < 64),
+           ("beaten, it leaves an orb; taking it clears the stage", orb_seen == 1 and clear_t > 0
+            and snaps["29_stage_clear"]["hp"] == 64),
+           ("after the stage clear the game starts again", snaps["30_restart"]["cur_area"] == 0)]
+          if boss_hp is not None and "30_restart" in snaps else []),
         *([("UP at a staircase's foot climbs it to the top",
             (snaps["11_stairs_up"]["px"], snaps["11_stairs_up"]["py"]) == stair["top"]
             and snaps["11_stairs_up"]["stair_state"] == 0 and snaps["11_stairs_up"]["on_ground"] == 1),

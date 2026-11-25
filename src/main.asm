@@ -47,6 +47,8 @@ init:
         ld (hearts),a                   ; the game starts with 5 hearts
         ld a,HP_MAX
         ld (hp),a
+        ld a,BOSS_HP
+        ld (boss_hp),a                  ; the enemy bar starts full
         call install_irq
         xor a
         call load_area                  ; area 0: Stage 1 courtyard
@@ -67,6 +69,23 @@ main_loop:
 vblank_done:                            ; (tests measure VBLANK work up to here)
 
         ; --- game logic ---
+        ld a,(clear_t)                  ; stage clear: everything waits, then
+        or a                            ; the game starts again (the next
+        jr z,.playing                   ; block is not converted yet)
+        dec a
+        ld (clear_t),a
+        jr nz,.cleared
+        ld a,BOSS_HP
+        ld (boss_hp),a
+        ld a,1
+        ld (hud_dirty),a
+        xor a
+        call load_area
+.cleared:
+        call build_sat
+        call write_player_sprites
+        jp main_loop
+.playing:
         call read_input
         call player_update
         call check_area_exit

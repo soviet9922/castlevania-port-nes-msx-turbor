@@ -101,7 +101,14 @@ ENEMY_ZOMBIE    equ 0x01                ; spawner types (NES enemy records)
 ENEMY_BAT       equ 0x02
 BAT_DELAY       equ 192                 ; frames before a bat appears (the NES
                                         ; varies from about 60 to 320)
-CROUCH_TOP      equ 20                  ; top of crouching Simon, for fireballs
+CROUCH_TOP      equ 20
+BOSS_HP         equ 64                  ; the boss's health (the NES's $01A9)
+BOSS_DAMAGE     equ 6                   ; per whip hit (NES: 64 -> 58 -> 52)
+BOSS_INV        equ 16                  ; frames without hits after one
+BOSS_WAKE       equ 72                  ; wakes when Simon is this close (x)
+BOSS_HOVER      equ 160                 ; frames it hovers before a swoop
+BOSS_HIGH_Y     equ 26                  ; box top of the spots it flies back to
+STAGE_CLEAR_FRAMES equ 180              ; after the orb, then the game restarts                  ; top of crouching Simon, for fireballs
 ENEMY_FISH      equ 0x03
 FISH_MAX        equ 2                   ; fishmen about at once
 FISH_DELAY      equ 32                  ; frames before the next one jumps out

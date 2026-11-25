@@ -208,6 +208,13 @@ right under Simon. They use a small state machine like the panther's (in the air
 walking, shooting) and fire fireballs, which are objects of their own. A fireball
 flies at standing height: crouching Simon ducks under it.
 
+The stage 3 boss is placed like a panther (record type `$59` becomes a candle-list
+entry of kind 5). It is a 48x32 object with its own state machine (asleep, flying to
+a spot, hovering, swooping at Simon, burning). Its health is shown in the HUD's
+enemy bar. When it dies it leaves an orb, and taking the orb clears the stage: for
+now the game then starts again from the courtyard, because the next block isn't
+converted yet.
+
 With more than 8 sprites on a line, the VDP drops the extras. The order of
 objects in the sprite list rotates every frame (Simon always comes first), so
 crowded lines flicker instead of losing sprites, as on the NES.

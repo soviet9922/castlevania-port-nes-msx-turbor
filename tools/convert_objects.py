@@ -39,7 +39,8 @@ OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
               "panther_sit_r", "panther_run1_r", "panther_run2_r", "panther_run3_r",
               "bat1_l", "bat2_l", "bat3_l", "bat1_r", "bat2_r", "bat3_r",
               "fish_walk1_l", "fish_walk2_l", "fish_shoot_l",
-              "fish_walk1_r", "fish_walk2_r", "fish_shoot_r", "fireball"]
+              "fish_walk1_r", "fish_walk2_r", "fish_shoot_r", "fireball",
+              "boss_open", "boss_up", "orb"]
 
 # Black panther: 32x16, palette 3, art faces left (recorded in the hall).
 # Run cycle run1 -> run2 -> run3, 7 frames each; the leap shows run2.
@@ -51,6 +52,8 @@ PANTHER_LEFT = {
 }
 
 KIND_BRAZIER, KIND_CANDLE, KIND_PANTHER = 0, 1, 2
+KIND_BOSS = 5
+ENEMY_BOSS = 0x59               # enemy group record type: the stage 3 boss
 ITEM_NONE = 0xFF
 ENEMY_PANTHER = 0x51            # enemy group record type: a waiting black panther
 ITEM_WHIPUP, ITEM_HEART, ITEM_DAGGER, ITEM_SMALLHEART = 0, 1, 2, 3
@@ -91,6 +94,18 @@ for _n, (_top, _bot) in (("fish_walk1", (0xA0, 0xA4)), ("fish_walk2", (0xA0, 0xA
     FRAME_SPRITES[_n + "_r"] = [(_top + 2, 0, 0, 3, 1), (_top, 8, 0, 3, 1),
                                 (_bot + 2, 0, 16, 3, 1), (_bot, 8, 16, 3, 1)]
 FRAME_SPRITES["fireball"] = [(0x68, 4, 0, 3, 0)]
+
+# stage 3 boss (giant bat): 48x32 box, symmetric, palette 3 (recorded in
+# stage 3); wings open (48 px wide) and up (32 px); the orb it leaves
+_BOSS_OPEN = [0xD0, 0xD2, 0xD4]
+FRAME_SPRITES["boss_open"] = (
+    [(t, 8 * i, 0, 3, 0) for i, t in enumerate(_BOSS_OPEN)]
+    + [(t, 40 - 8 * i, 0, 3, 1) for i, t in enumerate(_BOSS_OPEN)]
+    + [(0xD6, 16, 16, 3, 0), (0xD6, 24, 16, 3, 1)])
+FRAME_SPRITES["boss_up"] = [(0xD8, 8, 0, 3, 0), (0xDA, 16, 0, 3, 0),
+                            (0xDA, 24, 0, 3, 1), (0xD8, 32, 0, 3, 1),
+                            (0xDC, 16, 16, 3, 0), (0xDC, 24, 16, 3, 1)]
+FRAME_SPRITES["orb"] = [(0x5C, 0, 0, 3, 0), (0x5C, 8, 0, 3, 1)]
 
 ENEMY_ZOMBIE = 0x01             # spawner types in the enemy group records
 ENEMY_BAT = 0x02
@@ -137,7 +152,13 @@ def candles(rom, stage, section, level_px):
         if group == 0:
             continue
         p = w7(CANDLE_GROUPS[group >> 7] + ((group << 1) & 0xFF))
-        if rom.fixed(p) != ENEMY_PANTHER:
+        kind = rom.fixed(p)
+        if kind == ENEMY_BOSS:
+            # 48x32 box: left = centre - 24, top = NES centre - 8 - 48
+            cx, cy = (chunk - 1) * 64 + rom.fixed(p + 1) - 1, rom.fixed(p + 2)
+            out.append((cx - 24, cy - 56, ITEM_NONE, KIND_BOSS))
+            continue
+        if kind != ENEMY_PANTHER:
             continue
         cx, cy = (chunk - 1) * 64 + rom.fixed(p + 1) - 1, rom.fixed(p + 2)
         if 16 <= cx < level_px - 16:
@@ -166,6 +187,8 @@ def needed_frames(candle_list, spawners):
             need |= {"brazier1", "brazier2"}
         elif kind == KIND_CANDLE:
             need |= {"candle1", "candle2"}
+        elif kind == KIND_BOSS:
+            need |= {"boss_open", "boss_up", "orb"}
         else:
             need |= {n for n in OBJ_FRAMES if n.startswith("panther")}
         if item in ITEM_FRAMES:

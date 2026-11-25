@@ -33,12 +33,15 @@ OBJ_PANTHER     equ 6
 OBJ_BAT         equ 7
 OBJ_FISH        equ 8
 OBJ_FIREBALL    equ 9
+OBJ_BOSS        equ 10
+OBJ_ORB         equ 11
 
 KIND_BRAZIER    equ 0
 KIND_CANDLE     equ 1
 KIND_PANTHER    equ 2                   ; 32x16 box
 KIND_BAT        equ 3                   ; 16x16 box
 KIND_FIREBALL   equ 4                   ; 8x8 box at +4,+4
+KIND_BOSS       equ 5                   ; 48x32 sprite, 32x24 box at +8
 
 ; object frame numbers (OBJ_FRAMES in tools/convert_objects.py)
 OBJF_BRAZIER    equ 0
@@ -53,6 +56,8 @@ OBJF_PANTHER    equ 16                  ; sit, run1-3 facing left, then facing r
 OBJF_BAT        equ 24                  ; wings 1-3 flying left, then flying right
 OBJF_FISH       equ 30                  ; walk 1, walk 2, shoot facing left, then right
 OBJF_FIREBALL   equ 36
+OBJF_BOSS       equ 37                  ; wings open, wings up
+OBJF_ORB        equ 39
 
 ITEM_WHIPUP     equ 0
 ITEM_HEART      equ 1
@@ -213,12 +218,12 @@ spawn_candle:
         call candle_bit
         ld a,(hl)
         and b
-        jr nz,.no                       ; destroyed
+        jp nz,.no                       ; destroyed
         ld de,MAX_CANDLES/8
         add hl,de
         ld a,(hl)
         and b
-        jr nz,.no                       ; already has an object
+        jp nz,.no                       ; already has an object
         push hl                         ; panthers can be switched off (tests)
         ld hl,4                         ; stack: live byte, BC, record
         add hl,sp
@@ -267,6 +272,8 @@ spawn_candle:
         ret z
         cp KIND_PANTHER
         jr z,.panther
+        cp KIND_BOSS
+        jr z,.boss
         ld (ix+0),OBJ_CANDLE
         ld (ix+6),OBJF_CANDLE
         ret
@@ -274,6 +281,16 @@ spawn_candle:
         ld (ix+0),OBJ_PANTHER
         ld (ix+6),OBJF_PANTHER
         ld (ix+5),-1
+        ret
+.boss:
+        ld (ix+0),OBJ_BOSS
+        ld (ix+6),OBJF_BOSS+1
+        ld a,BOSS_HP
+        ld (boss_hp),a
+        xor a
+        ld (boss_inv),a
+        ld a,1
+        ld (hud_dirty),a
         ret
 .no:
         pop bc
@@ -349,6 +366,16 @@ objects_update:
         call fireball_update
         jr .next
 .not_fireball:
+        cp OBJ_BOSS
+        jr nz,.not_boss
+        call boss_update
+        jr .next
+.not_boss:
+        cp OBJ_ORB
+        jr nz,.not_orb
+        call orb_update
+        jr .next
+.not_orb:
         cp OBJ_ITEM
         call z,item_update
 .next:
@@ -1678,6 +1705,308 @@ fireball_update:
         ld (ix+0),OBJ_NONE
         ret
 
+
+; ---------------------------------------------------------------------------
+; The stage 3 boss: a giant bat (measured on the NES). It hangs asleep until
+; Simon comes within BOSS_WAKE px, sinks a little, then repeats: hover for
+; BOSS_HOVER frames, swoop at where Simon is (2 px across per frame, 1 down),
+; fly back to a new spot (3 px every 4 frames). A whip hit takes BOSS_DAMAGE
+; of its BOSS_HP health (then BOSS_INV frames without hits). At 0 it burns
+; for 60 frames and leaves an orb that drops to the floor; touching the orb
+; clears the stage. +9 = state: 0 asleep, 1 flying to (boss_tx, boss_ty),
+; 2 hovering, 3 swooping, 4 burning.
+; ---------------------------------------------------------------------------
+boss_update:
+        inc (ix+4)
+        ld a,(ix+4)                     ; wings: open / up every 8 frames
+        rrca
+        rrca
+        rrca
+        and 1
+        add a,OBJF_BOSS
+        ld (ix+6),a
+        ld a,(boss_inv)
+        or a
+        jr z,.no_inv
+        dec a
+        ld (boss_inv),a
+.no_inv:
+        ld a,(ix+9)
+        or a
+        jr z,.asleep
+        cp 4
+        jp z,.burning
+        cp 2
+        jr z,.hovering
+        cp 3
+        jr z,.swooping
+
+        ; 1: fly to the target, 3 px every 4 frames, y 1 px every 2nd frame
+        ld a,(ix+4)
+        and 3
+        jr z,.fly_y
+        call boss_step_x
+.fly_y:
+        ld a,(ix+4)
+        and 1
+        call z,boss_step_y
+        call boss_at_target
+        jp nz,.hits
+        ld (ix+9),2
+        ld (ix+4),0
+        jp .hits
+
+.asleep:
+        ld (ix+6),OBJF_BOSS+1
+        call boss_simon_dx              ; Simon's centre - boss centre
+        bit 7,h
+        jp nz,.hits
+        ld a,h
+        or a
+        jr nz,.wake
+        ld a,l
+        cp BOSS_WAKE
+        jp c,.hits
+.wake:
+        ld l,(ix+1)                     ; sink a little where it is
+        ld h,(ix+2)
+        ld (boss_tx),hl
+        ld a,(ix+3)
+        add a,22
+        ld (boss_ty),a
+        ld (ix+9),1
+        jp .hits
+
+.hovering:
+        ld a,(ix+4)
+        cp BOSS_HOVER
+        jp c,.hits
+        ld hl,(px)                      ; swoop at Simon: box centre on his
+        ld de,-16                       ; centre, wings at his chest
+        add hl,de
+        ld (boss_tx),hl
+        ld a,(py)
+        sub 4
+        ld (boss_ty),a
+        ld (ix+9),3
+        jp .hits
+
+.swooping:
+        call boss_step_x
+        call boss_step_x
+        call boss_step_y
+        call boss_at_target_x
+        jp nz,.hits
+        ld a,r                          ; then back to a new spot up high
+        ld hl,frame_count
+        xor (hl)
+        and 127
+        add a,24
+        ld e,a
+        ld d,0
+        ld hl,(cam_x)
+        add hl,de
+        ld (boss_tx),hl
+        and 15
+        add a,BOSS_HIGH_Y
+        ld (boss_ty),a
+        ld (ix+9),1
+        jp .hits
+
+.burning:                               ; burst frames on its body
+        ld a,(ix+4)
+        rrca
+        rrca
+        rrca
+        and 3
+        add a,OBJF_BURST
+        ld (ix+6),a
+        ld a,(ix+4)
+        cp 60
+        ret c
+        ld (ix+0),OBJ_ORB               ; the orb, where it burned
+        ld (ix+6),OBJF_ORB
+        ld (ix+7),KIND_BAT
+        ld (ix+4),0
+        ret
+
+.hits:
+        ld a,(whip_active)
+        or a
+        jr z,.touch
+        ld a,(boss_inv)
+        or a
+        jr nz,.touch
+        call whip_hits_object
+        jr nc,.touch
+        ld a,BOSS_INV
+        ld (boss_inv),a
+        ld a,1
+        ld (hud_dirty),a
+        ld a,(boss_hp)
+        sub BOSS_DAMAGE
+        jr z,.dead
+        jr c,.dead
+        ld (boss_hp),a
+        ret
+.dead:
+        xor a
+        ld (boss_hp),a
+        ld hl,kills
+        inc (hl)
+        ld (ix+9),4
+        ld (ix+4),0
+        ld l,(ix+1)                     ; burn at its centre (16x16 bursts)
+        ld h,(ix+2)
+        ld de,16
+        add hl,de
+        ld (ix+1),l
+        ld (ix+2),h
+        ld a,(ix+3)
+        add a,4
+        ld (ix+3),a
+        ld (ix+7),KIND_BAT
+        ret
+.touch:                                 ; body x+8..x+39, y+0..y+23
+        ld a,(ix+9)
+        or a
+        ret z                           ; asleep: harmless
+        ld a,(invuln_t)
+        or a
+        ret nz
+        ld a,(hurt_state)
+        or a
+        ret nz
+        call boss_simon_dx
+        ld de,22                        ; |dx| < 22 (16 + Simon's half body)
+        add hl,de
+        ld a,h
+        or a
+        ret nz
+        ld a,l
+        cp 44
+        ret nc
+        ld a,(py+1)
+        or a
+        ret nz
+        ld a,(ix+3)                     ; boss y..y+23 vs Simon py..py+31
+        add a,23
+        ld hl,py
+        sub (hl)
+        ret c
+        cp 32+23
+        ret nc
+        call boss_simon_dx
+        ld b,1
+        bit 7,h
+        jp z,simon_hurt
+        ld b,-1
+        jp simon_hurt
+
+; HL = Simon's centre - the boss's centre (x)
+boss_simon_dx:
+        ld hl,(px)
+        ld e,(ix+1)
+        ld d,(ix+2)
+        or a
+        sbc hl,de
+        ld de,8-24
+        add hl,de
+        ret
+
+; one pixel across towards boss_tx (none if there)
+boss_step_x:
+        ld hl,(boss_tx)
+        ld e,(ix+1)
+        ld d,(ix+2)
+        or a
+        sbc hl,de
+        ret z
+        ex de,hl
+        jr c,.left
+        inc hl
+        jr .set
+.left:
+        dec hl
+.set:
+        ld (ix+1),l
+        ld (ix+2),h
+        ret
+
+; one pixel up or down towards boss_ty
+boss_step_y:
+        ld a,(boss_ty)
+        cp (ix+3)
+        ret z
+        jr c,.up
+        inc (ix+3)
+        ret
+.up:
+        dec (ix+3)
+        ret
+
+; Z if at (boss_tx, boss_ty)
+boss_at_target:
+        ld a,(boss_ty)
+        cp (ix+3)
+        ret nz
+; Z if at boss_tx
+boss_at_target_x:
+        ld hl,(boss_tx)
+        ld e,(ix+1)
+        ld d,(ix+2)
+        or a
+        sbc hl,de
+        ret
+
+; The orb: falls 2 px per frame to the floor. Touching it clears the stage.
+orb_update:
+        inc (ix+4)
+        ld l,(ix+1)                     ; on the ground? (bottom of its 16x16)
+        ld h,(ix+2)
+        ld de,8
+        add hl,de
+        ld a,(ix+3)
+        add a,16
+        ld e,a
+        ld d,0
+        call solid_at
+        jr c,.landed
+        ld a,(ix+3)
+        add a,2
+        ld (ix+3),a
+.landed:
+        ld hl,(px)                      ; Simon's box over it?
+        ld de,12
+        add hl,de
+        ld e,(ix+1)
+        ld d,(ix+2)
+        or a
+        sbc hl,de
+        ret c                           ; Simon left of it
+        ld de,16+12+1-4
+        or a
+        sbc hl,de
+        ret nc                          ; right of it
+        ld a,(py+1)
+        or a
+        ret nz
+        ld a,(ix+3)
+        add a,15
+        ld hl,py
+        sub (hl)
+        ret c
+        cp 32+15
+        ret nc
+        ld (ix+0),OBJ_NONE
+        ld a,HP_MAX                     ; stage clear: health back
+        ld (hp),a
+        ld a,1
+        ld (hud_dirty),a
+        ld a,STAGE_CLEAR_FRAMES
+        ld (clear_t),a
+        ret
+
 ; -> A = number of zombies alive, Z if none (BC, DE, IX clobbered)
 count_zombies:
         ld ix,obj_table
@@ -1746,6 +2075,19 @@ whip_hits_object:
         inc hl
         jr .box_x
 .not_fireball:
+        cp KIND_BOSS
+        jr nz,.not_boss
+        ld de,31
+        ld bc,23*256 + 0
+        ld l,(ix+1)                     ; box starts 8 px in
+        ld h,(ix+2)
+        ld a,l
+        add a,8
+        ld l,a
+        jr nc,.box_x
+        inc h
+        jr .box_x
+.not_boss:
         cp KIND_CANDLE
         jr nz,.box_ready
         ld bc,15*256 + 8
@@ -1972,6 +2314,7 @@ objects_load_patterns:
 ; ---------------------------------------------------------------------------
 HUD_HEARTS_ADDR equ VRAM_PNT + 32 + 25
 HUD_HP_ADDR     equ VRAM_PNT + 32 + 3
+HUD_EN_ADDR     equ VRAM_PNT + 32 + 14
 
 hud_update:
         ld a,(hud_dirty)
@@ -1995,6 +2338,22 @@ hud_update:
 .full:
         out (VDP_DATA),a
         djnz .bar
+        ld hl,HUD_EN_ADDR               ; enemy (boss) bar
+        call vram_set_write
+        ld a,(boss_hp)
+        ld c,a
+        ld b,8
+.ebar:
+        ld a,c
+        sub 8
+        ld c,a
+        ld a,HUDT_BAR_ENEMY
+        jr nc,.efull
+        ld a,HUDT_BAR_EMPTY
+        ld c,0
+.efull:
+        out (VDP_DATA),a
+        djnz .ebar
         ld hl,HUD_HEARTS_ADDR
         call vram_set_write
         ld a,(hearts)

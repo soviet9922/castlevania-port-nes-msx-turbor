@@ -136,6 +136,25 @@ upper floor (y 96).
 Stage 3's map is the word at `$8008` (`$8202`), so its world column 0 is at `$821A`:
 24 columns (768 px). It has zombie records (type `$01`) and three staircases.
 
+## The stage 3 boss
+
+Recorded with `tools/nes_probe/record_stage3.lua` and `record_boss.lua`. Stage 3's
+end is a ledge at the top right (up its last staircase from a platform reached by
+a jump). The way out only opens after the boss.
+
+- Enemy record type `$59` at chunk 10 (x `$30`, y `$40`): object `$19` hanging at
+  (623, 64), asleep.
+- It wakes when Simon arrives (about 80 px away), sinks 22 px, and then repeats:
+  hover (about 120-190 frames), swoop at Simon (about 2 px across and 1 down per
+  frame), fly back slowly (about 0.75 px per frame) to a new spot high up.
+- Sprites (palette 3, symmetric): wings open `D0 D2 D4` (48 px) over `D6`; wings up
+  `D8 DA` (32 px) over `DC`. They flap.
+- Health in `$01A9`, 64 at the start, shown in the HUD's ENEMY bar. A whip hit
+  (basic whip) takes 6.
+- At 0 it burns (object `$31`, flame tile `91`) for 60 frames and becomes an orb
+  (object `$2F`, tiles `5C` mirrored), which appears after about 110 frames and
+  drops to the floor.
+
 ## Stage 2 enemies
 
 Recorded with enemies on (the probe route on a ROM copy without the hall's zombies).
