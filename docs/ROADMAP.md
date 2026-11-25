@@ -40,7 +40,8 @@
 - [x] Whip: standing, crouching and jumping, NES timing (checked by the test), hit box
 - [x] Metasprites with double-buffered sprite pages (VBLANK work stays under 3 ms)
 - [x] Stairs (climbing pose recorded from the NES; descending reuses it)
-- [ ] Whip upgrades (chain, morning star), sub-weapons, whip poses on stairs
+- [x] Whip upgrades (chain, morning star)
+- [ ] Whip poses on stairs
 - [ ] Sub-weapons
 - [x] Hearts, score, timer, lives, life bar and stage number in the HUD
 - [x] Death (animation, lives, restart at the section), time out, game over
@@ -50,7 +51,8 @@
 - [x] Object system: 8 slots, sprites after Simon's, colours written per frame
 - [x] Braziers from the ROM's placement data; whip destroys them (NES burst timing)
 - [x] Item drops: big heart (+5, shown in the HUD), whip upgrade, dagger; fall and pickup
-- [ ] Use the whip upgrade (chain whip graphics and reach) and the dagger (throwing, heart cost)
+- [x] Use the whip upgrades (chain whip, morning star: graphics and reach) and the dagger (throwing, heart cost)
+- [ ] Morning star flashing; other sub-weapons (axe, holy water, cross, stopwatch)
 - [x] Wall candles and small hearts; candles spawn by camera position like the NES
 - [ ] The NES item drop rule, money bags, enemy drops
 - [x] Zombies from the ROM's enemy groups: spawn at the screen edges, walk across, die to the whip

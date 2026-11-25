@@ -242,6 +242,19 @@ of the section with full health, 5 hearts and a full timer. A fall into a pit co
 the life without the animation. With no lives left it's game over: the HUD says so
 for 3 seconds and a new game starts.
 
+### Whips and the dagger
+
+Simon's whip poses come in three sets, one per whip level (leather, chain,
+morning star), each standing and crouched; the whip level picks the set. The
+morning star's hit box is 16 px longer. The NES flashes the morning star by cycling
+its palette; the port shows it in the whip colour for now.
+
+UP + whip with the dagger and at least one heart throws it instead: one heart, the
+whip's arm poses without a whip, and a dagger object that flies 4 px per frame. The
+whip and the dagger share one hit test (`weapon_hits`), so everything the whip can
+destroy, the dagger can too; a dagger is spent on its first hit. One dagger can fly at
+a time.
+
 ## Areas and ROM banks
 
 Each area (courtyard, entrance hall, …) is one 16 KB ROM bank (area n =

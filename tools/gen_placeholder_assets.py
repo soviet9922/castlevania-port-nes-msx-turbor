@@ -264,6 +264,9 @@ assert len(PLACEHOLDER_JUMP) == 20
 WHIP_SLOT = 14
 POSE_NAMES = ["stand", "walk1", "walk2", "tuck", "whip1", "whip2", "whip3", "whip4",
               "whip1c", "whip2c", "whip3c", "whip4c", "stair", "hurt", "dead1", "dead2"]
+POSE_NAMES += [p + w for p in ("chain_", "star_")
+               for w in ("whip1", "whip2", "whip3", "whip4", "whip1c", "whip2c", "whip3c", "whip4c")]
+POSE_NAMES += ["throw1", "throw2", "throw3", "throw1c", "throw2c", "throw3c"]
 # Placeholder knock-back arc (dy per frame while rising; the fall mirrors it)
 PLACEHOLDER_KNOCKBACK = [-4, -3, -2, -2, -1, -1, -1, 0, -1, 0, 0, 0, 0, 0, 0, 0]
 
@@ -470,6 +473,13 @@ OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
               "zombie_l1", "zombie_l2", "zombie_r1", "zombie_r2",
               "panther_sit_l", "panther_run1_l", "panther_run2_l", "panther_run3_l",
               "panther_sit_r", "panther_run1_r", "panther_run2_r", "panther_run3_r"]
+# frames the placeholder level doesn't use (bats, fishmen, boss: OBJF 24-39)
+# stay empty so that the engine's frame numbers match; then the flying dagger
+OBJ_FRAMES += [f"unused{i}" for i in range(24, 40)] + ["dagger_fly_r", "dagger_fly_l"]
+for _i in range(24, 40):
+    PLACEHOLDER_OBJECTS[f"unused{_i}"] = ["." * 16]
+PLACEHOLDER_OBJECTS["dagger_fly_r"] = _DAGGER
+PLACEHOLDER_OBJECTS["dagger_fly_l"] = [r[::-1] for r in _DAGGER]
 PLACEHOLDER_SPAWNERS = [(900, 128)]     # one zombie spawner near the end
 # placeholder candles: (box x, box y, item id, kind) - see tools/convert_objects.py
 # item ids: 0 whip upgrade, 1 big heart, 2 dagger, 3 small heart; kind 0 brazier, 1 candle
@@ -516,6 +526,23 @@ def placeholder_whip(pose):
     return w
 
 
+def placeholder_chain(pose, extra=0):
+    """Original placeholder for the upgraded whips: a dotted chain (pose 3 is
+    extended; extra = more length for the long whip, which ends in a ball)."""
+    w = placeholder_whip(pose)
+    if pose == 3:
+        w = {}
+        for x in range(16, 44 + extra):
+            if x % 3 != 2:
+                w[(x, 12)] = WHIP_SLOT
+                w[(x, 13)] = WHIP_SLOT
+        if extra:
+            for dx in range(3):
+                for dy in range(3):
+                    w[(43 + extra - dx, 11 + dy)] = WHIP_SLOT
+    return w
+
+
 def player_sprites():
     """-> (SpriteBank, frame names) in the engine's pose order."""
     stand, walk1, walk2, tuck = (_ascii_pixels(f) for f in PLAYER_FRAMES)
@@ -530,6 +557,15 @@ def player_sprites():
     poses.append({(x, y + 8): v for (x, y), v in tuck.items() if y + 8 < 32})  # falling
     # lying: the standing figure turned on its side, head first (32x16)
     poses.append({(31 - y, 16 + x): v for (x, y), v in stand.items() if x < 16})
+    for extra in (0, 16):               # chain whip, long whip
+        for base in (stand, tuck):
+            for n in (1, 2, 3, 4):
+                px = dict(placeholder_chain(n, extra))
+                px.update(base)
+                poses.append(px)
+    for base in (stand, tuck):          # throwing: arm poses without a whip
+        for n in (1, 2, 3):
+            poses.append(dict(base))
     bank = msx_sprites.SpriteBank()
     names = []
     for facing in ("right", "left"):

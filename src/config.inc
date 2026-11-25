@@ -89,13 +89,18 @@ CROUCH_Y        equ 8                   ; crouching pose is drawn this much lowe
 
 ; Player metasprites (see tools/msx_sprites.py)
 PLAYER_SPRITES  equ 12                  ; hardware sprites / pattern slots reserved
-NPOSES          equ 16                  ; poses per facing direction
+NPOSES          equ 38                  ; poses per facing direction
 POSE_WALK1      equ 1
 POSE_TUCK       equ 3
 POSE_STAIR      equ 12                  ; climbing (alternates with walk1)
 POSE_HURT       equ 13                  ; knocked back
 POSE_DEAD1      equ 14                  ; dying: falling down
 POSE_DEAD2      equ 15                  ; dying: lying (32 px wide)
+POSE_CHAIN      equ 16                  ; whip1-4, whip1c-4c with the chain whip
+POSE_STAR       equ 24                  ; ... with the morning star (longer)
+POSE_THROW      equ 32                  ; throw1-3, throw1c-3c (a sub-weapon)
+STAR_EXTRA      equ 16                  ; the morning star reaches 16 px further
+DAGGER_SPEED    equ 4                   ; px per frame (NES)
 
 ; Game rules (measured on the NES: RAM $42/$43 timer, $7FC score, $2A lives)
 TIME_START      equ 0x0300              ; BCD; restarts at a death or stage clear

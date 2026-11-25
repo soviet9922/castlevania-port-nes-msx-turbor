@@ -208,8 +208,24 @@ def tcl_script(syms, result_file):
                        poke {syms["lives"]} 0
                        poke {syms["time_bcd"]} 1; poke {syms["time_bcd"] + 1} 0; poke {syms["time_t"]} 60 }}
     after time 83.6 {{ rules "game_over" }}
-    after time 87.5 {{ rules "new_game" }}
-    after time 88.0 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
+    after time 87.5 {{ rules "new_game"
+                       # the chain whip
+                       poke {syms["whip_level"]} 1; poke {fa} 0; set ::wpn_tag chain; set ::wpn_on 1
+                       keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
+    after time 88.3 {{ wpn_report
+                       # the morning star
+                       poke {syms["whip_level"]} 2; set ::wpn_tag star; set ::wpn_on 1
+                       keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
+    after time 89.1 {{ wpn_report
+                       # the dagger: 60 px left of the first brazier, UP + whip
+                       set bx [expr {{[peek {obj + 1}] + 256*[peek {obj + 2}] - 60}}]
+                       poke {px_a} [expr {{$bx & 255}}]; poke {px_a + 1} [expr {{$bx >> 8}}]
+                       poke {fa} 0; poke {syms["subweapon"]} 1; poke {syms["hearts"]} 10
+                       set ::wpn_tag dagger; set ::wpn_on 1; set ::dagger_xs {{}}
+                       keymatrixdown 8 0x20; keymatrixdown 4 0x04
+                       after time 0.05 {{ keymatrixup 4 0x04 }}; after time 0.3 {{ keymatrixup 8 0x20 }} }}
+    after time 90.3 {{ wpn_report }}
+    after time 90.5 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """ if areas > 1 else f"""
     after time 9.0  {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
@@ -366,6 +382,32 @@ proc rules {{tag}} {{
     puts $f "rules $tag time=[format %02x%02x [peek {syms["time_bcd"] + 1}] [peek {syms["time_bcd"]}]] score=[format %02x%02x%02x [peek {syms["score"] + 2}] [peek {syms["score"] + 1}] [peek {syms["score"]}]] lives=[peek {syms["lives"]}] dying=[peek {syms["dying_t"]}] over=[peek {syms["game_over_t"]}] pose=[peek {pf}] hp=[peek {syms["hp"]}] area=[peek {cur}] hud=[string map {{" " _}} [format %c%c%c%c%c%c [vpeek {0x1800 + 7}] [vpeek {0x1800 + 8}] [vpeek {0x1800 + 9}] [vpeek {0x1800 + 10}] [vpeek {0x1800 + 11}] [vpeek {0x1800 + 12}]]]"
     close $f
 }}
+# weapons: poses shown, whip reach, dagger positions, while ::wpn_on
+set ::wpn_on 0
+set ::wpn_tag ""
+set ::wpn_poses {{}}
+set ::wpn_reach 0
+set ::dagger_xs {{}}
+proc wpn_watch {{}} {{
+    if {{!$::wpn_on}} return
+    set p [peek {pf}]
+    if {{[lsearch $::wpn_poses $p] < 0}} {{ lappend ::wpn_poses $p }}
+    if {{[peek {wa}]}} {{
+        set r [expr {{[peek {syms["whip_x2"]}] + 256*[peek {syms["whip_x2"] + 1}] - [peek {px_a}] - 256*[peek {px_a + 1}]}}]
+        if {{$r > $::wpn_reach}} {{ set ::wpn_reach $r }}
+    }}
+    for {{set i 0}} {{$i < 8}} {{incr i}} {{
+        set b [expr {{{objt} + $i*{obj_size}}}]
+        if {{[peek $b] == 12}} {{ lappend ::dagger_xs [expr {{[peek [expr {{$b+1}}]] + 256*[peek [expr {{$b+2}}]]}}] }}
+    }}
+}}
+debug set_watchpoint write_mem {fc} {{}} wpn_watch
+proc wpn_report {{}} {{
+    set f [open "{result_file}" a]
+    puts $f "weapon $::wpn_tag poses=[join [lsort -integer $::wpn_poses] ,] reach=$::wpn_reach hearts=[peek {syms["hearts"]}] daggers=[join [lrange $::dagger_xs 0 5] ,] obj0=[peek {obj}]"
+    close $f
+    set ::wpn_on 0; set ::wpn_poses {{}}; set ::wpn_reach 0
+}}
 proc count_type {{t}} {{
     set n 0
     for {{set i 0}} {{$i < 8}} {{incr i}} {{ if {{[peek [expr {{{objt} + $i*{obj_size}}}]] == $t}} {{ incr n }} }}
@@ -481,6 +523,8 @@ def run():
     boss_hp = boss_awake = None
     boss_maxy = boss_fire = boss_near_fire = 0
     rules = {}
+    weapons = {}
+    whip_reach = 43                     # WHIP_HIT_X2 in src/config.inc (leather whip)
     orb_seen = clear_t = None
     panther_dead = 0
     stair = None
@@ -495,6 +539,9 @@ def run():
                 continue
             if tag == "hud_hearts":
                 hud_hearts = kv[0] if kv else ""
+                continue
+            if tag == "weapon":
+                weapons[kv[0]] = dict(x.split("=") for x in kv[1:])
                 continue
             if tag == "rules":
                 rules[kv[0]] = dict(x.split("=") for x in kv[1:])
@@ -657,6 +704,20 @@ def run():
             rules["new_game"]["score"] == "000000" and rules["new_game"]["lives"] == "3"
             and rules["new_game"]["area"] == "0")]
           if "new_game" in rules else []),
+        *([("the chain whip has its own poses, the same reach as the leather whip",
+            any(16 <= int(p) < 24 for p in weapons["chain"]["poses"].split(","))
+            and int(weapons["chain"]["reach"]) == whip_reach),
+           ("the morning star has its own poses and reaches 16 px further",
+            any(24 <= int(p) < 32 for p in weapons["star"]["poses"].split(","))
+            and int(weapons["star"]["reach"]) == whip_reach + 16),
+           ("UP + whip throws the dagger: one heart, throwing poses",
+            weapons["dagger"]["hearts"] == "9"
+            and any(32 <= int(p) < 38 for p in weapons["dagger"]["poses"].split(","))),
+           ("the dagger flies at 4 px per frame and breaks a brazier",
+            len(weapons["dagger"]["daggers"].split(",")) >= 3
+            and int(weapons["dagger"]["daggers"].split(",")[1]) - int(weapons["dagger"]["daggers"].split(",")[0]) == 4
+            and weapons["dagger"]["obj0"] in ("2", "3"))]
+          if "dagger" in weapons else []),
         *([("UP at a staircase's foot climbs it to the top",
             (snaps["11_stairs_up"]["px"], snaps["11_stairs_up"]["py"]) == stair["top"]
             and snaps["11_stairs_up"]["stair_state"] == 0 and snaps["11_stairs_up"]["on_ground"] == 1),

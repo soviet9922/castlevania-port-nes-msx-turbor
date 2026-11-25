@@ -112,5 +112,13 @@ time_t          equ time_bcd+2          ; 1  frames to the next timer step
 lives           equ time_t+1            ; 1
 dying_t         equ lives+1             ; 1  death animation countdown (0 = alive)
 game_over_t     equ dying_t+1           ; 1
-RAM_END         equ game_over_t+1
+hit_x1          equ game_over_t+1       ; 8  box tested by whip_hits_object (x1 x2 y1 y2)
+hit_x2          equ hit_x1+2
+hit_y1          equ hit_x1+4
+hit_y2          equ hit_x1+6
+dagger_x1       equ hit_x1+8            ; 8  the flying dagger's box, same layout
+dagger_on       equ dagger_x1+8         ; 1  a dagger is flying
+throwing        equ dagger_on+1         ; 1  this whip action throws the dagger
+thrown          equ throwing+1          ; 1  ... and it has left his hand
+RAM_END         equ thrown+1
         ASSERT RAM_END < 0xF380

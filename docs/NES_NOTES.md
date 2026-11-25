@@ -145,6 +145,20 @@ stage 2 route).
   wide: `6E 5E 4E 3E`), and Simon restarts at the start of the section with one life
   fewer, full health, timer 300, 5 hearts and no sub-weapon.
 
+## Whip levels and the dagger
+
+Recorded with `tools/nes_probe/record_weapons.lua` (RAM pokes in the courtyard).
+
+- The whip's timing is the same at every level; only the whip tiles change.
+  - Chain (level 1): held back `46 48`, raised `58 56`, extended `2C 6C 6C 6A`. It
+    reaches as far as the leather whip.
+  - Morning star (level 2): extended `2C 6C 6C 6C 6C 6A`, 16 px longer. Its
+    palette cycles every frame, so it flashes.
+- Dagger (`$15B` = 8): UP + B costs one heart at once. Simon plays the whip's arm
+  poses without a whip. The dagger (tiles `BD BB`, palette 2, flipped both ways when
+  flying right) leaves his hand about 18 frames after the press, at head height, and
+  flies 4 px per frame until it leaves the screen.
+
 ## Stage 2's way out and stage 3
 
 Recorded with `tools/nes_probe/record_stage2_end.lua`. The corridor's floor is

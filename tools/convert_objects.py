@@ -40,7 +40,7 @@ OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
               "bat1_l", "bat2_l", "bat3_l", "bat1_r", "bat2_r", "bat3_r",
               "fish_walk1_l", "fish_walk2_l", "fish_shoot_l",
               "fish_walk1_r", "fish_walk2_r", "fish_shoot_r", "fireball",
-              "boss_open", "boss_up", "orb"]
+              "boss_open", "boss_up", "orb", "dagger_fly_r", "dagger_fly_l"]
 
 # Black panther: 32x16, palette 3, art faces left (recorded in the hall).
 # Run cycle run1 -> run2 -> run3, 7 frames each; the leap shows run2.
@@ -106,6 +106,11 @@ FRAME_SPRITES["boss_up"] = [(0xD8, 8, 0, 3, 0), (0xDA, 16, 0, 3, 0),
                             (0xDA, 24, 0, 3, 1), (0xD8, 32, 0, 3, 1),
                             (0xDC, 16, 16, 3, 0), (0xDC, 24, 16, 3, 1)]
 FRAME_SPRITES["orb"] = [(0x5C, 0, 0, 3, 0), (0x5C, 8, 0, 3, 1)]
+
+# the thrown dagger (recorded): 16x16, palette 2, flipped both ways flying
+# right (flip: 1 = horizontal, 2 = vertical); flying left, horizontal flip only
+FRAME_SPRITES["dagger_fly_r"] = [(0xBD, 0, 0, 2, 3), (0xBB, 8, 0, 2, 3)]
+FRAME_SPRITES["dagger_fly_l"] = [(0xBB, 0, 0, 2, 2), (0xBD, 8, 0, 2, 2)]
 
 ENEMY_ZOMBIE = 0x01             # spawner types in the enemy group records
 ENEMY_BAT = 0x02
@@ -193,6 +198,7 @@ def needed_frames(candle_list, spawners):
             need |= {n for n in OBJ_FRAMES if n.startswith("panther")}
         if item in ITEM_FRAMES:
             need.add(ITEM_FRAMES[item])
+    need |= {"dagger_fly_r", "dagger_fly_l"}    # it can be carried into any area
     kinds = {k for _, _, k in spawners}
     if ENEMY_ZOMBIE in kinds:
         need |= {n for n in OBJ_FRAMES if n.startswith("zombie")}
@@ -243,9 +249,10 @@ def _build_bank(rom, slot_for_nes, need, alias):
                 px = tile_pixels(chr_ram, table, top + half)
                 for y in range(8):
                     for x in range(8):
-                        v = px[y][7 - x if flip else x]
+                        v = px[y][7 - x if flip & 1 else x]
                         if v:
-                            pixels[(dx + x, dy + half * 8 + y)] = slot_for_nes(pals[pal][v])
+                            yy = 15 - (half * 8 + y) if flip & 2 else half * 8 + y
+                            pixels[(dx + x, dy + yy)] = slot_for_nes(pals[pal][v])
         bank.add_frame(pixels, name)
     return bank
 
@@ -258,9 +265,10 @@ def _frame_pixels(chr_ram, pals, sprites, slot_for_nes):
             px = tile_pixels(chr_ram, table, top + half)
             for y in range(8):
                 for x in range(8):
-                    v = px[y][7 - x if flip else x]
+                    v = px[y][7 - x if flip & 1 else x]
                     if v:
-                        pixels[(dx + x, dy + half * 8 + y)] = slot_for_nes(pals[pal][v])
+                        yy = 15 - (half * 8 + y) if flip & 2 else half * 8 + y
+                        pixels[(dx + x, dy + yy)] = slot_for_nes(pals[pal][v])
     return pixels
 
 

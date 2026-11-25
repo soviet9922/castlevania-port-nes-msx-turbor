@@ -279,6 +279,7 @@ player_update:
         jr z,.intent
         ld a,1
         ld (whip_t),a
+        call start_throw
 .whip_busy:
         ld a,(on_ground)
         or a
@@ -581,7 +582,7 @@ player_animate:
         or a
         ret z
         ld c,a
-        ld b,POSE_WHIP
+        ld b,0                          ; B = phase 0-3
         cp WHIP_P2
         jr c,.whip_pose
         inc b
@@ -594,14 +595,50 @@ player_animate:
         jr .whip_pose
 .whip_strike:
         push bc
+        ld a,(throwing)
+        or a
+        jr nz,.throw_now
         call whip_hitbox
+        jr .struck
+.throw_now:
+        ld a,(thrown)                   ; the dagger leaves his hand once
+        or a
+        call z,throw_dagger
+.struck:
         pop bc
 .whip_pose:
+        ld a,(throwing)                 ; throwing: arm poses without a whip
+        or a
+        jr z,.whip_kind
+        ld a,b
+        cp 3
+        jr c,.throw_phase
+        ld a,2
+.throw_phase:
+        add a,POSE_THROW
+        ld b,a
+        ld e,3                          ; crouched set: +3
+        jr .crouched
+.whip_kind:
+        ld a,(whip_level)               ; leather, chain or morning star
+        or a
+        ld a,POSE_WHIP
+        jr z,.base
+        ld a,(whip_level)
+        dec a
+        ld a,POSE_CHAIN
+        jr z,.base
+        ld a,POSE_STAR
+.base:
+        add a,b
+        ld b,a
+        ld e,4                          ; crouched set: +4
+.crouched:
         ld a,(pframe)
         cp POSE_TUCK                    ; crouching / tucked: crouched set
         ld a,b
         jr nz,.whip_standing
-        add a,4
+        add a,e
 .whip_standing:
         ld (pframe),a
         ld a,c
@@ -636,6 +673,23 @@ whip_hitbox:
         add hl,de
         ld (whip_x2),hl
 .y:
+        ld a,(whip_level)               ; the morning star reaches further
+        cp 2
+        jr c,.reach_ok
+        ld a,(facing)
+        or a
+        ld hl,(whip_x2)
+        ld de,STAR_EXTRA
+        jr z,.longer
+        ld hl,(whip_x1)
+        ld de,-STAR_EXTRA
+        add hl,de
+        ld (whip_x1),hl
+        jr .reach_ok
+.longer:
+        add hl,de
+        ld (whip_x2),hl
+.reach_ok:
         ld a,(pyoff)
         ld e,a
         ld d,0
@@ -651,6 +705,66 @@ whip_hitbox:
 
 walk_cycle:
         db 1, 2, 1, 0
+
+; A whip action starts: UP held, the dagger, a heart and no dagger flying ->
+; it throws the dagger instead (one heart)
+start_throw:
+        xor a
+        ld (throwing),a
+        ld (thrown),a
+        ld a,(subweapon)
+        or a
+        ret z
+        ld a,(dagger_on)
+        or a
+        ret nz
+        ld a,(hearts)
+        or a
+        ret z
+        ld a,(stick)
+        call stick_vertical
+        cp 1
+        ret nz
+        ld hl,hearts
+        dec (hl)
+        ld a,1
+        ld (throwing),a
+        ld (hud_dirty),a
+        ret
+
+; The dagger leaves Simon's hand: an object flying the way he faces
+throw_dagger:
+        ld a,1
+        ld (thrown),a
+        push ix
+        call obj_free_slot
+        jr c,.none
+        ld hl,(px)
+        ld (ix+1),l
+        ld (ix+2),h
+        ld a,(pyoff)
+        ld b,a
+        ld a,(py)
+        add a,b
+        add a,4                         ; at chest height (NES: top row)
+        ld (ix+3),a
+        ld a,(facing)
+        or a
+        ld a,DAGGER_SPEED
+        jr z,.dir
+        neg
+.dir:
+        ld (ix+5),a
+        ld (ix+0),OBJ_DAGGER
+        ld (ix+4),0
+        ld (ix+7),KIND_BAT              ; (16x16; never hit by the whip)
+        ld (ix+8),0xFF
+        ld a,1
+        ld (dagger_on),a
+        call dagger_box
+.none:
+        pop ix
+        ret
 
 ; C = y offset from py; probes x = new_x + probe_off
 side_probe:

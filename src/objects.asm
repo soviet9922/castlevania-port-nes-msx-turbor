@@ -35,6 +35,7 @@ OBJ_FISH        equ 8
 OBJ_FIREBALL    equ 9
 OBJ_BOSS        equ 10
 OBJ_ORB         equ 11
+OBJ_DAGGER      equ 12
 
 KIND_BRAZIER    equ 0
 KIND_CANDLE     equ 1
@@ -58,6 +59,7 @@ OBJF_FISH       equ 30                  ; walk 1, walk 2, shoot facing left, the
 OBJF_FIREBALL   equ 36
 OBJF_BOSS       equ 37                  ; wings open, wings up
 OBJF_ORB        equ 39
+OBJF_DAGGER_FLY equ 40                  ; flying right, flying left
 
 ITEM_WHIPUP     equ 0
 ITEM_HEART      equ 1
@@ -376,6 +378,11 @@ objects_update:
         call orb_update
         jr .next
 .not_orb:
+        cp OBJ_DAGGER
+        jr nz,.not_dagger
+        call dagger_update
+        jr .next
+.not_dagger:
         cp OBJ_ITEM
         call z,item_update
 .next:
@@ -411,10 +418,7 @@ candle_update:
         ld (ix+6),a
 
 candle_whipped:
-        ld a,(whip_active)
-        or a
-        ret z
-        call whip_hits_object
+        call weapon_hits
         ret nc
         ld a,(ix+8)                     ; destroyed for good
         call candle_bit
@@ -646,10 +650,7 @@ zombie_update:
         sbc hl,de
         jr nc,.gone
 
-        ld a,(whip_active)              ; whipped
-        or a
-        jr z,.touch
-        call whip_hits_object
+        call weapon_hits
         jr nc,.touch
         ld (ix+0),OBJ_BURST
         ld (ix+4),0
@@ -879,10 +880,7 @@ panther_update:
         add a,c
         ld (ix+6),a
 
-        ld a,(whip_active)              ; whipped
-        or a
-        jr z,.touch
-        call whip_hits_object
+        call weapon_hits
         jr nc,.touch
         ld a,(ix+8)                     ; dead for good
         cp 0xFF
@@ -1182,10 +1180,7 @@ bat_update:
         sbc hl,de
         jr nc,.gone
 
-        ld a,(whip_active)
-        or a
-        jr z,.touch
-        call whip_hits_object
+        call weapon_hits
         jr nc,.touch
         ld a,SCORE_BAT
         call add_score
@@ -1532,10 +1527,7 @@ fish_update:
         sbc hl,de
         jr nc,.gone
 
-        ld a,(whip_active)
-        or a
-        jp z,zombie_update.touch
-        call whip_hits_object
+        call weapon_hits
         jp nc,zombie_update.touch
         ld a,SCORE_FISH
         call add_score
@@ -1738,10 +1730,7 @@ fireball_update:
         sbc hl,de
         jr nc,.gone
 
-        ld a,(whip_active)
-        or a
-        jr z,.touch
-        call whip_hits_object
+        call weapon_hits
         jr c,.gone
 .touch:                                 ; ball x+4..x+11 vs Simon px+3..px+12
         ld a,(invuln_t)
@@ -1931,13 +1920,10 @@ boss_update:
         ret
 
 .hits:
-        ld a,(whip_active)
-        or a
-        jr z,.touch
         ld a,(boss_inv)
         or a
         jr nz,.touch
-        call whip_hits_object
+        call weapon_hits
         jr nc,.touch
         ld a,BOSS_INV
         ld (boss_inv),a
@@ -2107,6 +2093,65 @@ orb_update:
         ld (clear_t),a
         ret
 
+; ---------------------------------------------------------------------------
+; The dagger (sub-weapon): flies DAGGER_SPEED px per frame the way it was
+; thrown until it leaves the screen or hits something (weapon_hits).
+; ---------------------------------------------------------------------------
+dagger_update:
+        ld a,(dagger_on)
+        or a
+        jr z,.gone                      ; spent on a hit
+        ld a,(ix+5)
+        ld e,a
+        rla
+        sbc a,a
+        ld d,a
+        ld l,(ix+1)
+        ld h,(ix+2)
+        add hl,de
+        ld (ix+1),l
+        ld (ix+2),h
+        ld a,(ix+5)
+        rlca
+        and 1
+        add a,OBJF_DAGGER_FLY
+        ld (ix+6),a
+        ld de,(cam_x)                   ; off the screen: gone
+        or a
+        sbc hl,de
+        ld de,16
+        add hl,de
+        bit 7,h
+        jr nz,.gone
+        ld de,256+16+1
+        or a
+        sbc hl,de
+        jr nc,.gone
+        jp dagger_box
+.gone:
+        xor a
+        ld (dagger_on),a
+        ld (ix+0),OBJ_NONE
+        ret
+
+; the dagger's hit box from its object (IX): x..x+15, y+4..y+11
+dagger_box:
+        ld l,(ix+1)
+        ld h,(ix+2)
+        ld (dagger_x1),hl
+        ld de,15
+        add hl,de
+        ld (dagger_x1+2),hl
+        ld a,(ix+3)
+        add a,4
+        ld l,a
+        ld h,0
+        ld (dagger_x1+4),hl
+        ld de,7
+        add hl,de
+        ld (dagger_x1+6),hl
+        ret
+
 ; -> A = number of zombies alive, Z if none (BC, DE, IX clobbered)
 count_zombies:
         ld ix,obj_table
@@ -2148,6 +2193,33 @@ sway_table:
 ; Carry set if the whip's strike box overlaps the object's box.
 ; Boxes by kind: brazier/zombie 16x32 at y, wall candle 16x16 at y+8,
 ; panther 32x16 at y. (signed 16-bit compares: the whip can be left of x = 0)
+; Carry if the whip (while it can hit) or the flying dagger hits the object at
+; IX. A dagger that hits is spent.
+weapon_hits:
+        ld a,(whip_active)
+        or a
+        jr z,.dagger
+        ld hl,whip_x1
+        call .try
+        ret c
+.dagger:
+        ld a,(dagger_on)
+        or a
+        ret z
+        ld hl,dagger_x1
+        call .try
+        ret nc
+        xor a
+        ld (dagger_on),a
+        scf
+        ret
+.try:
+        ld de,hit_x1
+        ld bc,8
+        ldir
+        jp whip_hits_object
+
+; Carry if the box at hit_x1..hit_y2 overlaps the object at IX
 whip_hits_object:
         ld a,(ix+7)
         ld de,15                        ; DE = box width - 1
@@ -2197,13 +2269,13 @@ whip_hits_object:
 .box_x:
         push hl                         ; box left
         add hl,de
-        ld de,(whip_x1)
+        ld de,(hit_x1)
         or a
         sbc hl,de                       ; box right - whip left
         pop de
         bit 7,h
         jr nz,.no
-        ld hl,(whip_x2)
+        ld hl,(hit_x2)
         or a
         sbc hl,de                       ; whip right - box left
         bit 7,h
@@ -2216,13 +2288,13 @@ whip_hits_object:
         ld e,b
         ld d,0
         add hl,de                       ; box bottom
-        ld de,(whip_y1)
+        ld de,(hit_y1)
         or a
         sbc hl,de                       ; box bottom - whip top
         pop de
         bit 7,h
         jr nz,.no
-        ld hl,(whip_y2)
+        ld hl,(hit_y2)
         or a
         sbc hl,de                       ; whip bottom - box top
         bit 7,h

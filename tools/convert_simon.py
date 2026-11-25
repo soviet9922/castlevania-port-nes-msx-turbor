@@ -41,15 +41,38 @@ WHIP_TOPS = {
               [(0x2E, 20, -1), (0x2E, 28, -1), (0x30, 36, -1)]),
     "whip4": ([(0x2A, 0, 0), (0x28, 8, 0)], []),        # recovery, whip gone
 }
+# Upgraded whips (recorded with RAM $70 = 1 and 2): the same arm poses, other
+# whip tiles. Chain (level 1): same reach. Morning star (level 2): 16 px longer.
+_ARM = {n: [t for t in WHIP_TOPS[n][0]] for n in WHIP_TOPS}
+_ARM["whip3"] = [(0x2A, 0, 0), (0x28, 8, 0)]             # the hand is the whip's
+CHAIN_WHIPS = {
+    "whip1": [(0x46, -16, 0), (0x48, -16, 16)],
+    "whip2": [(0x58, -16, 8), (0x56, -8, 0)],
+    "whip3": [(0x2C, 16, 0), (0x6C, 20, 0), (0x6C, 28, 0), (0x6A, 36, 0)],
+    "whip4": [],
+}
+STAR_WHIPS = dict(CHAIN_WHIPS)
+STAR_WHIPS["whip3"] = [(0x2C, 16, 0)] + [(0x6C, x, 0) for x in (20, 28, 36, 44)] + [(0x6A, 52, 0)]
 for name, (top, whip) in WHIP_TOPS.items():
     POSES[name] = (top + LEGS_STAND, whip)
 for name, (top, whip) in WHIP_TOPS.items():
     POSES[name + "c"] = (top + LEGS_TUCK, whip)          # crouching / in the air
+for prefix, whips in (("chain_", CHAIN_WHIPS), ("star_", STAR_WHIPS)):
+    for name in WHIP_TOPS:
+        POSES[prefix + name] = (_ARM[name] + LEGS_STAND, whips[name])
+        POSES[prefix + name + "c"] = (_ARM[name] + LEGS_TUCK, whips[name])
+# throwing a sub-weapon: the whip's arm poses without a whip (recorded)
+for i, name in enumerate(("whip1", "whip2", "whip3"), 1):
+    POSES[f"throw{i}"] = (_ARM[name] + LEGS_STAND, [])
+    POSES[f"throw{i}c"] = (_ARM[name] + LEGS_TUCK, [])
 
 # engine pose numbers (src/player.asm)
 POSE_ORDER = ["stand", "walk1", "walk2", "tuck",
               "whip1", "whip2", "whip3", "whip4",
               "whip1c", "whip2c", "whip3c", "whip4c", "stair", "hurt", "dead1", "dead2"]
+POSE_ORDER += [p + w for p in ("chain_", "star_")
+               for w in ("whip1", "whip2", "whip3", "whip4", "whip1c", "whip2c", "whip3c", "whip4c")]
+POSE_ORDER += ["throw1", "throw2", "throw3", "throw1c", "throw2c", "throw3c"]
 
 SIMON_PALETTE = 0xCDE9          # fixed bank: $3F $10, then the sprite palettes
 JUMP_TABLE = (6, 0x9B90)        # 20 signed bytes: dy per frame while rising
