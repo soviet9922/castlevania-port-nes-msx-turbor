@@ -159,6 +159,17 @@ Recorded with `tools/nes_probe/record_weapons.lua` (RAM pokes in the courtyard).
   flying right) leaves his hand about 18 frames after the press, at head height, and
   flies 4 px per frame until it leaves the screen.
 
+## Candle items in stage 3
+
+Candle item codes (the byte after `$FF` in a candle record) seen in block 1: `$04`
+big heart, `$08` dagger, `$00` small heart (in stage 3 the first one gave the whip
+upgrade), and `$0A`, `$0B`, `$0D`, `$0E`, `$0F`, `$11`, `$21`, not identified yet.
+
+Whipping stage 3's candles on the NES (a local whipping variant of
+`record_stage3.lua`): the item dropped near world x 160 set the sub-weapon `$15B` to
+15. With that sub-weapon (`tools/nes_probe/record_subweapon.lua`), UP + B costs 5
+hearts and throws nothing: the stopwatch. No axe appeared in stage 3.
+
 ## Stage 2's way out and stage 3
 
 Recorded with `tools/nes_probe/record_stage2_end.lua`. The corridor's floor is
