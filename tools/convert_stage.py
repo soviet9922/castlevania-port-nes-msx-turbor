@@ -287,6 +287,50 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
     return params
 
 
+# HUD sub-weapon icons (recorded: the NES HUD's sub-weapon box), in the order of
+# HUD_ICON_NAMES in gen_placeholder_assets.py: (tile, dx, palette, flip)
+HUD_ICONS = [
+    [(0xBD, 0, 2, 3), (0xBB, 8, 2, 3)],         # dagger
+    [(0xB7, 0, 1, 0), (0xB9, 8, 1, 0)],         # axe
+    [(0xA1, 0, 2, 0), (0xA3, 8, 2, 0)],         # holy water
+    [(0x89, 0, 2, 0), (0x8B, 8, 2, 0)],         # stopwatch
+]
+HUD_ICON_FIRST = 4                  # HUD tile index of the first icon tile
+
+
+def write_hud_icons(rom, out_dir):
+    """Replace the placeholder icon tiles in hud_pgt.bin / hud_ct.bin with the
+    ROM's sub-weapon icons, white on black (the HUD has 2 colours per row)."""
+    chr_ram = rom.chr_ram()
+    pgt = bytearray(open(os.path.join(out_dir, "hud_pgt.bin"), "rb").read())
+    ct = bytearray(open(os.path.join(out_dir, "hud_ct.bin"), "rb").read())
+    for i, sprites in enumerate(HUD_ICONS):
+        lit = set()
+        for tile, dx, _pal, flip in sprites:
+            table, top = (tile & 1) * 0x1000, tile & 0xFE
+            for half in (0, 1):
+                px = cv_rom_tile_pixels(chr_ram, table, top + half)
+                for y in range(8):
+                    for x in range(8):
+                        if px[y][7 - x if flip & 1 else x]:
+                            yy = 15 - (half * 8 + y) if flip & 2 else half * 8 + y
+                            lit.add((dx + x, yy))
+        for q, (tx, ty) in enumerate(((0, 0), (8, 0), (0, 8), (8, 8))):
+            t = HUD_ICON_FIRST + i * 4 + q
+            for y in range(8):
+                pgt[t * 8 + y] = sum(0x80 >> x for x in range(8) if (tx + x, ty + y) in lit)
+                ct[t * 8 + y] = 0xF1
+    with open(os.path.join(out_dir, "hud_pgt.bin"), "wb") as f:
+        f.write(pgt)
+    with open(os.path.join(out_dir, "hud_ct.bin"), "wb") as f:
+        f.write(ct)
+
+
+def cv_rom_tile_pixels(chr_ram, table, n):
+    from cv_rom import tile_pixels
+    return tile_pixels(chr_ram, table, n)
+
+
 def convert(rom_path, out_dir, nes_pal_path=None):
     rom = CastlevaniaROM(rom_path)
     nes_rgb = load_nes_palette(nes_pal_path)
@@ -308,6 +352,7 @@ def convert(rom_path, out_dir, nes_pal_path=None):
         items = {it for _, _, it, _ in convert_objects.candles(rom, a["stage"], a["section"], width)}
         carried |= items & set(convert_objects.SUB_FRAMES)
         areas.append(convert_area(rom, a, i, out_dir, nes_rgb, simon_slots, carried))
+    write_hud_icons(rom, out_dir)
     areas_asm.write(out_dir, areas)
 
 

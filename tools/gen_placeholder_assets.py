@@ -155,6 +155,43 @@ HUD_TILES = [
     ("BAR_ENEMY", ["11111111"] * 2 + ["fffffff1"] * 4 + ["11111111"] * 2),
 ]
 
+# Sub-weapon icons for the HUD (16x16 = 4 tiles each: top left, top right,
+# bottom left, bottom right; white on black). Original placeholder art; the
+# converted build replaces them with the ROM's icons (tools/convert_stage.py).
+HUD_ICON_NAMES = ["DAGGER", "AXE", "HOLY", "WATCH"]
+_ICON_ART = {
+    "DAGGER": ["................"] * 6 + ["..x.............", "..xx.xxxxxxxxx..",
+               "xxxxxxxxxxxxxxx.", "..xx.xxxxxxxxx..", "..x............."] + ["................"] * 5,
+    "AXE": ["................", "..xx........xx..", ".xxxx......xxxx.", ".xxxxx....xxxxx.",
+            ".xxxxxxxxxxxxxx.", ".xxxxxxxxxxxxxx.", ".xxxxx.xx.xxxxx.", ".xxxx..xx..xxxx.",
+            "..xx...xx...xx..", ".......xx.......", ".......xx.......", ".......xx.......",
+            ".......xx.......", ".......xx.......", "......xxxx......", "................"],
+    "HOLY": ["................", "......xxxx......", ".......xx.......", ".......xx.......",
+             "......xxxx......", ".....xxxxxx.....", "....xxxxxxxx....", "...xxxxxxxxxx...",
+             "...xxxxxxxxxx...", "...xxxxxxxxxx...", "....xxxxxxxx....", ".....xxxxxx.....",
+             "................", "................", "................", "................"],
+    "WATCH": ["................", "......xxxx......", ".......xx.......", ".....xxxxxx.....",
+              "...xxx....xxx...", "..xx..........xx", "..x.....x.....x.", ".x......x......x",
+              ".x......xxxx...x", ".x.............x", "..x...........x.", "..xx........xx..",
+              "...xxx....xxx...", ".....xxxxxx.....", "................", "................"],
+}
+
+
+def icon_tiles(art):
+    """16x16 art (x = lit) -> 4 HUD tiles (rows of 8: 'f' lit, '1' black)."""
+    rows = [r.ljust(16, ".")[:16] for r in art]
+    out = []
+    for ty in (0, 8):
+        for tx in (0, 8):
+            out.append(["".join("f" if rows[ty + y][tx + x] != "." else "1" for x in range(8))
+                         for y in range(8)])
+    return out
+
+
+for _name in HUD_ICON_NAMES:
+    for _q, _rows in zip(("TL", "TR", "BL", "BR"), icon_tiles(_ICON_ART[_name])):
+        HUD_TILES.append((f"I_{_name}_{_q}", _rows))
+
 # ---------------------------------------------------------------------------
 # Player sprite: an original placeholder "hunter", 16x32, facing right.
 #   .  transparent
@@ -476,7 +513,8 @@ OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
 # frames the placeholder level doesn't use (bats, fishmen, boss: OBJF 24-39)
 # stay empty so that the engine's frame numbers match; then the flying dagger
 OBJ_FRAMES += [f"unused{i}" for i in range(24, 40)] + ["dagger_fly_r", "dagger_fly_l"]
-OBJ_FRAMES += ["axe1", "axe2", "axe3", "axe4", "bottle", "flame1", "flame2", "flame3"]
+OBJ_FRAMES += ["axe1", "axe2", "axe3", "axe4", "bottle", "flame1", "flame2", "flame3",
+               "holy_item", "watch_item"]
 # original placeholder art: a double-bladed throwing hatchet, turning
 _HATCHET = [
     "................", "..77........77..", ".7777......7777.", ".77777....77777.",
@@ -498,6 +536,12 @@ PLACEHOLDER_OBJECTS["axe2"] = _turn(_HATCHET)
 PLACEHOLDER_OBJECTS["axe3"] = _HATCHET
 PLACEHOLDER_OBJECTS["axe4"] = _turn(_HATCHET)
 PLACEHOLDER_OBJECTS["bottle"] = _FLASK
+PLACEHOLDER_OBJECTS["holy_item"] = _FLASK
+PLACEHOLDER_OBJECTS["watch_item"] = [r.replace("x", "f") for r in [
+    "................", "......xxxx......", ".......xx.......", ".....xxxxxx.....",
+    "...xxx....xxx...", "..xx........xx..", "..x.....x.....x.", ".x......x......x",
+    ".x......xxxx...x", ".x.............x", "..x...........x.", "..xx........xx..",
+    "...xxx....xxx...", ".....xxxxxx.....", "................", "................"]]
 for _n, _b in (("flame1", 0), ("flame2", 1), ("flame3", 2)):
     PLACEHOLDER_OBJECTS[_n] = _BURSTS[_b][8:24]
 for _i in range(24, 40):

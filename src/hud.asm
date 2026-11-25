@@ -14,13 +14,13 @@ hud_draw:
 hud_text:
         ;    0         1         2         3
         ;    01234567890123456789012345678901
-        db  " SCORE-000000 TIME 0300 STAGE01 "
+        db  " SCORE-000000 TIME 0300 STG01   "
 .row1:
         db  " PL"
         ds  8, HUDT_BAR_PLAYER
         db  " EN"
         ds  8, HUDT_BAR_ENEMY
-        db  " ", HUDT_HEART, "-05 P-3 "
+        db  " ", HUDT_HEART, "05 P3   "
 .end:
         ASSERT .row1 - hud_text == 32
         ASSERT .end - hud_text == HUD_ROWS*32

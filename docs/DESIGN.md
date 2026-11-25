@@ -264,6 +264,12 @@ earlier), and folds animation frames together where an area would need more than
 the 52 free sprite patterns (stage 3: two turning frames for the axe, one walking
 frame for the zombies).
 
+The stopwatch (5 hearts) freezes enemies, their fireballs, the spawners and the
+timer for 178 frames, as on the NES. Frozen enemies can still be whipped. A candle
+drops a small heart instead of the sub-weapon Simon already holds, the NES rule. The
+HUD shows the sub-weapon as a 2x2-tile icon at its top right (white on black: the
+HUD has two colours per tile row), converted from the NES HUD's icons.
+
 ## Areas and ROM banks
 
 Each area (courtyard, entrance hall, …) is one 16 KB ROM bank (area n =

@@ -65,6 +65,8 @@ OBJF_DAGGER_FLY equ 40                  ; flying right, flying left
 OBJF_AXE        equ 42                  ; turning: 4 frames (also its pickup)
 OBJF_BOTTLE     equ 46                  ; holy water (also its pickup)
 OBJF_FLAME      equ 47                  ; holy water's fire: 3 frames
+OBJF_HOLY_ITEM  equ 50
+OBJF_WATCH_ITEM equ 51
 
 ITEM_WHIPUP     equ 0
 ITEM_HEART      equ 1
@@ -72,6 +74,7 @@ ITEM_DAGGER     equ 2
 ITEM_SMALLHEART equ 3
 ITEM_AXE        equ 4
 ITEM_HOLYWATER  equ 5
+ITEM_STOPWATCH  equ 6
 ITEM_NONE       equ 0xFF                ; burst of an enemy: nothing drops
 
 SPAWN_LEFT      equ 16                  ; spawn when -16 <= box x - camera <= 272
@@ -334,6 +337,17 @@ objects_update:
         ld b,OBJ_MAX
 .lp:
         push bc
+        ld a,(freeze_t)                 ; stopwatch: enemies and their
+        or a                            ; fireballs stand still
+        jr z,.moving
+        ld a,(ix+0)
+        cp OBJ_ZOMBIE
+        jr c,.moving
+        cp OBJ_FIREBALL+1
+        jr nc,.moving
+        call frozen_update
+        jp .next
+.moving:
         ld a,(ix+0)
         cp OBJ_BRAZIER
         jr nz,.not_brazier
@@ -469,6 +483,13 @@ burst_update:
         ld (ix+0),OBJ_NONE              ; an enemy's burst: gone
         ret
 .item:
+        call item_subweapon             ; the sub-weapon Simon already holds:
+        jr z,.not_held                  ; a heart instead (NES)
+        ld hl,subweapon
+        cp (hl)
+        jr nz,.not_held
+        ld (ix+5),ITEM_SMALLHEART
+.not_held:
         ld (ix+0),OBJ_ITEM              ; the item appears
         ld (ix+4),0
         ld (ix+9),0
@@ -481,8 +502,28 @@ burst_update:
         ld (ix+6),c
         ret
 
+; A = the sub-weapon number of item (IX+5), Z if it is not a sub-weapon
+item_subweapon:
+        ld a,(ix+5)
+        cp ITEM_DAGGER
+        jr z,.dagger
+        sub ITEM_AXE
+        jr c,.none
+        cp 3
+        jr nc,.none
+        add a,2                         ; axe 2, holy water 3, stopwatch 4
+        ret
+.dagger:
+        ld a,1
+        or a
+        ret
+.none:
+        xor a
+        ret
+
 item_frames:
-        db OBJF_WHIPUP, OBJF_HEART, OBJF_DAGGER, OBJF_SMALLHEART, OBJF_AXE, OBJF_BOTTLE
+        db OBJF_WHIPUP, OBJF_HEART, OBJF_DAGGER, OBJF_SMALLHEART, OBJF_AXE, OBJF_HOLY_ITEM
+        db OBJF_WATCH_ITEM
 
 item_update:
         inc (ix+4)
@@ -599,18 +640,11 @@ item_update:
         ld (whip_level),a
         jr .gone
 .not_whip:
-        sub ITEM_DAGGER                 ; sub-weapons: dagger 1, axe 2, holy water 3
-        jr z,.dagger
-        sub ITEM_AXE-ITEM_DAGGER
-        jr c,.gone
-        cp 2
-        jr nc,.gone
-        add a,2
+        call item_subweapon             ; sub-weapons: dagger 1, axe 2, holy water 3,
+        jr z,.gone                      ; stopwatch 4
         ld (subweapon),a
-        jr .gone
-.dagger:
         ld a,1
-        ld (subweapon),a
+        ld (hud_dirty),a
         jr .gone
 .add_hearts:
         ld a,(hearts)
@@ -999,6 +1033,9 @@ simon_dx:
 ; (killed or walked off screen) plus a pause.
 ; ---------------------------------------------------------------------------
 enemies_update:
+        ld a,(freeze_t)                 ; stopwatch: no new enemies either
+        or a
+        ret nz
         ld a,(enemies_off)
         and 1
         ret nz
@@ -2346,6 +2383,28 @@ obj_fall_step:
         ld (ix+10),a
         ret
 
+
+; A frozen enemy (stopwatch): it doesn't move or hurt, but weapons still kill it
+frozen_update:
+        call weapon_hits
+        ret nc
+        ld a,(ix+0)
+        sub OBJ_ZOMBIE
+        ld e,a
+        ld d,0
+        ld hl,frozen_score
+        add hl,de
+        ld a,(hl)
+        or a
+        call nz,add_score
+        ld (ix+0),OBJ_BURST
+        ld (ix+4),0
+        ld (ix+6),OBJF_BURST
+        ld (ix+5),ITEM_NONE
+        ret
+frozen_score:
+        db SCORE_ZOMBIE, SCORE_PANTHER, SCORE_BAT, SCORE_FISH, 0
+
 ; -> A = number of zombies alive, Z if none (BC, DE, IX clobbered)
 count_zombies:
         ld ix,obj_table
@@ -2682,13 +2741,14 @@ objects_load_patterns:
 ; ---------------------------------------------------------------------------
 ; HUD: hearts counter (row 1, columns 25-26), written during VBLANK
 ; ---------------------------------------------------------------------------
-HUD_HEARTS_ADDR equ VRAM_PNT + 32 + 25
+HUD_HEARTS_ADDR equ VRAM_PNT + 32 + 24
 HUD_HP_ADDR     equ VRAM_PNT + 32 + 3
 HUD_EN_ADDR     equ VRAM_PNT + 32 + 14
 HUD_SCORE_ADDR  equ VRAM_PNT + 7
 HUD_TIME_ADDR   equ VRAM_PNT + 19
-HUD_STAGE_ADDR  equ VRAM_PNT + 29
-HUD_LIVES_ADDR  equ VRAM_PNT + 32 + 30
+HUD_STAGE_ADDR  equ VRAM_PNT + 27
+HUD_LIVES_ADDR  equ VRAM_PNT + 32 + 28
+HUD_ICON_ADDR   equ VRAM_PNT + 30
 
 ; A = two BCD digits -> the VDP (write address already set)
 hud_bcd:
@@ -2778,6 +2838,37 @@ hud_update:
         call vram_set_write
         ld a,(lives)
         add a,"0"
+        out (VDP_DATA),a
+        ld a,(subweapon)                ; sub-weapon icon: 2x2 tiles
+        ld b," "
+        ld c,b
+        ld d,b
+        ld e,b
+        or a
+        jr z,.icon
+        dec a
+        add a,a
+        add a,a
+        add a,HUDT_I_DAGGER_TL
+        ld b,a
+        inc a
+        ld c,a
+        inc a
+        ld d,a
+        inc a
+        ld e,a
+.icon:
+        ld hl,HUD_ICON_ADDR
+        call vram_set_write
+        ld a,b
+        out (VDP_DATA),a
+        ld a,c
+        out (VDP_DATA),a
+        ld hl,HUD_ICON_ADDR+32
+        call vram_set_write
+        ld a,d
+        out (VDP_DATA),a
+        ld a,e
         out (VDP_DATA),a
         ld hl,HUD_HEARTS_ADDR
         call vram_set_write

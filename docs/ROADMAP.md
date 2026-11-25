@@ -53,8 +53,9 @@
 - [x] Item drops: big heart (+5, shown in the HUD), whip upgrade, dagger; fall and pickup
 - [x] Use the whip upgrades (chain whip, morning star: graphics and reach) and the dagger (throwing, heart cost)
 - [x] Axe and holy water (from the candles that drop them)
-- [ ] Morning star flashing; the stopwatch and the cross; the NES's item rules
-      (a heart instead of a sub-weapon already held); the sub-weapon in the HUD
+- [x] The stopwatch; the sub-weapon icon in the HUD; a heart instead of a
+      sub-weapon already held
+- [ ] Morning star flashing; the cross; double and triple shots
 - [x] Wall candles and small hearts; candles spawn by camera position like the NES
 - [ ] The NES item drop rule, money bags, enemy drops
 - [x] Zombies from the ROM's enemy groups: spawn at the screen edges, walk across, die to the whip

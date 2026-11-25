@@ -179,6 +179,11 @@ sub-weapon up copies the candle's code into `$15B` (`$E7C9`).
 | `$0D` | axe | stage 3, the candle on the floor right of the stairs | 1 heart |
 | `$0E`/`$0F` | stopwatch | stage 3 (x 192), stage 2 waterway | 5 hearts |
 
+- Stopwatch (`tools/nes_probe/record_stopwatch.lua`): UP + B costs 5 hearts at once,
+  without a throw. The enemies stop for about 178 frames, and the timer stops too.
+- The HUD shows the sub-weapon in its box: 16x16 icons (dagger `BD BB`, holy
+  water `A1 A3`, axe `B7 B9`, stopwatch `89 8B`); the pickups use the same tiles.
+
 (Found with whipping variants of `record_stage3.lua` and a player's videos of the
 NES game; `tools/nes_probe/record_subweapon.lua` throws a given sub-weapon.)
 

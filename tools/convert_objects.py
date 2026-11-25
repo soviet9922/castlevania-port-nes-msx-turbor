@@ -41,7 +41,8 @@ OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
               "fish_walk1_l", "fish_walk2_l", "fish_shoot_l",
               "fish_walk1_r", "fish_walk2_r", "fish_shoot_r", "fireball",
               "boss_open", "boss_up", "orb", "dagger_fly_r", "dagger_fly_l",
-              "axe1", "axe2", "axe3", "axe4", "bottle", "flame1", "flame2", "flame3"]
+              "axe1", "axe2", "axe3", "axe4", "bottle", "flame1", "flame2", "flame3",
+              "holy_item", "watch_item"]
 
 # Black panther: 32x16, palette 3, art faces left (recorded in the hall).
 # Run cycle run1 -> run2 -> run3, 7 frames each; the leap shows run2.
@@ -58,7 +59,7 @@ ENEMY_BOSS = 0x59               # enemy group record type: the stage 3 boss
 ITEM_NONE = 0xFF
 ENEMY_PANTHER = 0x51            # enemy group record type: a waiting black panther
 ITEM_WHIPUP, ITEM_HEART, ITEM_DAGGER, ITEM_SMALLHEART = 0, 1, 2, 3
-ITEM_AXE, ITEM_HOLYWATER = 4, 5
+ITEM_AXE, ITEM_HOLYWATER, ITEM_STOPWATCH = 4, 5, 6
 
 # frame: list of (tile, dx, dy, palette, hflip) relative to the object's
 # 16x32 box top-left (box = brazier: flame on top, bowl below)
@@ -126,6 +127,9 @@ FRAME_SPRITES["bottle"] = [(0x76, 4, 0, 2, 0)]
 FRAME_SPRITES["flame1"] = [(0x91, 4, 0, 3, 0)]
 FRAME_SPRITES["flame2"] = [(0x93, 4, 0, 3, 0)]
 FRAME_SPRITES["flame3"] = [(0x95, 4, 0, 3, 0)]
+# pickups shown like the HUD's icons (recorded): holy water, the stopwatch
+FRAME_SPRITES["holy_item"] = [(0xA1, 0, 0, 2, 0), (0xA3, 8, 0, 2, 0)]
+FRAME_SPRITES["watch_item"] = [(0x89, 0, 0, 2, 0), (0x8B, 8, 0, 2, 0)]
 
 ENEMY_ZOMBIE = 0x01             # spawner types in the enemy group records
 ENEMY_BAT = 0x02
@@ -164,6 +168,8 @@ def candles(rom, stage, section, level_px):
             item = ITEM_AXE
         elif code == 0x0B:              # holy water (NES: item $44)
             item = ITEM_HOLYWATER
+        elif code in (0x0E, 0x0F):      # the stopwatch (NES: items $45, $46)
+            item = ITEM_STOPWATCH
         elif code == 0 and kind == KIND_BRAZIER:
             item = ITEM_WHIPUP
         else:
@@ -196,14 +202,14 @@ MAX_OBJ_PATTERNS = 64 - 12
 
 ITEM_FRAMES = {ITEM_WHIPUP: "whipup", ITEM_HEART: "heart",
                ITEM_DAGGER: "dagger", ITEM_SMALLHEART: "smallheart",
-               ITEM_AXE: "axe1", ITEM_HOLYWATER: "bottle"}
+               ITEM_AXE: "axe1", ITEM_HOLYWATER: "holy_item", ITEM_STOPWATCH: "watch_item"}
 
 # Frames to fold into another one when an area is over the pattern budget,
 # least visible loss first.
 FOLDS = [("panther_run3_l", "panther_run1_l"), ("panther_run3_r", "panther_run1_r"),
          ("panther_sit_r", "panther_sit_l"), ("flame3", "flame1"), ("flame2", "flame1"),
          ("axe3", "axe1"), ("axe4", "axe2"), ("burst4", "burst3"), ("burst2", "burst1"),
-         ("zombie_l2", "zombie_l1"), ("zombie_r2", "zombie_r1")]
+         ("candle2", "candle1"), ("zombie_l2", "zombie_l1"), ("zombie_r2", "zombie_r1")]
 
 
 SUB_FRAMES = {ITEM_DAGGER: {"dagger_fly_r", "dagger_fly_l"},

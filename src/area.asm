@@ -55,6 +55,8 @@ load_area:
         ld (cam_x),hl
         xor a
         ld (cam_lock),a
+        ld (freeze_t),a
+        ld (dagger_on),a
         call objects_reset
         ld a,(keep_player)
         or a

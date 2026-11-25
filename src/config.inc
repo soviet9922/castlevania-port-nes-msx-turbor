@@ -106,6 +106,8 @@ AXE_GRAVITY     equ 4                   ; 1/16 px per frame per frame (NES)
 HOLY_VY0        equ -20                 ; the bottle's low lob (NES)
 HOLY_GRAVITY    equ 2
 HOLY_BURN       equ 72                  ; frames the fire burns (NES: about 70)
+STOPWATCH_COST  equ 5                   ; hearts (NES)
+STOPWATCH_FRAMES equ 178                ; enemies stand still (NES)
 
 ; Game rules (measured on the NES: RAM $42/$43 timer, $7FC score, $2A lives)
 TIME_START      equ 0x0300              ; BCD; restarts at a death or stage clear

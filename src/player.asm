@@ -123,6 +123,13 @@ restart_section_vars:
 
 ; The timer: one step every TIME_TICK frames; at 0 Simon dies.
 timer_tick:
+        ld a,(freeze_t)                 ; the stopwatch stops the timer too
+        or a
+        jr z,.running
+        dec a
+        ld (freeze_t),a
+        ret
+.running:
         ld hl,time_t
         inc (hl)
         ld a,(hl)
@@ -725,6 +732,9 @@ start_throw:
         call stick_vertical
         cp 1
         ret nz
+        ld a,(subweapon)
+        cp 4
+        jr z,.stopwatch
         ld hl,hearts
         dec (hl)
         ld a,1
@@ -732,6 +742,22 @@ start_throw:
         ld (hud_dirty),a
         ld a,(subweapon)
         ld (sub_kind),a
+        ret
+.stopwatch:                             ; 5 hearts: enemies freeze (no throw)
+        ld a,(freeze_t)
+        or a
+        ret nz
+        ld a,(hearts)
+        cp STOPWATCH_COST
+        ret c
+        sub STOPWATCH_COST
+        ld (hearts),a
+        ld a,STOPWATCH_FRAMES
+        ld (freeze_t),a
+        ld a,1
+        ld (hud_dirty),a
+        xor a
+        ld (whip_t),a                   ; no whip action either
         ret
 
 ; The dagger leaves Simon's hand: an object flying the way he faces

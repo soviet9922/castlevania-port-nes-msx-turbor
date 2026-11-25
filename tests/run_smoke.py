@@ -238,8 +238,35 @@ def tcl_script(syms, result_file):
                        set ::wpn_tag holy; set ::wpn_on 1; set ::sub_track {{}}; set ::brazier_x [peek {obj + 1 + obj_size}]
                        keymatrixdown 8 0x20; keymatrixdown 4 0x04
                        after time 0.05 {{ keymatrixup 4 0x04 }}; after time 0.3 {{ keymatrixup 8 0x20 }} }}
-    after time 94.0 {{ wpn_report }}
-    after time 94.2 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
+    after time 94.0 {{ wpn_report
+                       # the stopwatch: on the hall's floor with zombies about
+                       poke {syms["subweapon"]} 4; poke {syms["hearts"]} 10 }}
+    after time 94.1 {{ sub_report "watch_hud" }}
+    after time 94.2 {{ # a zombie in front of Simon, enemies on; UP + whip
+                       poke {eoff} 2
+                       for {{set i 0}} {{$i < 8}} {{incr i}} {{
+                           set b [expr {{{objt} + $i*{obj_size}}}]
+                           if {{[peek $b] == 0}} {{
+                               set x [expr {{[peek {px_a}] + 256*[peek {px_a + 1}] + 90}}]
+                               poke [expr {{$b+1}}] [expr {{$x & 255}}]; poke [expr {{$b+2}}] [expr {{$x >> 8}}]
+                               poke [expr {{$b+3}}] [peek {py}]; poke [expr {{$b+4}}] 1; poke [expr {{$b+5}}] 255
+                               poke [expr {{$b+7}}] 0; poke [expr {{$b+8}}] 255; poke $b 5
+                               set ::zslot $b
+                               break
+                           }}
+                       }}
+                       keymatrixdown 8 0x20; keymatrixdown 4 0x04
+                       after time 0.05 {{ keymatrixup 4 0x04 }}; after time 0.2 {{ keymatrixup 8 0x20 }} }}
+    after time 94.4 {{ sub_report "watch_start" }}
+    after time 96.0 {{ sub_report "watch_frozen"; poke {eoff} 3; {dump('35_stopwatch')} }}
+    after time 98.0 {{ sub_report "watch_end"
+                       # the drop rule: an axe item while Simon holds the axe -> a heart
+                       poke {syms["subweapon"]} 2
+                       set b [expr {{{objt} + 7*{obj_size}}}]
+                       poke [expr {{$b+1}}] 100; poke [expr {{$b+2}}] 0; poke [expr {{$b+3}}] 60
+                       poke [expr {{$b+4}}] 0; poke [expr {{$b+5}}] 4; poke [expr {{$b+6}}] 2; poke $b 2 }}
+    after time 98.6 {{ sub_report "drop_rule" }}
+    after time 98.8 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """ if areas > 1 else f"""
     after time 9.0  {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
@@ -269,7 +296,7 @@ proc play {{}} {{
     after time 8.6  {{ keymatrixup 8 0x80 }}
     after time 8.8  {{ {dump('08_item_collected')}
                        set f [open "{result_file}" a]
-                       puts $f "hud_hearts [format %c [vpeek {0x1800 + 32 + 25}]][format %c [vpeek {0x1800 + 32 + 26}]]"
+                       puts $f "hud_hearts [format %c [vpeek {0x1800 + 32 + 24}]][format %c [vpeek {0x1800 + 32 + 25}]]"
                        close $f }}
 {hall}
 }}
@@ -428,6 +455,14 @@ proc wpn_report {{}} {{
     close $f
     set ::wpn_on 0; set ::wpn_poses {{}}; set ::wpn_reach 0; set ::sub_track {{}}
 }}
+set ::zslot 0
+proc sub_report {{tag}} {{
+    set z 0
+    if {{$::zslot}} {{ set z [expr {{[peek [expr {{$::zslot+1}}]] + 256*[peek [expr {{$::zslot+2}}]]}}] }}
+    set f [open "{result_file}" a]
+    puts $f "sub $tag hearts=[peek {syms["hearts"]}] freeze=[peek {syms["freeze_t"]}] time=[format %02x%02x [peek {syms["time_bcd"] + 1}] [peek {syms["time_bcd"]}]] zx=$z ztype=[expr {{$::zslot ? [peek $::zslot] : 0}}] icon=[vpeek {0x1800 + 30}],[vpeek {0x1800 + 31}],[vpeek {0x1800 + 62}],[vpeek {0x1800 + 63}] item7=[peek {objt + 7*obj_size + 5}]"
+    close $f
+}}
 proc count_type {{t}} {{
     set n 0
     for {{set i 0}} {{$i < 8}} {{incr i}} {{ if {{[peek [expr {{{objt} + $i*{obj_size}}}]] == $t}} {{ incr n }} }}
@@ -505,7 +540,7 @@ proc wait_game {{}} {{
     }}
 }}
 after time 0.1 wait_game
-after time 110 {{ exit }}
+after time 120 {{ exit }}
 """
 
 
@@ -555,6 +590,7 @@ def run():
     boss_maxy = boss_fire = boss_near_fire = 0
     rules = {}
     weapons = {}
+    subs = {}
     whip_reach = 43                     # WHIP_HIT_X2 in src/config.inc (leather whip)
     orb_seen = clear_t = None
     panther_dead = 0
@@ -570,6 +606,9 @@ def run():
                 continue
             if tag == "hud_hearts":
                 hud_hearts = kv[0] if kv else ""
+                continue
+            if tag == "sub":
+                subs[kv[0]] = dict(x.split("=") for x in kv[1:])
                 continue
             if tag == "weapon":
                 weapons[kv[0]] = dict(x.split("=") for x in kv[1:])
@@ -755,6 +794,18 @@ def run():
             weapons["holy"]["hearts"] == "9" and ":1" in weapons["holy"]["track"]
             and weapons["holy"]["obj1"] in ("0", "2", "3"))]
           if "holy" in weapons else []),
+        *([("the HUD shows the sub-weapon's icon (stopwatch)",
+            subs["watch_start"]["icon"] == f"{syms['HUDT_I_WATCH_TL']},{syms['HUDT_I_WATCH_TR']},"
+                                         f"{syms['HUDT_I_WATCH_BL']},{syms['HUDT_I_WATCH_BR']}"),
+           ("the stopwatch costs 5 hearts and freezes enemies and the timer",
+            subs["watch_start"]["hearts"] == "5" and int(subs["watch_start"]["freeze"]) > 0
+            and subs["watch_frozen"]["zx"] == subs["watch_start"]["zx"]
+            and subs["watch_frozen"]["time"] == subs["watch_start"]["time"]),
+           ("after about 3 seconds they move again",
+            subs["watch_end"]["freeze"] == "0" and subs["watch_end"]["zx"] != subs["watch_frozen"]["zx"]),
+           ("a candle drops a heart instead of the sub-weapon Simon holds (NES)",
+            subs["drop_rule"]["item7"] == "3")]
+          if "drop_rule" in subs else []),
         *([("UP at a staircase's foot climbs it to the top",
             (snaps["11_stairs_up"]["px"], snaps["11_stairs_up"]["py"]) == stair["top"]
             and snaps["11_stairs_up"]["stair_state"] == 0 and snaps["11_stairs_up"]["on_ground"] == 1),
