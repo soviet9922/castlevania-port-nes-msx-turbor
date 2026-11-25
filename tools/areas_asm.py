@@ -13,6 +13,8 @@ The engine maps an area's bank at 0x8000 and copies its header to RAM
   +46 stairs (count, then 7 bytes each: foot x, foot y, top x, top y, dir)
   +48 enemy spawners (count, then 4 bytes each: x, y, type)
   +50 exit only when Simon's y <= this (0xFF = at any height)
+  +51 area below, +52 area above (sections joined by stairs; 0xFF = none)
+  +53 area to restart in after a fall or death
 """
 
 import os
@@ -43,7 +45,8 @@ def write(gen_dir, areas):
             f"        dw {exit_x if exit_x is not None else 0xFFFF}",
             f"        db {a.get('next_area', 0)}, 0x{a['blank']:02X}",
             f"        dw {p}stairs, {p}enemies",
-            f"        db {a.get('exit_y', 0xFF)}",
+            f"        db {a.get('exit_y', 0xFF)}, {a.get('below', 0xFF)}, {a.get('above', 0xFF)}, "
+            f"{a.get('respawn', i)}",
             f'{p}palette: INCBIN "{d}/palette.bin"',
         ]
         for b in range(3):

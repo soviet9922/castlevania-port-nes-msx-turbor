@@ -94,5 +94,6 @@ spr_sat_ptr     equ sct_cache+2*MAX_SPRITES ; 2  next sat_buf entry (objects_dra
 
 sat_buf         equ spr_sat_ptr+2       ; (MAX_SPRITES+1)*4
 
-RAM_END         equ sat_buf+(MAX_SPRITES+1)*4
+keep_player     equ sat_buf+(MAX_SPRITES+1)*4 ; 1  load_area keeps Simon (section change)
+RAM_END         equ keep_player+1
         ASSERT RAM_END < 0xF380

@@ -8,7 +8,7 @@ MSX turbo R, written in Z80/R800 assembly.
 **Status: milestones 1-3 in progress.** The engine scrolls a level with a
 fixed HUD at 60 fps and has a controllable 3-colour character. From your
 own NES ROM, the build converts **Stage 1: the courtyard and, through the
-castle gate, the entrance hall, and through its door the first part of stage 2**: graphics, layout, palette and the NES's own
+castle gate, the entrance hall, and through its door stage 2's corridor and the waterway below it**: graphics, layout, palette and the NES's own
 collision rule. **Simon** is converted too:
 his graphics, walk animation, jump arc and whip (timing identical to the NES,
 frame by frame). **Braziers and wall candles** are placed from the ROM's data. Whip them

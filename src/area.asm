@@ -8,7 +8,8 @@
 ; to area_hdr so the engine can use its values without banking.
 ; ---------------------------------------------------------------------------
 
-; A = area number. Loads everything and restarts the player at the start.
+; A = area number. Loads everything and restarts the player at the start
+; (or, with keep_player set, keeps him where he is: section change).
 load_area:
         ld (cur_area),a
         inc a
@@ -53,7 +54,14 @@ load_area:
         ld hl,0
         ld (cam_x),hl
         call objects_reset
+        ld a,(keep_player)
+        or a
+        jr nz,.keep
         call player_reset
+        jr .placed
+.keep:
+        call camera_update              ; camera around Simon's position
+.placed:
         call full_redraw
         ld a,0xFF
         ld (loaded_frames),a            ; Simon's patterns must be streamed again
@@ -132,3 +140,99 @@ check_area_exit:
 .go:
         ld a,(area_hdr+AH_NEXT)
         jp load_area
+
+; ---------------------------------------------------------------------------
+; Sections joined by stairs. Called after each vertical step on the stairs:
+; past the bottom of the playfield (going down) or its top (going up), the
+; area below or above is loaded, Simon keeps his x, his y moves by
+; SECTION_DY, and he stays on the same staircase, which continues there.
+; ---------------------------------------------------------------------------
+section_link:
+        ld a,(stair_going)
+        or a
+        jp m,.down
+        ld a,(area_hdr+AH_ABOVE)
+        cp 0xFF
+        ret z
+        ld b,a
+        ld hl,(py)
+        ld a,h
+        inc a
+        ret nz                          ; py >= 0
+        ld a,l
+        cp (SECTION_UP_Y & 0xFF)+1
+        ret nc                          ; py > SECTION_UP_Y
+        ld de,SECTION_DY
+        jr .switch
+.down:
+        ld a,(area_hdr+AH_BELOW)
+        cp 0xFF
+        ret z
+        ld b,a
+        ld hl,(py)
+        ld a,h
+        or a
+        ret nz
+        ld a,l
+        cp SECTION_DOWN_Y
+        ret c
+        ld de,-SECTION_DY
+.switch:
+        add hl,de
+        ld (py),hl
+        ld a,1
+        ld (keep_player),a
+        ld a,b
+        call load_area
+        xor a
+        ld (keep_player),a
+        ; find the staircase that continues here: the one whose x range has Simon
+        ld hl,(area_hdr+AH_STAIRS)
+        ld a,(hl)
+        inc hl
+        or a
+        jr z,.lost
+        ld b,a
+.find:
+        push hl
+        pop ix
+        ld e,(ix+ST_FOOTX)
+        ld d,(ix+ST_FOOTX+1)
+        ld l,(ix+ST_TOPX)
+        ld h,(ix+ST_TOPX+1)
+        ex de,hl                        ; HL = foot x, DE = top x
+        or a
+        sbc hl,de
+        jr c,.ordered
+        add hl,de                       ; foot x > top x: swap
+        ex de,hl
+        jr .range
+.ordered:
+        add hl,de                       ; HL = smaller x, DE = larger x
+.range:
+        push de
+        ld de,(px)
+        ex de,hl                        ; HL = px, DE = smaller x
+        or a
+        sbc hl,de
+        pop de
+        jr c,.next                      ; px < smaller x
+        ld hl,(px)
+        ex de,hl
+        or a
+        sbc hl,de
+        jr c,.next                      ; larger x < px
+        ld (stair_ptr),ix
+        ld a,(ix+ST_DIR)
+        ld (stair_dir),a
+        ret
+.next:
+        ld de,ST_SIZE
+        add ix,de
+        push ix
+        pop hl
+        djnz .find
+.lost:
+        xor a                           ; no staircase here (bad data): drop him
+        ld (stair_state),a
+        ret

@@ -24,7 +24,8 @@
 - [x] Stairs from the ROM's stair table: get on/off, climb and descend, whip on stairs
 - [x] The exit door at the end of the hall (upper floor) into stage 2's first section
 - [ ] The door's opening animation and camera scroll; STAGE 02 in the HUD
-- [ ] Sections joined by stairs (stage 2's stairs down to the section below)
+- [x] Sections joined by stairs: stage 2's stairs down to the waterway and back up
+- [ ] Stage 2: the rest of the route (water, the far side of section 1, the exit)
 - [ ] Palette selection table, stages 2 and up
 
 ## Milestone 2: Simon (in progress)

@@ -90,8 +90,22 @@ def tcl_script(syms, result_file):
                            poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
                            poke {py} [expr {{[peek {exit_x + 8}] - 8}}]; poke {py + 1} 0
                            keymatrixdown 8 0x80 }} }}
-    after time 29.5 {{ keymatrixup 8 0x80; {dump('18_through_the_door')} }}
-    after time 31.0 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
+    after time 29.5 {{ keymatrixup 8 0x80; {dump('18_through_the_door')}
+                       # a staircase that leads to the section below (foot off the playfield)
+                       set sp [expr {{[peek {stairs}] + 256*[peek {stairs + 1}]}}]
+                       for {{set i 0}} {{$i < [peek $sp]}} {{incr i}} {{
+                           set r [expr {{$sp + 1 + 7*$i}}]
+                           if {{[peek [expr {{$r+2}}]] > 176 && [peek [expr {{$r+5}}]] < 176}} {{
+                               set x [expr {{[peek [expr {{$r+3}}]] + 256*[peek [expr {{$r+4}}]] + 4}}]
+                               poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
+                               poke {py} [peek [expr {{$r+5}}]]; poke {py + 1} 0
+                               keymatrixdown 8 0x40
+                               break
+                           }}
+                       }} }}
+    after time 31.5 {{ keymatrixup 8 0x40; {dump('19_section_below')}; keymatrixdown 8 0x20 }}
+    after time 33.5 {{ keymatrixup 8 0x20; {dump('20_section_above')} }}
+    after time 34.0 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """ if areas > 1 else f"""
     after time 9.0  {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
@@ -251,7 +265,7 @@ proc wait_game {{}} {{
     }}
 }}
 after time 0.1 wait_game
-after time 60 {{ exit }}
+after time 70 {{ exit }}
 """
 
 
@@ -383,6 +397,16 @@ def run():
             snaps["18_through_the_door"]["cur_area"] == 2
             and snaps["18_through_the_door"]["on_ground"] == 1)]
           if syms.get("AREA_COUNT", 1) > 2 and "18_through_the_door" in snaps else []),
+        *([("down the stairs into the section below, to the staircase's foot",
+            snaps["19_section_below"]["cur_area"] == 3
+            and snaps["19_section_below"]["stair_state"] == 0
+            and snaps["19_section_below"]["on_ground"] == 1
+            and 0 <= snaps["19_section_below"]["py"] < 144),
+           ("and back up into the section above, to the top",
+            snaps["20_section_above"]["cur_area"] == 2
+            and snaps["20_section_above"]["stair_state"] == 0
+            and snaps["20_section_above"]["on_ground"] == 1)]
+          if syms.get("AREA_COUNT", 1) > 3 and "19_section_below" in snaps else []),
         *([("UP at a staircase's foot climbs it to the top",
             (snaps["11_stairs_up"]["px"], snaps["11_stairs_up"]["py"]) == stair["top"]
             and snaps["11_stairs_up"]["stair_state"] == 0 and snaps["11_stairs_up"]["on_ground"] == 1),

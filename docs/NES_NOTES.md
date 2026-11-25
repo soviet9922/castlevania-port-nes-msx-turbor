@@ -109,6 +109,20 @@ Simon starts at world x 48 on the upper floor (y 96), with the camera at 0.
   (`$C7`, y `$C0`) with no foot in the same section. These are the stairs down to
   the section below. Ends are paired only when they form a foot and a top.
 
+## Sections joined by stairs
+
+Recorded with `tools/nes_probe/record_stage2.lua`. Stage 2 section 1 has two
+staircase tops at y `$C0` with no foot in that section, and section 0 has two feet
+with no top. Going down the left one, Simon's x keeps counting and his y goes from
+207 (section 1) to 49 (section 0) in one frame: `$46` changes, and the screen is
+redrawn around him (the camera x briefly counts up from -128 while it does). So
+the sections are not scrolled vertically: they share the x axis, and y differs by
+158. Section 0's map is the word at `$8004`+0 (`$8292`), so its world column 0 is
+at `$82AA`: 16 columns (512 px), the waterway. It matched the PPU nametables
+exactly, and it uses the same palette.
+
+Falling into the water kills Simon, and the game restarts him at section 1's start.
+
 ## Palettes
 
 Stored in the fixed bank as `$3F $00 <16 colour bytes> $FE` strings.

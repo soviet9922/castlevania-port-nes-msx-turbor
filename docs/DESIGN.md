@@ -218,6 +218,14 @@ map, collision, candle list, object sprites, start position, and an exit
 is copied to RAM. Code and data shared by all areas (Simon's sprites, HUD)
 live in bank 0, at 0x4000.
 
+A stage's sections (for example stage 2's corridor and the waterway under it) are
+separate areas. Their header names the area below and the area above. A staircase
+whose other end is in the next section is converted with a made-up end beyond the
+playfield edge. When Simon walks down past the bottom of the playfield, or up past
+its top, the next area is loaded around him. His x stays the same and his y moves
+by 158 px, as measured on the NES, and he carries on along the same staircase
+there. Each area also names the area to restart in after a fall.
+
 `load_area` turns the display off, loads the palette, tiles and object
 patterns, resets objects and the player, redraws the screen and turns
 the display back on. Walking past the area's exit x loads the next area.

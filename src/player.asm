@@ -37,7 +37,7 @@ respawn:
         ld (hp),a
         ld a,1
         ld (hud_dirty),a
-        ld a,(cur_area)
+        ld a,(area_hdr+AH_RESPAWN)
         jp load_area
 
 ; Main loop: health ran out -> restart the area (lives are not counted yet)
@@ -871,6 +871,10 @@ stairs_update:
         ld hl,(py)
         add hl,de
         ld (py),hl
+        call section_link               ; off the playfield: next section
+        ld a,(stair_state)
+        or a
+        jp z,player_animate
 
         ; reached the end it is moving towards?
         ld ix,(stair_ptr)

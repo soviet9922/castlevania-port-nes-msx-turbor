@@ -64,8 +64,26 @@ AREAS = [
         "stage": 2, "section": 1,
         "start_x": 40,                  # NES: world x 48 (centre), upper floor
         "exit_x": None,
+        "below": 3,                     # two staircases lead down to section 0
+    },
+    {
+        "name": "2-lower",
+        "map": (0x82AA, 0x830A),        # stage 2, section 0 (512 px): the
+        "palette": "1-courtyard",       # waterway under section 1
+        "stage": 2, "section": 0,
+        "start_x": 40,                  # (not used: entered by the stairs)
+        "exit_x": None,
+        "above": 2,
+        "respawn": 2,                   # the NES restarts in section 1
     },
 ]
+
+# Sections of a stage are joined by staircases: an end without a partner in
+# its own section continues in the next one. On the NES, Simon keeps his x
+# and his y moves by SECTION_DY (measured: y 207 in section 1 = y 49 in
+# section 0). Must match SECTION_DY in src/config.inc.
+SECTION_DY = 158
+LINK_LEN = 64                   # length of the off-screen part of such a staircase
 
 
 # Stairs (bank 6, $9CBD): word at $FBF3 + 2*stage -> list of 2-byte endpoints,
@@ -98,11 +116,24 @@ def stairs(rom, stage, section):
     while i < len(ends):
         pair = _staircase(ends[i], ends[i + 1]) if i + 1 < len(ends) else None
         if pair is None:
+            out.append(_link_staircase(ends[i]))
             i += 1
             continue
         out.append(pair)
         i += 2
     return out
+
+
+def _link_staircase(end):
+    """An end whose partner is in another section: a staircase that runs
+    LINK_LEN px past the playfield edge (the engine switches sections when
+    Simon gets there, before the made-up end)."""
+    t, x, y = end
+    d = -1 if t & 1 else 1
+    ex, ey = x + 2 - 8, y - 64
+    if t & 2:                                   # a top: continues down
+        return (ex - d * LINK_LEN, ey + LINK_LEN, ex, ey, d)
+    return (ex, ey, ex + d * LINK_LEN, ey - LINK_LEN, d)
 
 
 def _staircase(a, b):
@@ -207,13 +238,15 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, preview=True)
     st = stairs(rom, area["stage"], area["section"])
     data = bytearray([len(st)])
     for fx, fy, tx, ty, d in st:
-        data += bytes([fx & 0xFF, fx >> 8, fy, tx & 0xFF, tx >> 8, ty, d & 0xFF])
+        data += bytes([fx & 0xFF, fx >> 8, fy & 0xFF, tx & 0xFF, tx >> 8, ty & 0xFF, d & 0xFF])
     with open(os.path.join(out_dir, "stairs.bin"), "wb") as f:
         f.write(data)
 
     params = msx_area.write_area(out_dir, pixels, msx_pal, solid, sx, sy, area["name"])
     params.update(dir=f"area_{index}", obj_patterns=n_obj_patterns,
                   exit_x=area.get("exit_x"), exit_y=area.get("exit_y", 0xFF),
+                  below=area.get("below", 0xFF), above=area.get("above", 0xFF),
+                  respawn=area.get("respawn", index),
                   next_area=area.get("next_area", 0))
 
     if preview:

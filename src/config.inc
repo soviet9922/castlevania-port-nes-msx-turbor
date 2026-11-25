@@ -54,7 +54,17 @@ AH_BLANK        equ 45
 AH_STAIRS       equ 46                  ; count, then 7 bytes per staircase
 AH_ENEMIES      equ 48                  ; count, then 4 bytes per spawner (x, y, type)
 AH_EXITY        equ 50                  ; exit only when py <= this (0xFF = any)
-AH_SIZE         equ 51
+AH_BELOW        equ 51                  ; area below (stairs down), 0xFF = none
+AH_ABOVE        equ 52                  ; area above (stairs up), 0xFF = none
+AH_RESPAWN      equ 53                  ; area to restart in after a fall/death
+AH_SIZE         equ 54
+
+; Sections: a staircase that leaves the bottom of the playfield continues in
+; the area below (and the other way). As on the NES, x stays, y moves by
+; SECTION_DY and the new area is drawn around Simon.
+SECTION_DY      equ 158
+SECTION_DOWN_Y  equ 144                 ; going down: switch when py >= this
+SECTION_UP_Y    equ -15                 ; going up: switch when py <= this
 
 ; Stair records (tools/convert_stage.py): foot x, foot y, top x, top y, dir
 ST_FOOTX        equ 0
