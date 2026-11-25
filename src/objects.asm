@@ -1768,6 +1768,10 @@ boss_update:
         cp BOSS_WAKE
         jp c,.hits
 .wake:
+        ld hl,(cam_x)                   ; the screen locks: no way back
+        ld (cam_min),hl
+        ld a,1
+        ld (cam_lock),a
         ld l,(ix+1)                     ; sink a little where it is
         ld h,(ix+2)
         ld (boss_tx),hl

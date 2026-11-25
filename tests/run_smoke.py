@@ -160,6 +160,13 @@ def tcl_script(syms, result_file):
                        if {{[peek {cur}] == 4}} {{
                            poke {px_a} [expr {{711 & 255}}]; poke {px_a + 1} [expr {{711 >> 8}}]
                            poke {py} 64; poke {py + 1} 0; set ::boss_hunt 1 }} }}
+    after time 62.0 {{ set ::boss_hunt 0
+                       # on the floor at the screen's left edge: unlocked, the camera would follow
+                       poke {px_a} [expr {{524 & 255}}]; poke {px_a + 1} [expr {{524 >> 8}}]
+                       poke {py} 128; poke {py + 1} 0; keymatrixdown 8 0x10 }}
+    after time 62.5 {{ keymatrixup 8 0x10; {dump('27a_boss_left')}
+                       poke {px_a} [expr {{711 & 255}}]; poke {px_a + 1} [expr {{711 >> 8}}]
+                       poke {py} 64; poke {py + 1} 0; set ::boss_hunt 1 }}
     after time 63.0 {{ {dump('27_boss')}
                        set f [open "{result_file}" a]; puts $f "boss_hp [peek {syms["boss_hp"]}] $::boss_awake"; close $f
                        poke {syms["boss_hp"]} 1 }}
@@ -547,6 +554,8 @@ def run():
             snaps["26_standing_fireball"]["hp"] < snaps["25_crouched_fireball"]["hp"])]
           if "26_standing_fireball" in snaps else []),
         *([("the stage 3 boss wakes up and the whip hurts it", boss_awake == 1 and boss_hp < 64),
+           ("the screen locks at the boss: walking left doesn't scroll back",
+            snaps["27a_boss_left"]["cam_x"] == 512 and snaps["27a_boss_left"]["px"] < 530),
            ("beaten, it leaves an orb; taking it clears the stage", orb_seen == 1 and clear_t > 0
             and snaps["29_stage_clear"]["hp"] == 64),
            ("after the stage clear the game starts again", snaps["30_restart"]["cur_area"] == 0)]

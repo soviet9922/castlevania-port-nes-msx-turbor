@@ -53,6 +53,8 @@ load_area:
         di
         ld hl,0
         ld (cam_x),hl
+        xor a
+        ld (cam_lock),a
         call objects_reset
         ld a,(keep_player)
         or a
