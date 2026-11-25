@@ -291,8 +291,10 @@ by 158 px, as measured on the NES, and he carries on along the same staircase
 there. Each area also names the area to restart in after a fall.
 
 Exits can play a sequence first, as on the NES (`AH_EXIT_KIND`). At the castle gate
-Simon walks in by himself and disappears once he is behind the gate's pillar (the MSX
-can't draw sprites behind the background, so he is hidden). At a door the screen
+Simon walks in by himself and goes behind the gate's right pillar a column of pixels at
+a time, as on the NES. The MSX can't draw sprites behind the background, so while he
+walks in, the columns of his sprite patterns past the pillar's edge (`AH_DOOR_COL`) are
+cleared as the patterns are copied to video memory (`clip_pattern`), every frame. At a door the screen
 scrolls on to `AH_DOOR_CAM`; the door half opens, opens, half opens again and shuts.
 The NES draws the opened door with sprites; the port has no sprite patterns to spare
 in these areas, so the converter draws the half-open and open door over the wall into

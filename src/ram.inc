@@ -131,5 +131,8 @@ hud_parts       equ door_mode+1         ; 1  HUD parts still to redraw (bits 0-2
 seq_hidden      equ hud_parts+1         ; 1  Simon is behind the castle gate
 door_src        equ seq_hidden+1        ; 2
 door_dst        equ door_src+2          ; 2
-RAM_END         equ door_dst+2
+clip_l          equ door_dst+2          ; 1  gate: pattern masks for Simon's left
+clip_r          equ clip_l+1            ; 1  and right 8 columns
+clip_buf        equ clip_r+1            ; 32 a masked pattern
+RAM_END         equ clip_buf+32
         ASSERT RAM_END < 0xF380

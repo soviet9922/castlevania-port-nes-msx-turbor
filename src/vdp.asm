@@ -333,6 +333,7 @@ stream_frame:
         call vram_set_write_far
         ei
         ex de,hl
+        call clip_pattern               ; (entering the castle gate: cut off)
         ld b,32
         call vram_out_slow
         pop bc
@@ -369,6 +370,42 @@ stream_frame:
         ld a,(cur_area)                 ; the area's bank again
         inc a
         ld (ASCII16_PAGE2),a
+        ret
+
+; HL = a 16x16 pattern (32 bytes: left 8 columns, then right 8). While Simon
+; walks into the castle gate, the columns past the gate's pillar are cleared
+; (the NES draws him behind it); returns HL = the pattern to copy.
+clip_pattern:
+        ld a,(seq_kind)
+        cp 1
+        ret nz
+        push de
+        push bc
+        ld de,clip_buf
+        push de
+        ld b,16
+        ld a,(clip_l)
+        ld c,a
+.left:
+        ld a,(hl)
+        and c
+        ld (de),a
+        inc hl
+        inc de
+        djnz .left
+        ld b,16
+        ld a,(clip_r)
+        ld c,a
+.right:
+        ld a,(hl)
+        and c
+        ld (de),a
+        inc hl
+        inc de
+        djnz .right
+        pop hl
+        pop bc
+        pop de
         ret
 
 ; VBLANK: show the page written last frame (interrupts disabled).

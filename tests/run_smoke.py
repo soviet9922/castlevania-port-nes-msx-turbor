@@ -96,7 +96,7 @@ def tcl_script(syms, result_file):
                            keymatrixdown 8 0x80 }} }}
     after time 37.1 {{ keymatrixup 8 0x80; {dump('18_through_the_door')}
                        set f [open "{result_file}" a]
-                       puts $f "seqs gate=$::gate_seen,$::gate_px0,$::gate_pxmax door=$::door_cam ys=[join $::seq_ys ,] doorstates=[join $::door_states /] gatehidden=$::gate_hidden walk=$::door_pxmax,$::door_walk_end screenx=$::door_screen_x"
+                       puts $f "seqs gate=$::gate_seen,$::gate_px0,$::gate_pxmax door=$::door_cam ys=[join $::seq_ys ,] doorstates=[join $::door_states /] gatemasks=[join $::gate_masks /] walk=$::door_pxmax,$::door_walk_end screenx=$::door_screen_x"
                        close $f
                        # a staircase that leads to the section below (foot off the playfield)
                        set sp [expr {{[peek {stairs}] + 256*[peek {stairs + 1}]}}]
@@ -479,6 +479,7 @@ set ::door_closed 0
 set ::door_states {{}}
 set ::door_first ""
 set ::gate_hidden 0
+set ::gate_masks {{}}
 set ::door_pxmax 0
 set ::door_walk_end 0
 set ::door_screen_x 0
@@ -488,7 +489,8 @@ proc seq_watch {{}} {{
     set x [expr {{[peek {px_a}] + 256*[peek {px_a + 1}]}}]
     set y [peek {py}]
     if {{$k == 1}} {{
-        if {{[peek {syms["seq_hidden"]}]}} {{ set ::gate_hidden 1 }}
+        set m "[peek {syms["clip_l"]}].[peek {syms["clip_r"]}]"
+        if {{[lindex $::gate_masks end] != $m}} {{ lappend ::gate_masks $m }}
         if {{!$::gate_seen}} {{ set ::gate_seen 1; set ::gate_px0 $x }}
         set ::gate_pxmax $x
         if {{[lsearch $::seq_ys "g$y"] < 0}} {{ lappend ::seq_ys "g$y" }}
@@ -593,6 +595,18 @@ proc wait_game {{}} {{
 after time 0.1 wait_game
 after time 140 {{ exit }}
 """
+
+
+def gate_ok(masks):
+    """pattern masks (left.right) during the gate walk: from whole (255.255),
+    through every width, to nothing (0.0), each narrower than the last"""
+    def width(m):
+        l, r = (int(v) for v in m.split("."))
+        return bin(l).count("1") + bin(r).count("1")
+    ws = [width(m) for m in masks.split("/")]
+    if ws and ws[0] == 0:
+        ws = ws[1:]             # (the masks' RAM before the sequence's first frame)
+    return ws[0] == 16 and ws[-1] == 0 and ws == sorted(ws, reverse=True) and len(ws) == 17
 
 
 def door_ok(states):
@@ -794,7 +808,8 @@ def run():
             seqs["door"].split(",")[0] == "1408" or int(seqs["door"].split(",")[0]) > 1408),
            ("the door opens (half open, then open), and closes again behind Simon",
             door_ok(seqs["doorstates"])),
-           ("Simon goes inside the castle gate (behind its pillar)", seqs["gatehidden"] == "1"),
+           (f"Simon goes behind the castle gate's pillar a column at a time ({seqs['gatemasks']})",
+            gate_ok(seqs["gatemasks"])),
            (f"the next stage takes over without a jump: Simon's screen x at the end of the "
             f"door is his start x there ({seqs['screenx']})",
             int(seqs["screenx"]) in (39, 40) and snaps["18_through_the_door"]["cur_area"] == 2),

@@ -194,21 +194,31 @@ seq_tick:
         inc hl
         ld (px),hl
 .no_step:
-        ld hl,(area_hdr+AH_DOOR_COL)    ; behind the gate's pillar: out of sight
+        ld hl,(area_hdr+AH_DOOR_COL)    ; behind the gate's pillar: he is cut
+        add hl,hl                       ; off there, one column of pixels at a
+        add hl,hl                       ; time (width = pillar x - px, 0..16)
         add hl,hl
-        add hl,hl
-        add hl,hl
-        ld de,-8
-        add hl,de
-        ex de,hl
-        ld hl,(px)
+        ld de,(px)
         or a
         sbc hl,de
-        ld a,0
-        jr c,.visible
-        inc a
-.visible:
-        ld (seq_hidden),a
+        ld a,16
+        jr c,.gone
+        ld a,h
+        or a
+        ld a,16
+        jr nz,.width
+        ld a,l
+        cp 16
+        jr c,.width
+        ld a,16
+        jr .width
+.gone:
+        xor a
+.width:
+        call set_clip
+        ld a,0xFF                       ; patterns streamed again each frame
+        ld (loaded_frames),a
+        ld (loaded_frames+1),a
         ld a,(seq_t)
         rrca                            ; walk cycle at a third of the speed
         and 0x18
@@ -339,6 +349,34 @@ seq_next_area:
         ld (seq_hidden),a
         ld a,(area_hdr+AH_NEXT)
         jp load_area
+
+; A = visible width of Simon (0..16 px from his left): pattern masks
+set_clip:
+        ld b,a
+        cp 8
+        jr c,.narrow
+        sub 8                           ; 8..16: all of the left half, part of
+        call .mask                      ; the right
+        ld (clip_r),a
+        ld a,0xFF
+        ld (clip_l),a
+        ret
+.narrow:
+        call .mask                      ; 0..7: part of the left half only
+        ld (clip_l),a
+        xor a
+        ld (clip_r),a
+        ret
+.mask:                                  ; A = n (0..8) -> the n left bits set
+        ld c,a
+        xor a
+        inc c
+.lp:
+        dec c
+        ret z
+        scf
+        rra
+        jr .lp
 
 ; A = walk cycle step * 8 (0, 8, 16, 24): Simon's walk pose, facing right
 walk_pose:
