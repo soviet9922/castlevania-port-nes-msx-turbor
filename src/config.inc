@@ -66,7 +66,7 @@ AH_SIZE         equ 62
 
 ; Exit sequences (measured on the NES)
 GATE_FRAMES     equ 120                 ; walking into the castle gate, 1 px every 3 frames
-DOOR_ROW        equ 4                   ; the door: 6 tiles from playfield row 4
+DOOR_ROW        equ 2                   ; the door: 6 tiles from playfield row 2 (NES nametable row 8)
 DOOR_ROWS       equ 6
 DOOR_WALK       equ 118                 ; px walked on after the door closes
 DOOR_HALF_OPEN  equ 16                  ; frames half open before it opens
@@ -115,6 +115,7 @@ STAR_EXTRA      equ 16                  ; the morning star reaches 16 px further
 DAGGER_SPEED    equ 4                   ; px per frame (NES)
 AXE_VY0         equ -68                 ; 1/16 px per frame: up 4.25 (NES)
 AXE_GRAVITY     equ 4                   ; 1/16 px per frame per frame (NES)
+AXE_VMAX        equ 112                 ; fastest fall: 7 px per frame
 HOLY_VY0        equ -20                 ; the bottle's low lob (NES)
 HOLY_GRAVITY    equ 2
 HOLY_BURN       equ 72                  ; frames the fire burns (NES: about 70)

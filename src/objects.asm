@@ -2237,8 +2237,11 @@ axe_update:
         ld (ix+2),h
         ld a,(ix+9)                     ; y: speed += gravity, y += speed / 16
         add a,AXE_GRAVITY
-        jp po,.vy_ok                    ; (no overflow)
-        ld a,127
+        bit 7,a
+        jr nz,.vy_ok                    ; still going up
+        cp AXE_VMAX+1                   ; capped, so that speed + fraction stays
+        jr c,.vy_ok                     ; a signed byte (it went back up)
+        ld a,AXE_VMAX
 .vy_ok:
         ld (ix+9),a
         call obj_fall_step

@@ -608,10 +608,12 @@ def axe_ok(track):
     pts = [tuple(int(v) for v in p.split(":")[:2]) for p in track.split(",") if p]
     if len(pts) < 20:
         return False
-    xs, ys = [p[0] for p in pts], [p[1] for p in pts]
+    xs, ys = [p[0] for p in pts], [p[1] % 256 for p in pts]   # (y is a byte)
     top = ys.index(min(ys))
+    falling = ys[top:]
     return (all(b - a == 2 for a, b in zip(xs, xs[1:]))
-            and 3 < top < len(ys) - 3 and ys[-1] > ys[top] + 20 and ys[0] > ys[top] + 20)
+            and 3 < top < len(ys) - 3 and ys[-1] > ys[top] + 20 and ys[0] > ys[top] + 20
+            and all(b >= a for a, b in zip(falling, falling[1:])))   # never back up
 
 
 def run():

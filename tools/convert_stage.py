@@ -324,7 +324,7 @@ DOOR_HALF = [(0x77, 8, 0), (0x7B, 8, 16), (0x7B, 8, 32),
 DOOR_OPEN = [(0x87, 0, 0), (0x7B, 0, 16), (0x7B, 0, 32),
              (0x87, 8, 0), (0x7B, 8, 16), (0x7B, 8, 32),
              (0x85, 16, 0), (0x7B, 16, 16), (0x7B, 16, 32)]
-DOOR_ROW = 4                        # must match DOOR_ROW in src/config.inc
+DOOR_ROW = 2                        # playfield row (NES nametable row 8); must match src/config.inc
 DOOR_ROWS = 6
 
 

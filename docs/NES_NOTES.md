@@ -244,7 +244,7 @@ Recorded with a variant of `record_exit.lua` that also dumps the PPU nametables.
 - **The doors** (mode 8; the hall's at world x 1528, stage 2's at x 504): Simon stands
   while the screen scrolls 128 px further, 1 px per frame (into the next stage's first
   columns, which follow the area's map in the ROM). The shut door is a 1x6-tile column
-  of the background (nametable rows 8-13). It opens in two steps drawn with sprites
+  of the background (nametable rows 8-13, playfield rows 2-7). It opens in two steps drawn with sprites
   (palette 3, mirrored): half open for 16 frames (the column goes dark; tiles `77 7B 7B`
   and `75 79 79` on the 2 columns to its right), then open (`87 7B 7B`, `87 7B 7B`,
   `85 7B 7B` over 3 columns) while Simon walks through at 1 px per frame; half open for
