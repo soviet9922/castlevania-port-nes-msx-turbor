@@ -1610,6 +1610,51 @@ fish_shoot:
         ld (ix+6),OBJF_FIREBALL
         ld (ix+7),KIND_FIREBALL
         ld (ix+8),0xFF
+        ld (ix+9),0                     ; straight across
+.none:
+        pop ix
+        ret
+
+; The boss spits a fireball at Simon (an addition: not seen in the NES
+; recordings, see BOSS_FIRE_AT). From its mouth, across towards him, and
+; 1 px up or down every 2nd frame if he is above or below.
+boss_shoot:
+        push ix
+        call boss_simon_dx
+        ld c,1
+        bit 7,h
+        jr z,.dir
+        ld c,-1
+.dir:
+        ld a,(py)                       ; his chest vs its mouth
+        add a,8
+        sub (ix+3)
+        sub 12
+        ld b,0
+        jr z,.dy
+        ld b,1
+        jp p,.dy
+        ld b,-1
+.dy:
+        ld l,(ix+1)
+        ld h,(ix+2)
+        ld de,16
+        add hl,de
+        ld a,(ix+3)
+        add a,8
+        ld e,a
+        call obj_free_slot
+        jr c,.none
+        ld (ix+1),l
+        ld (ix+2),h
+        ld (ix+3),e
+        ld (ix+5),c
+        ld (ix+9),b
+        ld (ix+0),OBJ_FIREBALL
+        ld (ix+4),0
+        ld (ix+6),OBJF_FIREBALL
+        ld (ix+7),KIND_FIREBALL
+        ld (ix+8),0xFF
 .none:
         pop ix
         ret
@@ -1639,6 +1684,14 @@ fireball_update:
         add hl,de
         ld (ix+1),l
         ld (ix+2),h
+        bit 0,(ix+4)                    ; aimed up or down: 1 px every 2nd frame
+        jr z,.no_dy
+        ld a,(ix+3)
+        add a,(ix+9)
+        ld (ix+3),a
+        cp MT_ROWS*16
+        jr nc,.gone                     ; left the playfield
+.no_dy:
 
         ld de,(cam_x)                   ; off the screen: gone
         or a
@@ -1709,7 +1762,8 @@ fireball_update:
 ; ---------------------------------------------------------------------------
 ; The stage 3 boss: a giant bat (measured on the NES). It hangs asleep until
 ; Simon comes within BOSS_WAKE px, sinks a little, then repeats: hover for
-; BOSS_HOVER frames, swoop at where Simon is (2 px across per frame, 1 down),
+; BOSS_HOVER frames, swoop at where Simon is (2 px per frame across and down,
+; all the way to his height),
 ; fly back to a new spot (3 px every 4 frames). A whip hit takes BOSS_DAMAGE
 ; of its BOSS_HP health (then BOSS_INV frames without hits). At 0 it burns
 ; for 60 frames and leaves an orb that drops to the floor; touching the orb
@@ -1739,7 +1793,7 @@ boss_update:
         cp 2
         jr z,.hovering
         cp 3
-        jr z,.swooping
+        jp z,.swooping
 
         ; 1: fly to the target, 3 px every 4 frames, y 1 px every 2nd frame
         ld a,(ix+4)
@@ -1783,6 +1837,9 @@ boss_update:
 
 .hovering:
         ld a,(ix+4)
+        cp BOSS_FIRE_AT
+        call z,boss_shoot
+        ld a,(ix+4)
         cp BOSS_HOVER
         jp c,.hits
         ld hl,(px)                      ; swoop at Simon: box centre on his
@@ -1793,14 +1850,20 @@ boss_update:
         sub 4
         ld (boss_ty),a
         ld (ix+9),3
+        ld (ix+4),0
         jp .hits
 
-.swooping:
-        call boss_step_x
-        call boss_step_x
+.swooping:                              ; 2 px per frame on both axes, all
+        call boss_step_x                ; the way down to where Simon was (on
+        call boss_step_x                ; the floor too, as on the NES)
         call boss_step_y
-        call boss_at_target_x
+        call boss_step_y
+        ld a,(ix+4)
+        cp BOSS_SWOOP_MAX
+        jr nc,.swoop_done
+        call boss_at_target
         jp nz,.hits
+.swoop_done:
         ld a,r                          ; then back to a new spot up high
         ld hl,frame_count
         xor (hl)

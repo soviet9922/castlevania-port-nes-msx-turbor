@@ -211,7 +211,11 @@ flies at standing height: crouching Simon ducks under it.
 The stage 3 boss is placed like a panther (record type `$59` becomes a candle-list
 entry of kind 5). It is a 48x32 object with its own state machine (asleep, flying to
 a spot, hovering, swooping at Simon, burning). Its health is shown in the HUD's
-enemy bar. When it wakes, the camera locks: it can still move right but never back
+enemy bar. Its swoops aim at where Simon is on both axes, so it reaches him on the
+floor too. While hovering it spits a fireball at him (`BOSS_FIRE_AT` in
+`src/config.inc`). The fireball is an addition the player asked for: the NES
+recordings of this ROM never showed one. A value of `BOSS_FIRE_AT` at or above
+`BOSS_HOVER` turns it off. When it wakes, the camera locks: it can still move right but never back
 left, so the fight stays on one screen as on the NES. When it dies it leaves an orb, and taking the orb clears the stage: for
 now the game then starts again from the courtyard, because the next block isn't
 converted yet.

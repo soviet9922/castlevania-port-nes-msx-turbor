@@ -167,10 +167,20 @@ def tcl_script(syms, result_file):
     after time 62.5 {{ keymatrixup 8 0x10; {dump('27a_boss_left')}
                        poke {px_a} [expr {{711 & 255}}]; poke {px_a + 1} [expr {{711 >> 8}}]
                        poke {py} 64; poke {py + 1} 0; set ::boss_hunt 1 }}
-    after time 63.0 {{ {dump('27_boss')}
+    after time 62.6 {{ # wait on the floor without whipping: the boss must come down
+                       set ::boss_hunt 0; set ::boss_floor 1
+                       poke {px_a} [expr {{700 & 255}}]; poke {px_a + 1} [expr {{700 >> 8}}]
+                       poke {py} 128; poke {py + 1} 0 }}
+    after time 62.65 {{ {dump('27b_floor_start')} }}
+    after time 67.5 {{ {dump('27c_floor_end')}; set ::boss_floor 0
+set ::boss_fire 0
+                       set f [open "{result_file}" a]; puts $f "boss_maxy $::boss_maxy"; close $f
+                       poke {px_a} [expr {{711 & 255}}]; poke {px_a + 1} [expr {{711 >> 8}}]
+                       poke {py} 64; poke {py + 1} 0; set ::boss_hunt 1 }}
+    after time 68.0 {{ {dump('27_boss')}
                        set f [open "{result_file}" a]; puts $f "boss_hp [peek {syms["boss_hp"]}] $::boss_awake"; close $f
                        poke {syms["boss_hp"]} 1 }}
-    after time 70.0 {{ set ::boss_hunt 0; {dump('28_boss_dead')}
+    after time 74.0 {{ set ::boss_hunt 0; {dump('28_boss_dead')}
                        # walk onto the orb
                        for {{set i 0}} {{$i < 8}} {{incr i}} {{
                            set b [expr {{{objt} + $i*{obj_size}}}]
@@ -180,10 +190,10 @@ def tcl_script(syms, result_file):
                                set ::orb_seen 1
                            }}
                        }} }}
-    after time 70.5 {{ {dump('29_stage_clear')}
-                       set f [open "{result_file}" a]; puts $f "orb $::orb_seen [peek {syms["clear_t"]}]"; close $f }}
-    after time 74.5 {{ {dump('30_restart')} }}
-    after time 75.0 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
+    after time 74.5 {{ {dump('29_stage_clear')}
+                       set f [open "{result_file}" a]; puts $f "orb $::orb_seen [peek {syms["clear_t"]}] $::boss_fire"; close $f }}
+    after time 78.5 {{ {dump('30_restart')} }}
+    after time 79.0 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """ if areas > 1 else f"""
     after time 9.0  {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
@@ -305,8 +315,20 @@ proc panther_test {{}} {{
 set ::boss_hunt 0
 set ::boss_awake 0
 set ::orb_seen 0
+set ::boss_maxy 0
+set ::boss_floor 0
 proc boss_watch {{}} {{
-    if {{!$::boss_hunt || [peek {hurt}] != 0}} return
+    if {{$::boss_floor || $::boss_hunt}} {{
+        for {{set i 0}} {{$i < 8}} {{incr i}} {{
+            set b [expr {{{objt} + $i*{obj_size}}}]
+            if {{[peek $b] == 9}} {{ set ::boss_fire 1 }}
+            if {{$::boss_floor && [peek $b] == 10 && [peek [expr {{$b+3}}]] > $::boss_maxy}} {{ set ::boss_maxy [peek [expr {{$b+3}}]] }}
+        }}
+    }}
+    if {{!$::boss_hunt}} return
+    # the scripted fighter can't dodge 2 px-per-frame swoops: keep him invincible
+    poke {syms["invuln_t"]} 2
+    if {{[peek {hurt}] != 0}} return
     set px [expr {{[peek {px_a}] + 256*[peek {px_a + 1}]}}]
     set py [peek {py}]
     for {{set i 0}} {{$i < 8}} {{incr i}} {{
@@ -375,7 +397,7 @@ proc wait_game {{}} {{
     }}
 }}
 after time 0.1 wait_game
-after time 90 {{ exit }}
+after time 100 {{ exit }}
 """
 
 
@@ -411,6 +433,7 @@ def run():
     bat_seen = None
     fish_seen = None
     boss_hp = boss_awake = None
+    boss_maxy = boss_fire = 0
     orb_seen = clear_t = None
     panther_dead = 0
     stair = None
@@ -426,11 +449,14 @@ def run():
             if tag == "hud_hearts":
                 hud_hearts = kv[0] if kv else ""
                 continue
+            if tag == "boss_maxy":
+                boss_maxy = int(kv[0])
+                continue
             if tag == "boss_hp":
                 boss_hp, boss_awake = int(kv[0]), int(kv[1])
                 continue
             if tag == "orb":
-                orb_seen, clear_t = int(kv[0]), int(kv[1])
+                orb_seen, clear_t, boss_fire = int(kv[0]), int(kv[1]), int(kv[2])
                 continue
             if tag == "fish":
                 fish_seen = int(kv[0])
@@ -556,6 +582,9 @@ def run():
         *([("the stage 3 boss wakes up and the whip hurts it", boss_awake == 1 and boss_hp < 64),
            ("the screen locks at the boss: walking left doesn't scroll back",
             snaps["27a_boss_left"]["cam_x"] == 512 and snaps["27a_boss_left"]["px"] < 530),
+           (f"the boss swoops down to Simon waiting on the floor (lowest box top {boss_maxy})",
+            boss_maxy >= 112 and snaps["27c_floor_end"]["hp"] < snaps["27b_floor_start"]["hp"]),
+           ("the boss spits a fireball now and then", boss_fire == 1),
            ("beaten, it leaves an orb; taking it clears the stage", orb_seen == 1 and clear_t > 0
             and snaps["29_stage_clear"]["hp"] == 64),
            ("after the stage clear the game starts again", snaps["30_restart"]["cur_area"] == 0)]

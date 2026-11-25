@@ -188,7 +188,7 @@ def needed_frames(candle_list, spawners):
         elif kind == KIND_CANDLE:
             need |= {"candle1", "candle2"}
         elif kind == KIND_BOSS:
-            need |= {"boss_open", "boss_up", "orb"}
+            need |= {"boss_open", "boss_up", "orb", "fireball"}
         else:
             need |= {n for n in OBJ_FRAMES if n.startswith("panther")}
         if item in ITEM_FRAMES:
