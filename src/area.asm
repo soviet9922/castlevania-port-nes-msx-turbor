@@ -142,8 +142,192 @@ check_area_exit:
         sbc hl,de                       ; exit y - py
         ret c
 .go:
+        ld a,(area_hdr+AH_EXIT_KIND)    ; the castle gate and the doors play
+        or a                            ; a short sequence first
+        jr z,.now
+        ld (seq_kind),a
+        xor a
+        ld (seq_phase),a
+        ld (whip_t),a
+        ld (whip_active),a
+        ld (facing),a
+        ld hl,0
+        ld (seq_t),hl
+        ret
+.now:
         ld a,(area_hdr+AH_NEXT)
         jp load_area
+
+; ---------------------------------------------------------------------------
+; Exit sequences, one frame each (main loop, instead of the game logic).
+;  castle gate: Simon walks into the gate, 1 px every 3 frames
+;  door: the screen scrolls 1 px per frame to AH_DOOR_CAM while Simon stands;
+;        the door opens, he walks through (1 px per frame), it closes, he
+;        walks on DOOR_WALK px with the screen following; then the next area
+; ---------------------------------------------------------------------------
+seq_tick:
+        ld hl,(seq_t)
+        inc hl
+        ld (seq_t),hl
+        ld a,(seq_kind)
+        cp 1
+        jr nz,door_tick
+        ; --- the castle gate ---
+        ld a,l                          ; every 3rd frame a step
+        ld b,3
+.mod3:
+        sub b
+        jr nc,.mod3
+        add a,b
+        jr nz,.no_step
+        ld hl,(px)
+        inc hl
+        ld (px),hl
+.no_step:
+        ld a,(seq_t)
+        rrca                            ; walk cycle at a third of the speed
+        and 0x18
+        call walk_pose
+        ld hl,(seq_t)
+        ld de,GATE_FRAMES
+        or a
+        sbc hl,de
+        ret c
+        jr seq_next_area
+
+door_tick:
+        ld a,(seq_phase)
+        or a
+        jr nz,.walking
+        xor a                           ; standing while the screen scrolls
+        ld (pframe),a
+        ld hl,(cam_x)
+        ld de,(area_hdr+AH_DOOR_CAM)
+        or a
+        sbc hl,de
+        jr nc,.open
+        ld hl,(cam_x)
+        inc hl
+        jp camera_goto
+.open:
+        ld a,1
+        ld (seq_phase),a
+        ld (door_pending),a             ; open the door (VBLANK)
+        ld hl,0
+        ld (seq_t),hl
+        ret
+.walking:
+        ld hl,(px)                      ; walks right, 1 px per frame
+        inc hl
+        ld (px),hl
+        ld a,(seq_t)
+        rlca
+        and 0x18
+        call walk_pose
+        ld a,(seq_phase)
+        cp 2
+        jr z,.after
+        ld hl,(area_hdr+AH_DOOR_COL)    ; past the door? close it behind him
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        ld de,8
+        add hl,de
+        ex de,hl
+        ld hl,(px)
+        or a
+        sbc hl,de
+        ret c
+        ld a,2
+        ld (seq_phase),a
+        ld (door_pending),a             ; close the door (VBLANK)
+        ld hl,0
+        ld (seq_t),hl
+        ret
+.after:
+        ld hl,(cam_x)                   ; the screen follows him
+        inc hl
+        call camera_goto
+        ld hl,(seq_t)
+        ld de,DOOR_WALK
+        or a
+        sbc hl,de
+        ret c
+seq_next_area:
+        xor a
+        ld (seq_kind),a
+        ld a,(area_hdr+AH_NEXT)
+        jp load_area
+
+; A = walk cycle step * 8 (0, 8, 16, 24): Simon's walk pose, facing right
+walk_pose:
+        rrca
+        rrca
+        rrca
+        and 3
+        ld e,a
+        ld d,0
+        ld hl,walk_cycle
+        add hl,de
+        ld a,(hl)
+        ld (pframe),a
+        xor a
+        ld (facing),a
+        ld (pyoff),a
+        ret
+
+; VBLANK: open (blank tiles) or close (the map's tiles) the door's column
+door_vram:
+        ld a,(door_pending)
+        or a
+        ret z
+        ld (door_mode),a
+        xor a
+        ld (door_pending),a
+        ld hl,(area_hdr+AH_DOOR_COL)    ; map column: AH_TILES + col * PF_ROWS
+        ld d,h
+        ld e,l
+        add hl,hl                       ; *2
+        push hl
+        add hl,hl
+        add hl,hl                       ; *8
+        push hl
+        add hl,hl                       ; *16
+        pop bc
+        add hl,bc                       ; *24
+        pop bc
+        or a
+        sbc hl,bc                       ; *22 (PF_ROWS)
+        ld de,(area_hdr+AH_TILES)
+        add hl,de
+        ld de,DOOR_ROW
+        add hl,de
+        ex de,hl                        ; DE = the door's first map tile
+        ld a,(area_hdr+AH_DOOR_COL)
+        and 31
+        ld l,a
+        ld h,0
+        ld bc,VRAM_PNT+(HUD_ROWS+DOOR_ROW)*32
+        add hl,bc                       ; HL = its name-table address
+        ld b,DOOR_ROWS
+.lp:
+        push bc
+        push hl
+        call vram_set_write
+        ld a,(door_mode)
+        cp 1
+        ld a,(area_hdr+AH_BLANK)
+        jr z,.put
+        ld a,(de)
+.put:
+        out (VDP_DATA),a
+        inc de
+        pop hl
+        ld bc,32
+        add hl,bc
+        pop bc
+        djnz .lp
+        ret
 
 ; ---------------------------------------------------------------------------
 ; Sections joined by stairs. Called after each vertical step on the stairs:

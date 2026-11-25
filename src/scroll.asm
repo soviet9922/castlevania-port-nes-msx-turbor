@@ -164,6 +164,9 @@ camera_update:
 .raise:
         ld (cam_min),hl
 .unlocked:
+; HL = new camera x (at most 8 px from the old one): move there, queueing the
+; tile column that comes into view
+camera_goto:
         ld (cam_new),hl
         call hl_shr3
         ld (new_col),hl

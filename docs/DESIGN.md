@@ -277,8 +277,9 @@ bank n+1) that starts with a header: palette, background tiles per band,
 map, collision, candle list, object sprites, start position, and an exit
 (x position, the highest y at which it counts, plus next area). The current area's bank stays mapped at
 0x8000 because column streaming and collision read it directly. The header
-is copied to RAM. Code and data shared by all areas (Simon's sprites, HUD)
-live in bank 0, at 0x4000.
+is copied to RAM. Code and data shared by all areas live in bank 0, at 0x4000. Simon's sprite
+patterns and colours are in the last bank: the code that copies his current frame
+into video memory maps it at 0x8000 for the copy, then maps the area's bank back.
 
 A stage's sections (for example stage 2's corridor and the waterway under it) are
 separate areas. Their header names the area below and the area above. A staircase
@@ -287,6 +288,14 @@ playfield edge. When Simon walks down past the bottom of the playfield, or up pa
 its top, the next area is loaded around him. His x stays the same and his y moves
 by 158 px, as measured on the NES, and he carries on along the same staircase
 there. Each area also names the area to restart in after a fall.
+
+Exits can play a sequence first, as on the NES (`AH_EXIT_KIND`). At the castle gate
+Simon walks in by himself. At a door the screen scrolls on to `AH_DOOR_CAM`, the door's
+tile column (`AH_DOOR_COL`) is blanked in the name table, he walks through, the
+column is put back from the map, and he walks on with the screen following. The hall
+and stage 2's corridor include the next stage's first 8 map columns for this; their
+normal camera limit (`AH_MAXCAM`) stays where it was, so those columns only show
+during the sequence. The game logic, the timer and the enemies wait meanwhile.
 
 `load_area` turns the display off, loads the palette, tiles and object
 patterns, resets objects and the player, redraws the screen and turns

@@ -16,6 +16,8 @@ The engine maps an area's bank at 0x8000 and copies its header to RAM
   +51 area below, +52 area above (sections joined by stairs; 0xFF = none)
   +53 area to restart in after a fall or death
   +54 stage number for the HUD (BCD)
+  +55 exit kind (0 at once, 1 castle gate, 2 door), +56 door tile column,
+  +58 camera x while the door opens
 """
 
 import os
@@ -40,14 +42,15 @@ def write(gen_dir, areas):
             f"        dw {p}palette",
             f"        dw {p}pgt0, {p}ct0, {p}pgt1, {p}ct1, {p}pgt2, {p}ct2",
             "        dw " + ", ".join(str(n * 8) for n in a["bg_tiles"]),
-            f"        dw {p}tiles, {p}coll, {a['tcols']}, {a['width'] - 256}",
+            f"        dw {p}tiles, {p}coll, {a['tcols']}, {a.get('max_cam', a['width'] - 256)}",
             f"        dw {a['start_x']}, {a['start_y'] & 0xFFFF}",
             f"        dw {p}candles, {p}obj_spt, {a['obj_patterns'] * 32}, {p}obj_sct, {p}obj_frame_table",
             f"        dw {exit_x if exit_x is not None else 0xFFFF}",
             f"        db {a.get('next_area', 0)}, 0x{a['blank']:02X}",
             f"        dw {p}stairs, {p}enemies",
             f"        db {a.get('exit_y', 0xFF)}, {a.get('below', 0xFF)}, {a.get('above', 0xFF)}, "
-            f"{a.get('respawn', i)}, 0x{a.get('stage_no', 1):02X}",
+            f"{a.get('respawn', i)}, 0x{a.get('stage_no', 1):02X}, {a.get('exit_kind', 0)}",
+            f"        dw {a.get('door_col', 0)}, {a.get('door_cam', 0)}",
             f'{p}palette: INCBIN "{d}/palette.bin"',
         ]
         for b in range(3):
@@ -67,11 +70,19 @@ def write(gen_dir, areas):
             f"        ASSERT {p}end <= 0xC000",
             "        ds 0xC000-$, 0xFF",
         ]
-    pad = ROM_BANKS - 1 - len(areas)
+    pad = ROM_BANKS - 2 - len(areas)   # bank 0: code, last bank: Simon's sprites
     if pad < 0:
         raise SystemExit("too many areas for the ROM size")
     out += ["", "; ---- unused banks ----"]
     for _ in range(pad):
         out += ["        ORG 0x8000", "        ds 0x4000, 0xFF"]
+    out += ["", f"; ---- bank {ROM_BANKS - 1}: Simon's sprite patterns and colours ----",
+            f"PLAYER_BANK equ {ROM_BANKS - 1}",
+            "        ORG 0x8000",
+            'player_spt:     INCBIN "player_spt.bin"         ; 32 bytes per 16x16 pattern',
+            'player_sct:     INCBIN "player_sct.bin"         ; 16 colour bytes per sprite',
+            "player_bank_end:",
+            "        ASSERT player_bank_end <= 0xC000",
+            "        ds 0xC000-$, 0xFF"]
     with open(os.path.join(gen_dir, "areas.asm"), "w") as f:
         f.write("\n".join(out) + "\n")

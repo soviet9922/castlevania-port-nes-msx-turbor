@@ -234,6 +234,20 @@ a jump). The way out only opens after the boss.
   (object `$2F`, tiles `5C` mirrored), which appears after about 110 frames and
   drops to the floor.
 
+## Exit sequences
+
+Recorded with a variant of `record_exit.lua` that also dumps the PPU nametables.
+
+- **The castle gate** (game mode `$18` = 10): at the gate, control is taken away
+  and Simon walks into it by himself, about 1 px every 3 frames, with the timer
+  stopped; then the hall loads.
+- **The doors** (mode 8; the hall's at world x 1528, stage 2's at x 504): Simon stands
+  while the screen scrolls 128 px further, 1 px per frame (into the next stage's first
+  columns, which follow the area's map in the ROM). The door is a 1x6-tile column of
+  the background (nametable rows 8-13): it opens (the column goes dark, and the opened
+  door shows beside it), Simon walks through at 1 px per frame, it closes behind him,
+  and he walks on about 118 px with the screen following. Then the next stage loads.
+
 ## Stage 2 enemies
 
 Recorded with enemies on (the probe route on a ROM copy without the hall's zombies).

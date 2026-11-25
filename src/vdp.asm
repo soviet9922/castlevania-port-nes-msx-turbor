@@ -300,6 +300,8 @@ stream_frame:
         ld (hl),0xFF
         inc hl
         djnz .inv_lp
+        ld a,PLAYER_BANK                ; Simon's patterns: the last ROM bank,
+        ld (ASCII16_PAGE2),a            ; at 0x8000 instead of the area's
         ld a,(cur_frame)
         call frame_address
         ld b,(ix+0)
@@ -364,6 +366,9 @@ stream_frame:
         pop bc
         inc c
         djnz .lp
+        ld a,(cur_area)                 ; the area's bank again
+        inc a
+        ld (ASCII16_PAGE2),a
         ret
 
 ; VBLANK: show the page written last frame (interrupts disabled).

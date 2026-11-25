@@ -46,26 +46,34 @@ AREAS = [
         "start_x": 40,                  # NES: Simon at world x 48 (centre)
         "exit_x": 688,                  # walking into the gate ...
         "next_area": 1,                 # ... enters the hall
+        "exit_kind": 1,                 # (Simon walks into the gate first)
     },
     {
         "name": "1-hall",
-        "map": (0x809A, 0x81BA),        # entrance hall (1536 px)
+        "map": (0x809A, 0x81EA),        # entrance hall (1536 px), plus 8 columns
+        "play_px": 1536,                # of stage 2 seen through its door
         "palette": "1-courtyard",       # the hall uses the same palette
         "stage": 1, "section": 0,
         "start_x": 40,
         "exit_x": 1500,                 # NES: the door opens at world x 1516
         "exit_y": 40,                   # (centre), on the upper floor only
         "next_area": 2,
+        "max_cam": 1280,                # (the extra columns only show in the
+        "exit_kind": 2,                 # door sequence: camera to 1408)
+        "door_col": 191, "door_cam": 1408,
     },
     {
         "name": "2-upper",
-        "map": (0x81BA, 0x821A),        # stage 2, section 1 (512 px): behind
+        "map": (0x81BA, 0x824A),        # stage 2, section 1 (512 px): behind
+        "play_px": 512,                 # (+ 8 columns of stage 3 for its door)
         "palette": "1-courtyard",       # the hall's door; same palette
         "stage": 2, "section": 1,
         "start_x": 40,                  # NES: world x 48 (centre), upper floor
         "exit_x": 484,                  # NES: the door at the top right opens at
         "exit_y": 40,                   # world x 492 (centre), on the ledge
         "next_area": 4,
+        "max_cam": 256, "exit_kind": 2,
+        "door_col": 63, "door_cam": 384,
         "below": 3,                     # two staircases lead down to section 0
     },
     {
@@ -236,8 +244,9 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
         rgb = nes_to_msx_rgb(nes_rgb[nes])
         return min(range(1, 16), key=lambda s: (sum((a - b) ** 2 for a, b in
                                                     zip(msx_pal[s], rgb)), s))
-    cl = convert_objects.candles(rom, area["stage"], area["section"], width)
-    en = convert_objects.enemy_spawners(rom, area["stage"], area["section"], width)
+    play_px = area.get("play_px", width)    # objects only from the area itself
+    cl = convert_objects.candles(rom, area["stage"], area["section"], play_px)
+    en = convert_objects.enemy_spawners(rom, area["stage"], area["section"], play_px)
     obj_bank, obj_names = convert_objects.sprite_frames(
         rom, slot_for_nes, convert_objects.needed_frames(cl, en, carried))
     n_obj_patterns, _ = msx_sprites.write_bank(out_dir, obj_bank, obj_names,
@@ -258,6 +267,9 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
                   below=area.get("below", 0xFF), above=area.get("above", 0xFF),
                   respawn=area.get("respawn", index),
                   stage_no=area["stage"] if area["stage"] >= 1 else 1,
+                  exit_kind=area.get("exit_kind", 0), door_col=area.get("door_col", 0),
+                  door_cam=area.get("door_cam", 0),
+                  **({"max_cam": area["max_cam"]} if "max_cam" in area else {}),
                   next_area=area.get("next_area", 0))
 
     if preview:
@@ -348,7 +360,7 @@ def convert(rom_path, out_dir, nes_pal_path=None):
     # it (areas are in play order)
     areas, carried = [], set()
     for i, a in enumerate(AREAS):
-        width = (a["map"][1] - a["map"][0]) // 6 * 32
+        width = a.get("play_px", (a["map"][1] - a["map"][0]) // 6 * 32)
         items = {it for _, _, it, _ in convert_objects.candles(rom, a["stage"], a["section"], width)}
         carried |= items & set(convert_objects.SUB_FRAMES)
         areas.append(convert_area(rom, a, i, out_dir, nes_rgb, simon_slots, carried))

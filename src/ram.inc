@@ -122,5 +122,10 @@ throwing        equ dagger_on+1         ; 1  this whip action throws the dagger
 thrown          equ throwing+1          ; 1  ... and it has left his hand
 sub_kind        equ thrown+1            ; 1  what is flying: 1 dagger, 2 axe, 3 holy water
 freeze_t        equ sub_kind+1          ; 1  stopwatch: frames the enemies stand still
-RAM_END         equ freeze_t+1
+seq_kind        equ freeze_t+1          ; 1  exit sequence: 0 none, 1 gate, 2 door
+seq_phase       equ seq_kind+1          ; 1
+seq_t           equ seq_phase+1         ; 2  frames into the phase
+door_pending    equ seq_t+2             ; 1  VBLANK: 1 open the door, 2 close it
+door_mode       equ door_pending+1      ; 1
+RAM_END         equ door_mode+1
         ASSERT RAM_END < 0xF380

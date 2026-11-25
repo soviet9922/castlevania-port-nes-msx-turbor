@@ -23,7 +23,9 @@
 - [x] Entrance hall: graphics, layout, collision, wall candles
 - [x] Stairs from the ROM's stair table: get on/off, climb and descend, whip on stairs
 - [x] The exit door at the end of the hall (upper floor) into stage 2's first section
-- [ ] The door's opening animation and camera scroll; STAGE 02 in the HUD
+- [x] The doors' sequence (camera scroll, door opens and closes, walk on), the
+      castle gate walk-in, the stage number in the HUD
+- [ ] The opened door's picture beside the doorway (the NES draws it as it opens)
 - [x] Sections joined by stairs: stage 2's stairs down to the waterway and back up
 - [x] Stage 2: the rest of the route and its exit door, into stage 3
 - [x] Stage 3's boss: wake, hover, swoop, health in the HUD, burns, orb, stage clear

@@ -54,6 +54,7 @@ main_loop:
         ; --- VBLANK work: everything that touches VRAM ---
         di
         call upload_column
+        call door_vram
         call flip_sprites
         call hud_update
         call calc_scroll
@@ -79,6 +80,12 @@ vblank_done:                            ; (tests measure VBLANK work up to here)
         call write_player_sprites
         jp main_loop
 .alive:
+        ld a,(seq_kind)                 ; castle gate / door sequence
+        or a
+        jr z,.no_seq
+        call seq_tick
+        jr .frozen
+.no_seq:
         ld a,(clear_t)                  ; stage clear: everything waits, then
         or a                            ; the game starts again (the next
         jr z,.playing                   ; block is not converted yet)
@@ -166,10 +173,9 @@ enable_page2:
         INCLUDE "area.asm"
 
 ; ---------------------------------------------------------------------------
-; Data shared by all areas (stays in bank 0)
+; Data shared by all areas (stays in bank 0; Simon's sprite patterns and
+; colours are in the last bank, see areas.asm)
 ; ---------------------------------------------------------------------------
-player_spt:     INCBIN "player_spt.bin"         ; 32 bytes per 16x16 pattern
-player_sct:     INCBIN "player_sct.bin"         ; 16 colour bytes per sprite
 player_frames:  INCBIN "player_frames.bin"      ; count, then (dy, dx, pattern, colour)
         INCLUDE "player_frames.inc"             ; player_frame_table
 jump_table:     INCBIN "player_jump.bin"        ; JUMP_LEN signed dy, rising half

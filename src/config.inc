@@ -58,7 +58,16 @@ AH_BELOW        equ 51                  ; area below (stairs down), 0xFF = none
 AH_ABOVE        equ 52                  ; area above (stairs up), 0xFF = none
 AH_RESPAWN      equ 53                  ; area to restart in after a fall/death
 AH_STAGE        equ 54                  ; stage number shown in the HUD (BCD)
-AH_SIZE         equ 55
+AH_EXIT_KIND    equ 55                  ; 0 at once, 1 castle gate, 2 door
+AH_DOOR_COL     equ 56                  ; door: tile column (2 bytes)
+AH_DOOR_CAM     equ 58                  ; door: camera x while it opens (2 bytes)
+AH_SIZE         equ 60
+
+; Exit sequences (measured on the NES)
+GATE_FRAMES     equ 120                 ; walking into the castle gate, 1 px every 3 frames
+DOOR_ROW        equ 4                   ; the door: 6 tiles from playfield row 4
+DOOR_ROWS       equ 6
+DOOR_WALK       equ 118                 ; px walked on after the door closes
 
 ; Sections: a staircase that leaves the bottom of the playfield continues in
 ; the area below (and the other way). As on the NES, x stays, y moves by
