@@ -101,6 +101,11 @@ POSE_STAR       equ 24                  ; ... with the morning star (longer)
 POSE_THROW      equ 32                  ; throw1-3, throw1c-3c (a sub-weapon)
 STAR_EXTRA      equ 16                  ; the morning star reaches 16 px further
 DAGGER_SPEED    equ 4                   ; px per frame (NES)
+AXE_VY0         equ -68                 ; 1/16 px per frame: up 4.25 (NES)
+AXE_GRAVITY     equ 4                   ; 1/16 px per frame per frame (NES)
+HOLY_VY0        equ -20                 ; the bottle's low lob (NES)
+HOLY_GRAVITY    equ 2
+HOLY_BURN       equ 72                  ; frames the fire burns (NES: about 70)
 
 ; Game rules (measured on the NES: RAM $42/$43 timer, $7FC score, $2A lives)
 TIME_START      equ 0x0300              ; BCD; restarts at a death or stage clear

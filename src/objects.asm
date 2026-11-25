@@ -36,6 +36,8 @@ OBJ_FIREBALL    equ 9
 OBJ_BOSS        equ 10
 OBJ_ORB         equ 11
 OBJ_DAGGER      equ 12
+OBJ_AXE         equ 13
+OBJ_HOLY        equ 14                  ; holy water: bottle, then fire
 
 KIND_BRAZIER    equ 0
 KIND_CANDLE     equ 1
@@ -60,11 +62,16 @@ OBJF_FIREBALL   equ 36
 OBJF_BOSS       equ 37                  ; wings open, wings up
 OBJF_ORB        equ 39
 OBJF_DAGGER_FLY equ 40                  ; flying right, flying left
+OBJF_AXE        equ 42                  ; turning: 4 frames (also its pickup)
+OBJF_BOTTLE     equ 46                  ; holy water (also its pickup)
+OBJF_FLAME      equ 47                  ; holy water's fire: 3 frames
 
 ITEM_WHIPUP     equ 0
 ITEM_HEART      equ 1
 ITEM_DAGGER     equ 2
 ITEM_SMALLHEART equ 3
+ITEM_AXE        equ 4
+ITEM_HOLYWATER  equ 5
 ITEM_NONE       equ 0xFF                ; burst of an enemy: nothing drops
 
 SPAWN_LEFT      equ 16                  ; spawn when -16 <= box x - camera <= 272
@@ -383,13 +390,24 @@ objects_update:
         call dagger_update
         jr .next
 .not_dagger:
+        cp OBJ_AXE
+        jr nz,.not_axe
+        call axe_update
+        jr .next
+.not_axe:
+        cp OBJ_HOLY
+        jr nz,.not_holy
+        call holy_update
+        jr .next
+.not_holy:
         cp OBJ_ITEM
         call z,item_update
 .next:
         ld de,OBJ_SIZE
         add ix,de
         pop bc
-        djnz .lp
+        dec b
+        jp nz,.lp
         ret
 
 brazier_update:
@@ -464,7 +482,7 @@ burst_update:
         ret
 
 item_frames:
-        db OBJF_WHIPUP, OBJF_HEART, OBJF_DAGGER, OBJF_SMALLHEART
+        db OBJF_WHIPUP, OBJF_HEART, OBJF_DAGGER, OBJF_SMALLHEART, OBJF_AXE, OBJF_BOTTLE
 
 item_update:
         inc (ix+4)
@@ -581,8 +599,16 @@ item_update:
         ld (whip_level),a
         jr .gone
 .not_whip:
-        cp ITEM_DAGGER
-        jr nz,.gone
+        sub ITEM_DAGGER                 ; sub-weapons: dagger 1, axe 2, holy water 3
+        jr z,.dagger
+        sub ITEM_AXE-ITEM_DAGGER
+        jr c,.gone
+        cp 2
+        jr nc,.gone
+        add a,2
+        ld (subweapon),a
+        jr .gone
+.dagger:
         ld a,1
         ld (subweapon),a
         jr .gone
@@ -2152,6 +2178,174 @@ dagger_box:
         ld (dagger_x1+6),hl
         ret
 
+
+; ---------------------------------------------------------------------------
+; The axe (measured on the NES): 2 px per frame forward, thrown up at
+; AXE_VY0/16 px per frame and pulled down by AXE_GRAVITY/16 each frame; it
+; turns (4 frames of 4) and goes through what it hits, off the screen.
+;   +5 direction (+1/-1)   +9 vertical speed (1/16 px)   +10 fraction
+; ---------------------------------------------------------------------------
+axe_update:
+        inc (ix+4)
+        ld a,(ix+5)                     ; x: 2 px per frame
+        add a,a
+        ld e,a
+        rla
+        sbc a,a
+        ld d,a
+        ld l,(ix+1)
+        ld h,(ix+2)
+        add hl,de
+        ld (ix+1),l
+        ld (ix+2),h
+        ld a,(ix+9)                     ; y: speed += gravity, y += speed / 16
+        add a,AXE_GRAVITY
+        jp po,.vy_ok                    ; (no overflow)
+        ld a,127
+.vy_ok:
+        ld (ix+9),a
+        call obj_fall_step
+        ld a,(ix+4)                     ; turning: frame (timer / 4) mod 4
+        rrca
+        rrca
+        and 3
+        add a,OBJF_AXE
+        ld (ix+6),a
+        ld a,(ix+3)                     ; fell out of the playfield
+        cp MT_ROWS*16
+        jr c,.on_screen
+        cp 256-32
+        jp c,sub_gone
+.on_screen:
+        call sub_on_screen
+        jp nc,sub_gone
+        jp sub_box16
+
+; Holy water (measured on the NES): the bottle is lobbed forward 3 px every
+; 2 frames, up at HOLY_VY0/16 px per frame, gravity HOLY_GRAVITY/16; on the
+; floor it breaks into fire that burns HOLY_BURN frames. +11: 0 flying, 1 fire
+holy_update:
+        inc (ix+4)
+        ld a,(ix+11)
+        or a
+        jr nz,.burning
+        ld a,(ix+4)                     ; x: 1 or 2 px (3 every 2 frames)
+        and 1
+        inc a
+        bit 7,(ix+5)
+        jr z,.dx
+        neg
+.dx:
+        ld e,a
+        rla
+        sbc a,a
+        ld d,a
+        ld l,(ix+1)
+        ld h,(ix+2)
+        add hl,de
+        ld (ix+1),l
+        ld (ix+2),h
+        ld a,(ix+9)
+        add a,HOLY_GRAVITY
+        ld (ix+9),a
+        call obj_fall_step
+        ld (ix+6),OBJF_BOTTLE
+        call sub_on_screen
+        jr nc,sub_gone
+        ld a,(ix+9)                     ; coming down onto the floor?
+        or a
+        jp m,sub_box16
+        ld l,(ix+1)
+        ld h,(ix+2)
+        ld de,8
+        add hl,de
+        ld a,(ix+3)
+        add a,16
+        ld e,a
+        ld d,0
+        call solid_at
+        jp nc,sub_box16
+        ld a,(ix+3)                     ; it breaks: fire, standing on the tile
+        add a,16
+        and 0xF8
+        sub 16
+        ld (ix+3),a
+        ld (ix+11),1
+        ld (ix+4),0
+.burning:
+        ld a,(ix+4)
+        cp HOLY_BURN
+        jr nc,sub_gone
+        rrca                            ; flames: (timer / 4) mod 3
+        rrca
+        and 3
+        cp 3
+        jr nz,.f
+        ld a,1
+.f:
+        add a,OBJF_FLAME
+        ld (ix+6),a
+        jp sub_box16
+
+; the sub-weapon is gone
+sub_gone:
+        xor a
+        ld (dagger_on),a
+        ld (ix+0),OBJ_NONE
+        ret
+
+; carry if the object (16 px wide) is still (partly) on the screen
+sub_on_screen:
+        ld l,(ix+1)
+        ld h,(ix+2)
+        ld de,(cam_x)
+        or a
+        sbc hl,de
+        ld de,16
+        add hl,de
+        bit 7,h
+        ret nz                          ; (no carry)
+        ld de,256+16+1
+        or a
+        sbc hl,de
+        ret                             ; carry: on screen
+
+; the sub-weapon's hit box: the object's 16x16 (x..x+15, y..y+15)
+sub_box16:
+        ld l,(ix+1)
+        ld h,(ix+2)
+        ld (dagger_x1),hl
+        ld de,15
+        add hl,de
+        ld (dagger_x1+2),hl
+        ld l,(ix+3)
+        ld h,0
+        bit 7,l
+        jr z,.y
+        dec h
+.y:
+        ld (dagger_x1+4),hl
+        add hl,de
+        ld (dagger_x1+6),hl
+        ret
+
+; y += (+9) / 16 with the fraction in +10 (signed)
+obj_fall_step:
+        ld c,a
+        ld a,(ix+10)
+        add a,c
+        ld c,a
+        sra a
+        sra a
+        sra a
+        sra a
+        add a,(ix+3)
+        ld (ix+3),a
+        ld a,c
+        and 15
+        ld (ix+10),a
+        ret
+
 ; -> A = number of zombies alive, Z if none (BC, DE, IX clobbered)
 count_zombies:
         ld ix,obj_table
@@ -2209,8 +2403,12 @@ weapon_hits:
         ld hl,dagger_x1
         call .try
         ret nc
+        ld a,(sub_kind)                 ; the dagger is spent; the axe and the
+        cp 1                            ; holy water's fire go on
+        jr nz,.pierce
         xor a
         ld (dagger_on),a
+.pierce:
         scf
         ret
 .try:

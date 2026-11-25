@@ -165,10 +165,30 @@ Candle item codes (the byte after `$FF` in a candle record) seen in block 1: `$0
 big heart, `$08` dagger, `$00` small heart (in stage 3 the first one gave the whip
 upgrade), and `$0A`, `$0B`, `$0D`, `$0E`, `$0F`, `$11`, `$21`, not identified yet.
 
-Whipping stage 3's candles on the NES (a local whipping variant of
-`record_stage3.lua`): the item dropped near world x 160 set the sub-weapon `$15B` to
-15. With that sub-weapon (`tools/nes_probe/record_subweapon.lua`), UP + B costs 5
-hearts and throws nothing: the stopwatch. No axe appeared in stage 3.
+How a candle's item is chosen (fixed bank, `$EB8A`): the low nibble of the candle's
+code indexes the table at `$EC16` (item types: `$08` -> `$17`, `$0B` -> `$44`, `$0D` ->
+`$18`, `$0E` -> `$45`, ...). Code 1 is a money bag (the high nibble its value). A
+sub-weapon item turns into a heart instead when Simon already holds that sub-weapon,
+or while another sub-weapon item is waiting to be picked up (flag `$72`). Picking a
+sub-weapon up copies the candle's code into `$15B` (`$E7C9`).
+
+| Code | Sub-weapon | Where in block 1 | Cost |
+|---|---|---|---|
+| `$08` | dagger | courtyard | 1 heart |
+| `$0B` | holy water | the hall's upper floor | 1 heart |
+| `$0D` | axe | stage 3, the candle on the floor right of the stairs | 1 heart |
+| `$0E`/`$0F` | stopwatch | stage 3 (x 192), stage 2 waterway | 5 hearts |
+
+(Found with whipping variants of `record_stage3.lua` and a player's videos of the
+NES game; `tools/nes_probe/record_subweapon.lua` throws a given sub-weapon.)
+
+- Axe: leaves the hand about 22 frames after the press, flies forward 2 px per
+  frame, up at about 4.25 px per frame with gravity 1/4 px per frame per frame, and
+  turns (tiles `B7 B9`, palette 1, flipped four ways, 4 frames each). It goes on
+  through what it hits and off the screen.
+- Holy water: the bottle (tile `76`, palette 2) is lobbed forward 3 px every 2
+  frames in a low arc; on the floor it breaks into fire (tiles `91 93 95`) for
+  about 70 frames, which burns what it touches (a brazier in the recording).
 
 ## Stage 2's way out and stage 3
 

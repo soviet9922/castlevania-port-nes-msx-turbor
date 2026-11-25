@@ -40,7 +40,8 @@ OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
               "bat1_l", "bat2_l", "bat3_l", "bat1_r", "bat2_r", "bat3_r",
               "fish_walk1_l", "fish_walk2_l", "fish_shoot_l",
               "fish_walk1_r", "fish_walk2_r", "fish_shoot_r", "fireball",
-              "boss_open", "boss_up", "orb", "dagger_fly_r", "dagger_fly_l"]
+              "boss_open", "boss_up", "orb", "dagger_fly_r", "dagger_fly_l",
+              "axe1", "axe2", "axe3", "axe4", "bottle", "flame1", "flame2", "flame3"]
 
 # Black panther: 32x16, palette 3, art faces left (recorded in the hall).
 # Run cycle run1 -> run2 -> run3, 7 frames each; the leap shows run2.
@@ -57,6 +58,7 @@ ENEMY_BOSS = 0x59               # enemy group record type: the stage 3 boss
 ITEM_NONE = 0xFF
 ENEMY_PANTHER = 0x51            # enemy group record type: a waiting black panther
 ITEM_WHIPUP, ITEM_HEART, ITEM_DAGGER, ITEM_SMALLHEART = 0, 1, 2, 3
+ITEM_AXE, ITEM_HOLYWATER = 4, 5
 
 # frame: list of (tile, dx, dy, palette, hflip) relative to the object's
 # 16x32 box top-left (box = brazier: flame on top, bowl below)
@@ -112,6 +114,19 @@ FRAME_SPRITES["orb"] = [(0x5C, 0, 0, 3, 0), (0x5C, 8, 0, 3, 1)]
 FRAME_SPRITES["dagger_fly_r"] = [(0xBD, 0, 0, 2, 3), (0xBB, 8, 0, 2, 3)]
 FRAME_SPRITES["dagger_fly_l"] = [(0xBB, 0, 0, 2, 2), (0xBD, 8, 0, 2, 2)]
 
+# the axe (recorded): 16x16, palette 1, turning: the same two tiles flipped
+# four ways, 4 frames each; also its pickup
+FRAME_SPRITES["axe1"] = [(0xB7, 0, 0, 1, 0), (0xB9, 8, 0, 1, 0)]
+FRAME_SPRITES["axe2"] = [(0xB9, 0, 0, 1, 1), (0xB7, 8, 0, 1, 1)]
+FRAME_SPRITES["axe3"] = [(0xB9, 0, 0, 1, 3), (0xB7, 8, 0, 1, 3)]
+FRAME_SPRITES["axe4"] = [(0xB7, 0, 0, 1, 2), (0xB9, 8, 0, 1, 2)]
+# holy water (recorded): the bottle (palette 2, also its pickup) and the fire
+# it leaves on the floor (palette 3)
+FRAME_SPRITES["bottle"] = [(0x76, 4, 0, 2, 0)]
+FRAME_SPRITES["flame1"] = [(0x91, 4, 0, 3, 0)]
+FRAME_SPRITES["flame2"] = [(0x93, 4, 0, 3, 0)]
+FRAME_SPRITES["flame3"] = [(0x95, 4, 0, 3, 0)]
+
 ENEMY_ZOMBIE = 0x01             # spawner types in the enemy group records
 ENEMY_BAT = 0x02
 ENEMY_FISH = 0x03
@@ -145,6 +160,10 @@ def candles(rom, stage, section, level_px):
             item = ITEM_HEART
         elif code == 8:
             item = ITEM_DAGGER
+        elif code == 0x0D:              # the axe (NES: item $18)
+            item = ITEM_AXE
+        elif code == 0x0B:              # holy water (NES: item $44)
+            item = ITEM_HOLYWATER
         elif code == 0 and kind == KIND_BRAZIER:
             item = ITEM_WHIPUP
         else:
@@ -176,16 +195,25 @@ def candles(rom, stage, section, level_px):
 MAX_OBJ_PATTERNS = 64 - 12
 
 ITEM_FRAMES = {ITEM_WHIPUP: "whipup", ITEM_HEART: "heart",
-               ITEM_DAGGER: "dagger", ITEM_SMALLHEART: "smallheart"}
+               ITEM_DAGGER: "dagger", ITEM_SMALLHEART: "smallheart",
+               ITEM_AXE: "axe1", ITEM_HOLYWATER: "bottle"}
 
 # Frames to fold into another one when an area is over the pattern budget,
 # least visible loss first.
 FOLDS = [("panther_run3_l", "panther_run1_l"), ("panther_run3_r", "panther_run1_r"),
-         ("panther_sit_r", "panther_sit_l")]
+         ("panther_sit_r", "panther_sit_l"), ("flame3", "flame1"), ("flame2", "flame1"),
+         ("axe3", "axe1"), ("axe4", "axe2"), ("burst4", "burst3"), ("burst2", "burst1"),
+         ("zombie_l2", "zombie_l1"), ("zombie_r2", "zombie_r1")]
 
 
-def needed_frames(candle_list, spawners):
-    """-> set of frame names an area can show (others are left empty)."""
+SUB_FRAMES = {ITEM_DAGGER: {"dagger_fly_r", "dagger_fly_l"},
+              ITEM_AXE: {"axe1", "axe2", "axe3", "axe4"},
+              ITEM_HOLYWATER: {"bottle", "flame1", "flame2", "flame3"}}
+
+
+def needed_frames(candle_list, spawners, carried=()):
+    """-> set of frame names an area can show (others are left empty).
+    carried: the sub-weapon items Simon can have picked up by now."""
     need = {"burst1", "burst2", "burst3", "burst4"}
     for _, _, item, kind in candle_list:
         if kind == KIND_BRAZIER:
@@ -198,7 +226,9 @@ def needed_frames(candle_list, spawners):
             need |= {n for n in OBJ_FRAMES if n.startswith("panther")}
         if item in ITEM_FRAMES:
             need.add(ITEM_FRAMES[item])
-    need |= {"dagger_fly_r", "dagger_fly_l"}    # it can be carried into any area
+    # sub-weapons found here or carried from an earlier area
+    for item in set(carried) | {it for _, _, it, _ in candle_list}:
+        need |= SUB_FRAMES.get(item, set())
     kinds = {k for _, _, k in spawners}
     if ENEMY_ZOMBIE in kinds:
         need |= {n for n in OBJ_FRAMES if n.startswith("zombie")}
@@ -220,6 +250,8 @@ def sprite_frames(rom, slot_for_nes, need=None):
             alias[drop] = keep
         bank = _build_bank(rom, slot_for_nes, need, alias)
         if len(bank.patterns) <= MAX_OBJ_PATTERNS:
+            if alias:
+                print("  object frames folded to fit:", ", ".join(f"{a}->{b}" for a, b in alias.items()))
             return bank, list(OBJ_FRAMES)
     raise SystemExit(f"object sprites need {len(bank.patterns)} patterns, "
                      f"only {MAX_OBJ_PATTERNS} available")

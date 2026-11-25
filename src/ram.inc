@@ -60,7 +60,7 @@ obj_sct_list    equ spr_player_n+1      ; MAX_SPRITES colour column per sprite
 obj_table       equ obj_sct_list+MAX_SPRITES ; OBJ_MAX*OBJ_SIZE
 hearts          equ obj_table+OBJ_MAX*OBJ_SIZE ; 1
 whip_level      equ hearts+1            ; 1  0 leather, 1 chain, 2 morning star
-subweapon       equ whip_level+1        ; 1  0 none, 1 dagger
+subweapon       equ whip_level+1        ; 1  0 none, 1 dagger, 2 axe, 3 holy water
 hud_dirty       equ subweapon+1         ; 1
 
 area_hdr        equ hud_dirty+1         ; AH_SIZE copy of the current area's header
@@ -120,5 +120,6 @@ dagger_x1       equ hit_x1+8            ; 8  the flying dagger's box, same layou
 dagger_on       equ dagger_x1+8         ; 1  a dagger is flying
 throwing        equ dagger_on+1         ; 1  this whip action throws the dagger
 thrown          equ throwing+1          ; 1  ... and it has left his hand
-RAM_END         equ thrown+1
+sub_kind        equ thrown+1            ; 1  what is flying: 1 dagger, 2 axe, 3 holy water
+RAM_END         equ sub_kind+1
         ASSERT RAM_END < 0xF380

@@ -224,8 +224,22 @@ def tcl_script(syms, result_file):
                        set ::wpn_tag dagger; set ::wpn_on 1; set ::dagger_xs {{}}
                        keymatrixdown 8 0x20; keymatrixdown 4 0x04
                        after time 0.05 {{ keymatrixup 4 0x04 }}; after time 0.3 {{ keymatrixup 8 0x20 }} }}
-    after time 90.3 {{ wpn_report }}
-    after time 90.5 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
+    after time 90.3 {{ wpn_report
+                       # the axe: standing still, UP + whip
+                       poke {syms["subweapon"]} 2; poke {syms["hearts"]} 10; poke {fa} 0
+                       set ::wpn_tag axe; set ::wpn_on 1; set ::sub_track {{}}
+                       keymatrixdown 8 0x20; keymatrixdown 4 0x04
+                       after time 0.05 {{ keymatrixup 4 0x04 }}; after time 0.3 {{ keymatrixup 8 0x20 }} }}
+    after time 92.0 {{ wpn_report
+                       # holy water, 40 px left of the second brazier
+                       set bx [expr {{[peek {obj + 1 + obj_size}] + 256*[peek {obj + 2 + obj_size}] - 40}}]
+                       poke {px_a} [expr {{$bx & 255}}]; poke {px_a + 1} [expr {{$bx >> 8}}]
+                       poke {syms["subweapon"]} 3; poke {syms["hearts"]} 10; poke {fa} 0
+                       set ::wpn_tag holy; set ::wpn_on 1; set ::sub_track {{}}; set ::brazier_x [peek {obj + 1 + obj_size}]
+                       keymatrixdown 8 0x20; keymatrixdown 4 0x04
+                       after time 0.05 {{ keymatrixup 4 0x04 }}; after time 0.3 {{ keymatrixup 8 0x20 }} }}
+    after time 94.0 {{ wpn_report }}
+    after time 94.2 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """ if areas > 1 else f"""
     after time 9.0  {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
@@ -388,6 +402,8 @@ set ::wpn_tag ""
 set ::wpn_poses {{}}
 set ::wpn_reach 0
 set ::dagger_xs {{}}
+set ::sub_track {{}}
+set ::brazier_x 0
 proc wpn_watch {{}} {{
     if {{!$::wpn_on}} return
     set p [peek {pf}]
@@ -399,14 +415,18 @@ proc wpn_watch {{}} {{
     for {{set i 0}} {{$i < 8}} {{incr i}} {{
         set b [expr {{{objt} + $i*{obj_size}}}]
         if {{[peek $b] == 12}} {{ lappend ::dagger_xs [expr {{[peek [expr {{$b+1}}]] + 256*[peek [expr {{$b+2}}]]}}] }}
+        if {{[peek $b] == 13 || [peek $b] == 14}} {{
+            set y [peek [expr {{$b+3}}]]; if {{$y > 127}} {{ set y [expr {{$y - 256}}] }}
+            lappend ::sub_track "[expr {{[peek [expr {{$b+1}}]] + 256*[peek [expr {{$b+2}}]]}}]:$y:[peek [expr {{$b+11}}]]"
+        }}
     }}
 }}
 debug set_watchpoint write_mem {fc} {{}} wpn_watch
 proc wpn_report {{}} {{
     set f [open "{result_file}" a]
-    puts $f "weapon $::wpn_tag poses=[join [lsort -integer $::wpn_poses] ,] reach=$::wpn_reach hearts=[peek {syms["hearts"]}] daggers=[join [lrange $::dagger_xs 0 5] ,] obj0=[peek {obj}]"
+    puts $f "weapon $::wpn_tag poses=[join [lsort -integer $::wpn_poses] ,] reach=$::wpn_reach hearts=[peek {syms["hearts"]}] daggers=[join [lrange $::dagger_xs 0 5] ,] obj0=[peek {obj}] obj1=[peek {obj + obj_size}] track=[join $::sub_track ,]"
     close $f
-    set ::wpn_on 0; set ::wpn_poses {{}}; set ::wpn_reach 0
+    set ::wpn_on 0; set ::wpn_poses {{}}; set ::wpn_reach 0; set ::sub_track {{}}
 }}
 proc count_type {{t}} {{
     set n 0
@@ -487,6 +507,17 @@ proc wait_game {{}} {{
 after time 0.1 wait_game
 after time 110 {{ exit }}
 """
+
+
+def axe_ok(track):
+    """the axe's path (x:y:state, one per frame): x +2 per frame, up then down"""
+    pts = [tuple(int(v) for v in p.split(":")[:2]) for p in track.split(",") if p]
+    if len(pts) < 20:
+        return False
+    xs, ys = [p[0] for p in pts], [p[1] for p in pts]
+    top = ys.index(min(ys))
+    return (all(b - a == 2 for a, b in zip(xs, xs[1:]))
+            and 3 < top < len(ys) - 3 and ys[-1] > ys[top] + 20 and ys[0] > ys[top] + 20)
 
 
 def run():
@@ -718,6 +749,12 @@ def run():
             and int(weapons["dagger"]["daggers"].split(",")[1]) - int(weapons["dagger"]["daggers"].split(",")[0]) == 4
             and weapons["dagger"]["obj0"] in ("2", "3"))]
           if "dagger" in weapons else []),
+        *([("the axe costs one heart and flies up and forward, 2 px per frame, then down",
+            weapons["axe"]["hearts"] == "9" and axe_ok(weapons["axe"]["track"])),
+           ("holy water costs one heart, lands, burns, and burns down a brazier",
+            weapons["holy"]["hearts"] == "9" and ":1" in weapons["holy"]["track"]
+            and weapons["holy"]["obj1"] in ("0", "2", "3"))]
+          if "holy" in weapons else []),
         *([("UP at a staircase's foot climbs it to the top",
             (snaps["11_stairs_up"]["px"], snaps["11_stairs_up"]["py"]) == stair["top"]
             and snaps["11_stairs_up"]["stair_state"] == 0 and snaps["11_stairs_up"]["on_ground"] == 1),

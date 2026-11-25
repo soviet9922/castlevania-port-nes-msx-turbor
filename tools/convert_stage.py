@@ -166,7 +166,7 @@ def nes_to_msx_rgb(c):
     return tuple(min(7, (v * 7 + 127) // 255) for v in c)
 
 
-def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, preview=True):
+def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), preview=True):
     import cv_rom
     out_dir = os.path.join(out_root, f"area_{index}")
     os.makedirs(out_dir, exist_ok=True)
@@ -239,7 +239,7 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, preview=True)
     cl = convert_objects.candles(rom, area["stage"], area["section"], width)
     en = convert_objects.enemy_spawners(rom, area["stage"], area["section"], width)
     obj_bank, obj_names = convert_objects.sprite_frames(
-        rom, slot_for_nes, convert_objects.needed_frames(cl, en))
+        rom, slot_for_nes, convert_objects.needed_frames(cl, en, carried))
     n_obj_patterns, _ = msx_sprites.write_bank(out_dir, obj_bank, obj_names,
                                                prefix=f"a{index}_obj")
     convert_objects.write_candles(os.path.join(out_dir, "candles.bin"), cl)
@@ -300,7 +300,14 @@ def convert(rom_path, out_dir, nes_pal_path=None):
     with open(os.path.join(out_dir, "player_kb.bin"), "wb") as f:
         f.write(kb)
 
-    areas = [convert_area(rom, a, i, out_dir, nes_rgb, simon_slots) for i, a in enumerate(AREAS)]
+    # sub-weapons Simon can carry into each area: those found in it or before
+    # it (areas are in play order)
+    areas, carried = [], set()
+    for i, a in enumerate(AREAS):
+        width = (a["map"][1] - a["map"][0]) // 6 * 32
+        items = {it for _, _, it, _ in convert_objects.candles(rom, a["stage"], a["section"], width)}
+        carried |= items & set(convert_objects.SUB_FRAMES)
+        areas.append(convert_area(rom, a, i, out_dir, nes_rgb, simon_slots, carried))
     areas_asm.write(out_dir, areas)
 
 

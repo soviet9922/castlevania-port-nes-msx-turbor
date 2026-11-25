@@ -255,6 +255,15 @@ whip and the dagger share one hit test (`weapon_hits`), so everything the whip c
 destroy, the dagger can too; a dagger is spent on its first hit. One dagger can fly at
 a time.
 
+The axe and holy water work the same way (one sub-weapon in the air at a time, one
+heart each) with their own movement: the axe flies up and forward under gravity,
+goes through what it hits and leaves the screen; holy water is lobbed low and burns
+on the floor for 72 frames, hitting what touches the fire. The converter includes a
+sub-weapon's sprites only in areas where Simon can have it by then (found there or
+earlier), and folds animation frames together where an area would need more than
+the 52 free sprite patterns (stage 3: two turning frames for the axe, one walking
+frame for the zombies).
+
 ## Areas and ROM banks
 
 Each area (courtyard, entrance hall, …) is one 16 KB ROM bank (area n =

@@ -476,6 +476,30 @@ OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
 # frames the placeholder level doesn't use (bats, fishmen, boss: OBJF 24-39)
 # stay empty so that the engine's frame numbers match; then the flying dagger
 OBJ_FRAMES += [f"unused{i}" for i in range(24, 40)] + ["dagger_fly_r", "dagger_fly_l"]
+OBJ_FRAMES += ["axe1", "axe2", "axe3", "axe4", "bottle", "flame1", "flame2", "flame3"]
+# original placeholder art: a double-bladed throwing hatchet, turning
+_HATCHET = [
+    "................", "..77........77..", ".7777......7777.", ".77777....77777.",
+    ".777777ff777777.", ".777777ff777777.", ".77777.ff.77777.", ".7777..ff..7777.",
+    "..77...ff...77..", ".......ff.......", ".......ff.......", ".......ff.......",
+    ".......ff.......", ".......ff.......", "......ffff......", "................",
+]
+_FLASK = [
+    "................", "......ffff......", ".......55.......", ".......55.......",
+    "......5555......", ".....555555.....", "....55555555....", "....55555555....",
+    "....55555555....", ".....555555.....", "......5555......", "................",
+    "................", "................", "................", "................",
+]
+def _turn(art):  # a quarter turn clockwise
+    return ["".join(art[15 - x][y] for x in range(16)) for y in range(16)]
+PLACEHOLDER_OBJECTS["axe1"] = _HATCHET
+PLACEHOLDER_OBJECTS["axe2"] = _turn(_HATCHET)
+# (two turns only: the placeholder level has no room for four in 52 patterns)
+PLACEHOLDER_OBJECTS["axe3"] = _HATCHET
+PLACEHOLDER_OBJECTS["axe4"] = _turn(_HATCHET)
+PLACEHOLDER_OBJECTS["bottle"] = _FLASK
+for _n, _b in (("flame1", 0), ("flame2", 1), ("flame3", 2)):
+    PLACEHOLDER_OBJECTS[_n] = _BURSTS[_b][8:24]
 for _i in range(24, 40):
     PLACEHOLDER_OBJECTS[f"unused{_i}"] = ["." * 16]
 PLACEHOLDER_OBJECTS["dagger_fly_r"] = _DAGGER

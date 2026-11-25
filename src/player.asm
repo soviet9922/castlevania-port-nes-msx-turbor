@@ -730,6 +730,8 @@ start_throw:
         ld a,1
         ld (throwing),a
         ld (hud_dirty),a
+        ld a,(subweapon)
+        ld (sub_kind),a
         ret
 
 ; The dagger leaves Simon's hand: an object flying the way he faces
@@ -739,6 +741,11 @@ throw_dagger:
         push ix
         call obj_free_slot
         jr c,.none
+        ld a,(sub_kind)
+        cp 2
+        jr z,.axe
+        cp 3
+        jp z,.holy
         ld hl,(px)
         ld (ix+1),l
         ld (ix+2),h
@@ -763,6 +770,49 @@ throw_dagger:
         ld (dagger_on),a
         call dagger_box
 .none:
+        pop ix
+        ret
+.axe:                                   ; the axe: thrown up and forward
+        ld hl,(px)
+        ld (ix+1),l
+        ld (ix+2),h
+        ld a,(pyoff)
+        ld b,a
+        ld a,(py)
+        add a,b
+        sub 16
+        ld (ix+3),a
+        ld (ix+0),OBJ_AXE
+        ld (ix+9),AXE_VY0
+        jr .thrown
+.holy:                                  ; holy water: lobbed low
+        ld hl,(px)
+        ld (ix+1),l
+        ld (ix+2),h
+        ld a,(pyoff)
+        ld b,a
+        ld a,(py)
+        add a,b
+        add a,2
+        ld (ix+3),a
+        ld (ix+0),OBJ_HOLY
+        ld (ix+9),HOLY_VY0
+.thrown:
+        ld a,(facing)
+        or a
+        ld a,1
+        jr z,.d
+        ld a,-1
+.d:
+        ld (ix+5),a
+        ld (ix+4),0
+        ld (ix+7),KIND_BAT
+        ld (ix+8),0xFF
+        ld (ix+10),0
+        ld (ix+11),0
+        ld a,1
+        ld (dagger_on),a
+        call sub_box16
         pop ix
         ret
 
