@@ -252,10 +252,10 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
     play_px = area.get("play_px", width)    # objects only from the area itself
     cl = convert_objects.candles(rom, area["stage"], area["section"], play_px)
     en = convert_objects.enemy_spawners(rom, area["stage"], area["section"], play_px)
-    obj_bank, obj_names = convert_objects.sprite_frames(
-        rom, slot_for_nes, convert_objects.needed_frames(cl, en, carried))
-    n_obj_patterns, _ = msx_sprites.write_bank(out_dir, obj_bank, obj_names,
-                                               prefix=f"a{index}_obj")
+    objs = convert_objects.object_sprites(
+        rom, slot_for_nes, convert_objects.needed_frames(cl, en, carried), carried)
+    write_object_sprites(out_dir, index, objs)
+    n_obj_patterns = objs.n_main
     convert_objects.write_candles(os.path.join(out_dir, "candles.bin"), cl)
     convert_objects.write_enemies(os.path.join(out_dir, "enemies.bin"), en)
 
@@ -267,7 +267,8 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
         f.write(data)
 
     params = msx_area.write_area(out_dir, pixels, msx_pal, solid, sx, sy, area["name"])
-    params.update(dir=f"area_{index}", obj_patterns=n_obj_patterns,
+    params.update(dir=f"area_{index}", obj_patterns=n_obj_patterns, subs=sorted(objs.subs),
+                  sub_slot=objs.n_main,
                   exit_x=area.get("exit_x"), exit_y=area.get("exit_y", 0xFF),
                   below=area.get("below", 0xFF), above=area.get("above", 0xFF),
                   respawn=area.get("respawn", index),
@@ -361,6 +362,26 @@ def add_door_columns(rom, pixels, solid, door_col, slot_for_nes, backdrop):
             row += block[y]
     for row in solid:
         row += [0] * 6
+
+
+def write_object_sprites(out_dir, index, objs):
+    """a<n>_obj_spt/sct/frames.bin, the frame table include, and a<n>_sub<k>_spt.bin
+    for each sub-weapon's window patterns (see convert_objects.ObjectSprites)"""
+    p = f"a{index}_obj"
+    for suffix, data in (("spt", objs.main_spt), ("sct", objs.sct), ("frames", objs.frames)):
+        with open(os.path.join(out_dir, f"{p}_{suffix}.bin"), "wb") as f:
+            f.write(data)
+    for n, data in objs.subs.items():
+        with open(os.path.join(out_dir, f"a{index}_sub{n}_spt.bin"), "wb") as f:
+            f.write(data)
+    lines = ["; generated sprite frames - do not edit",
+             f"{p.upper()}_FRAME_COUNT equ {len(objs.offsets)}",
+             f"{p.upper()}_PATTERNS    equ {objs.n_main}",
+             f"{p}_frame_table:"]
+    for name, off in zip(convert_objects.OBJ_FRAMES, objs.offsets):
+        lines.append(f"        dw {p}_frames+{off:<5}  ; {name}")
+    with open(os.path.join(out_dir, f"{p}_frames.inc"), "w") as f:
+        f.write("\n".join(lines) + "\n")
 
 
 def write_hud_icons(rom, out_dir):

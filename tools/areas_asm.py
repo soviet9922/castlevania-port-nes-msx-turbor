@@ -21,6 +21,8 @@ The engine maps an area's bank at 0x8000 and copies its header to RAM
   (half open, open; or for the castle gate, +56 is where Simon goes behind it),
   +62 the x Simon walks on to after the door shuts, +64 the camera x the
   screen scrolls on to (both: where the next area starts)
+  +66 patterns of the flying dagger, axe, holy water (0 = none here), +72 their
+  sizes, +78 the pattern slot of the sub-weapon window (after the main ones)
 """
 
 import os
@@ -55,6 +57,10 @@ def write(gen_dir, areas):
             f"{a.get('respawn', i)}, 0x{a.get('stage_no', 1):02X}, {a.get('exit_kind', 0)}",
             f"        dw {a.get('door_col', 0)}, {a.get('door_cam', 0)}, {a.get('door_vcol', 0)}, "
             f"{a.get('walk_end', 0)}, {a.get('cam_end', 0)}",
+            "        dw " + ", ".join(f"{p}sub{n}_spt" if n in a.get("subs", []) else "0" for n in (1, 2, 3)),
+            "        dw " + ", ".join(f"{p}sub{n}_end-{p}sub{n}_spt" if n in a.get("subs", []) else "0"
+                                     for n in (1, 2, 3)),
+            f"        db {a.get('sub_slot', 0)}",
             f'{p}palette: INCBIN "{d}/palette.bin"',
         ]
         for b in range(3):
@@ -67,6 +73,8 @@ def write(gen_dir, areas):
             f'{p}stairs:  INCBIN "{d}/stairs.bin"',
             f'{p}enemies: INCBIN "{d}/enemies.bin"',
             f'{p}obj_spt: INCBIN "{d}/{p}obj_spt.bin"',
+            *[line for n in a.get("subs", [])
+              for line in (f'{p}sub{n}_spt: INCBIN "{d}/{p}sub{n}_spt.bin"', f"{p}sub{n}_end:")],
             f'{p}obj_sct: INCBIN "{d}/{p}obj_sct.bin"',
             f'{p}obj_frames: INCBIN "{d}/{p}obj_frames.bin"',
             f'        INCLUDE "{d}/{p}obj_frames.inc"',

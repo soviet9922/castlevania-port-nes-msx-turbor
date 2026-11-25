@@ -42,7 +42,7 @@ OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
               "fish_walk1_r", "fish_walk2_r", "fish_shoot_r", "fireball",
               "boss_open", "boss_up", "orb", "dagger_fly_r", "dagger_fly_l",
               "axe1", "axe2", "axe3", "axe4", "bottle", "flame1", "flame2", "flame3",
-              "holy_item", "watch_item"]
+              "holy_item", "watch_item", "flame4", "flame5", "axe_item"]
 
 # Black panther: 32x16, palette 3, art faces left (recorded in the hall).
 # Run cycle run1 -> run2 -> run3, 7 frames each; the leap shows run2.
@@ -121,12 +121,18 @@ FRAME_SPRITES["axe1"] = [(0xB7, 0, 0, 1, 0), (0xB9, 8, 0, 1, 0)]
 FRAME_SPRITES["axe2"] = [(0xB9, 0, 0, 1, 1), (0xB7, 8, 0, 1, 1)]
 FRAME_SPRITES["axe3"] = [(0xB9, 0, 0, 1, 3), (0xB7, 8, 0, 1, 3)]
 FRAME_SPRITES["axe4"] = [(0xB7, 0, 0, 1, 2), (0xB9, 8, 0, 1, 2)]
+FRAME_SPRITES["axe_item"] = FRAME_SPRITES["axe1"]
 # holy water (recorded): the bottle (palette 2, also its pickup) and the fire
 # it leaves on the floor (palette 3)
 FRAME_SPRITES["bottle"] = [(0x76, 4, 0, 2, 0)]
-FRAME_SPRITES["flame1"] = [(0x91, 4, 0, 3, 0)]
-FRAME_SPRITES["flame2"] = [(0x93, 4, 0, 3, 0)]
-FRAME_SPRITES["flame3"] = [(0x95, 4, 0, 3, 0)]
+# the fire (recorded on the hall's floor): 91, 93, 95, then wide 97, 99 (both
+# halves, mirrored), 8 frames each, round again, 77 frames in all. Drawn 8 px
+# down like the bursts, so that flames 2 and 3 share the bursts' patterns
+FRAME_SPRITES["flame1"] = [(0x91, 4, 8, 3, 0)]
+FRAME_SPRITES["flame2"] = [(0x93, 4, 8, 3, 0)]
+FRAME_SPRITES["flame3"] = [(0x95, 4, 8, 3, 0)]
+FRAME_SPRITES["flame4"] = [(0x97, 0, 8, 3, 0), (0x97, 8, 8, 3, 1)]
+FRAME_SPRITES["flame5"] = [(0x99, 0, 8, 3, 0), (0x99, 8, 8, 3, 1)]
 # pickups shown like the HUD's icons (recorded): holy water, the stopwatch
 FRAME_SPRITES["holy_item"] = [(0xA1, 0, 0, 2, 0), (0xA3, 8, 0, 2, 0)]
 FRAME_SPRITES["watch_item"] = [(0x89, 0, 0, 2, 0), (0x8B, 8, 0, 2, 0)]
@@ -202,19 +208,23 @@ MAX_OBJ_PATTERNS = 64 - 12
 
 ITEM_FRAMES = {ITEM_WHIPUP: "whipup", ITEM_HEART: "heart",
                ITEM_DAGGER: "dagger", ITEM_SMALLHEART: "smallheart",
-               ITEM_AXE: "axe1", ITEM_HOLYWATER: "holy_item", ITEM_STOPWATCH: "watch_item"}
+               ITEM_AXE: "axe_item", ITEM_HOLYWATER: "holy_item", ITEM_STOPWATCH: "watch_item"}
 
 # Frames to fold into another one when an area is over the pattern budget,
 # least visible loss first.
 FOLDS = [("panther_run3_l", "panther_run1_l"), ("panther_run3_r", "panther_run1_r"),
-         ("panther_sit_r", "panther_sit_l"), ("flame3", "flame1"), ("flame2", "flame1"),
-         ("axe3", "axe1"), ("axe4", "axe2"), ("burst4", "burst3"), ("burst2", "burst1"),
-         ("candle2", "candle1"), ("zombie_l2", "zombie_l1"), ("zombie_r2", "zombie_r1")]
+         ("panther_sit_r", "panther_sit_l"), ("axe3", "axe1"), ("axe4", "axe2"),
+         ("candle2", "candle1"),
+         ("flame5", "flame4"),          # (the fire's two wide flames look alike)
+         ("burst4", "burst3"), ("burst2", "burst1"),
+         ("fish_walk2_l", "fish_walk1_l"), ("fish_walk2_r", "fish_walk1_r"),
+         ("zombie_l2", "zombie_l1"), ("zombie_r2", "zombie_r1"),
+         ("flame3", "flame1"), ("flame2", "flame1"), ("flame4", "flame1"), ("axe2", "axe1")]
 
 
 SUB_FRAMES = {ITEM_DAGGER: {"dagger_fly_r", "dagger_fly_l"},
               ITEM_AXE: {"axe1", "axe2", "axe3", "axe4"},
-              ITEM_HOLYWATER: {"bottle", "flame1", "flame2", "flame3"}}
+              ITEM_HOLYWATER: {"bottle", "flame1", "flame2", "flame3", "flame4", "flame5"}}
 
 
 def needed_frames(candle_list, spawners, carried=()):
@@ -232,9 +242,8 @@ def needed_frames(candle_list, spawners, carried=()):
             need |= {n for n in OBJ_FRAMES if n.startswith("panther")}
         if item in ITEM_FRAMES:
             need.add(ITEM_FRAMES[item])
-    # sub-weapons found here or carried from an earlier area
-    for item in set(carried) | {it for _, _, it, _ in candle_list}:
-        need |= SUB_FRAMES.get(item, set())
+    # (the flying sub-weapons' frames are not here: only the one Simon holds
+    # needs patterns, and it gets a window of its own, see object_sprites)
     kinds = {k for _, _, k in spawners}
     if ENEMY_ZOMBIE in kinds:
         need |= {n for n in OBJ_FRAMES if n.startswith("zombie")}
@@ -243,6 +252,100 @@ def needed_frames(candle_list, spawners, carried=()):
     if ENEMY_FISH in kinds:
         need |= {n for n in OBJ_FRAMES if n.startswith("fish")} | {"fireball"}
     return need
+
+
+# the engine's sub-weapon numbers (src/ram.inc: subweapon) for the items
+SUB_OF_ITEM = {ITEM_DAGGER: 1, ITEM_AXE: 2, ITEM_HOLYWATER: 3}
+SUB_SETS = {1: ["dagger_fly_r", "dagger_fly_l"],
+            2: ["axe1", "axe2", "axe3", "axe4"],
+            3: ["bottle", "flame1", "flame2", "flame3", "flame4", "flame5"]}
+
+
+class ObjectSprites:
+    """An area's object sprites. The main patterns are always in video memory;
+    a window after them holds the patterns of the sub-weapon Simon holds (only
+    one can be in the air), loaded when the area starts or the sub-weapon
+    changes: subs[n] = that sub-weapon's patterns (numbered from n_main)."""
+    def __init__(self, main_spt, sct, frames, offsets, subs, n_main, window):
+        self.main_spt, self.sct, self.frames, self.offsets = main_spt, sct, frames, offsets
+        self.subs, self.n_main, self.window = subs, n_main, window
+
+
+def object_sprites(rom, slot_for_nes, need, carried_items):
+    """-> ObjectSprites: frames in `need` in the main patterns, the carried
+    sub-weapons' frames in the window; FOLDS applied until it all fits."""
+    subs = sorted({SUB_OF_ITEM[i] for i in carried_items if i in SUB_OF_ITEM})
+    alias = {}
+    for drop, keep in [(None, None)] + FOLDS:
+        if drop is not None and (drop in need or any(drop in SUB_SETS[n] for n in subs)):
+            alias[drop] = keep
+        result = _object_sprites(rom, slot_for_nes, need, subs, alias)
+        if result.n_main + result.window <= MAX_OBJ_PATTERNS:
+            if alias:
+                print("  object frames folded to fit:", ", ".join(f"{a}->{b}" for a, b in alias.items()))
+            return result
+    raise SystemExit(f"object sprites need {result.n_main} + {result.window} patterns, "
+                     f"only {MAX_OBJ_PATTERNS} available")
+
+
+def _object_sprites(rom, slot_for_nes, need, subs, alias):
+    chr_ram = rom.chr_ram()
+    pals = [[rom.fixed(SPRITE_PALETTES + p * 4 + v) for v in range(4)] for p in range(4)]
+    main = SpriteBank()
+    per_frame = {}                          # name -> (bank, frame index, pattern offset)
+    for name in OBJ_FRAMES:
+        if name in need:
+            per_frame[name] = (main, main.add_frame(_pixels(chr_ram, pals, alias.get(name, name),
+                                                            slot_for_nes), name))
+    n_main = len(main.patterns)
+    sub_banks = {}
+    for n in subs:
+        b = _WindowBank(main, n_main)
+        b.colors, b.col_index = main.colors, main.col_index      # one colour table
+        for name in SUB_SETS[n]:
+            per_frame[name] = (b, b.add_frame(_pixels(chr_ram, pals, alias.get(name, name),
+                                                      slot_for_nes), name))
+        sub_banks[n] = b
+    window = max([len(b.patterns) for b in sub_banks.values()] + [0])
+    frames, offsets = bytearray(), []
+    for name in OBJ_FRAMES:
+        offsets.append(len(frames))
+        if name not in per_frame:
+            frames.append(0)
+            continue
+        bank, idx = per_frame[name]
+        spr = bank.frames[idx]
+        frames.append(len(spr))
+        for dy, dx, pat, col in spr:
+            frames += bytes([dy & 0xFF, dx & 0xFF, pat, col])
+    if len(main.colors) > 255:
+        raise SystemExit("too many sprite colour columns")
+    return ObjectSprites(b"".join(main.patterns), b"".join(main.colors), bytes(frames), offsets,
+                         {n: b"".join(b.patterns) for n, b in sub_banks.items()}, n_main, window)
+
+
+class _WindowBank(SpriteBank):
+    """A sub-weapon's frames: patterns the main set already has are used from
+    there; the others go into the window after the main patterns."""
+    def __init__(self, main, n_main):
+        super().__init__()
+        self.main, self.n_main = main, n_main
+
+    def _pat(self, cell):
+        from msx_sprites import _pattern
+        p = _pattern(cell)
+        if p in self.main.pat_index:
+            return self.main.pat_index[p]
+        return self.n_main + super()._pat(cell)
+
+
+def _pixels(chr_ram, pals, name, slot_for_nes):
+    from msx_sprites import mirror
+    frames = dict(FRAME_SPRITES)
+    frames.update(PANTHER_LEFT)
+    if name.startswith("panther") and name.endswith("_r"):
+        return mirror(_frame_pixels(chr_ram, pals, frames[name[:-2] + "_l"], slot_for_nes), width=32)
+    return _frame_pixels(chr_ram, pals, frames[name], slot_for_nes)
 
 
 def sprite_frames(rom, slot_for_nes, need=None):

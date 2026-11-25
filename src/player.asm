@@ -109,6 +109,9 @@ new_game:
         jp load_area
 
 restart_section_vars:
+        xor a                           ; (NES: a death costs the whip upgrades
+        ld (whip_level),a               ; and the sub-weapon)
+        ld (subweapon),a
         ld a,HP_MAX
         ld (hp),a
         ld a,5

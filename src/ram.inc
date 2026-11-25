@@ -134,5 +134,8 @@ door_dst        equ door_src+2          ; 2
 clip_l          equ door_dst+2          ; 1  gate: pattern masks for Simon's left
 clip_r          equ clip_l+1            ; 1  and right 8 columns
 clip_buf        equ clip_r+1            ; 32 a masked pattern
-RAM_END         equ clip_buf+32
+holy_fire       equ clip_buf+32         ; 1  holy water's fire is burning
+sub_src         equ holy_fire+1         ; 2
+sub_len         equ sub_src+2           ; 2
+RAM_END         equ sub_len+2
         ASSERT RAM_END < 0xF380

@@ -192,8 +192,13 @@ NES game; `tools/nes_probe/record_subweapon.lua` throws a given sub-weapon.)
   turns (tiles `B7 B9`, palette 1, flipped four ways, 4 frames each). It goes on
   through what it hits and off the screen.
 - Holy water: the bottle (tile `76`, palette 2) is lobbed forward 3 px every 2
-  frames in a low arc; on the floor it breaks into fire (tiles `91 93 95`) for
-  about 70 frames, which burns what it touches (a brazier in the recording).
+  frames in a low arc; on the floor it breaks into fire for 77 frames, which
+  burns what it touches (a brazier in the recording). The fire steps through
+  five pictures, 8 frames each, then starts again: three small flames (tiles
+  `91`, `93`, `95`) and two wide ones (`97` and `99`, each drawn with its mirror
+  beside it, 16 px wide). An enemy that takes more than one hit is held in the
+  fire, unable to move, and hurt each time its hit flash ends (the stage 3 boss).
+- A death costs the whip upgrades and the sub-weapon.
 
 ## Stage 2's way out and stage 3
 

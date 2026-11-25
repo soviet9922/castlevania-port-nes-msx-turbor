@@ -64,9 +64,11 @@ OBJF_ORB        equ 39
 OBJF_DAGGER_FLY equ 40                  ; flying right, flying left
 OBJF_AXE        equ 42                  ; turning: 4 frames (also its pickup)
 OBJF_BOTTLE     equ 46                  ; holy water (also its pickup)
-OBJF_FLAME      equ 47                  ; holy water's fire: 3 frames
+OBJF_FLAME      equ 47                  ; holy water's fire: 3 small flames
 OBJF_HOLY_ITEM  equ 50
 OBJF_WATCH_ITEM equ 51
+OBJF_FLAME4     equ 52                  ; the fire's wide flames
+OBJF_AXE_ITEM   equ 54
 
 ITEM_WHIPUP     equ 0
 ITEM_HEART      equ 1
@@ -522,7 +524,7 @@ item_subweapon:
         ret
 
 item_frames:
-        db OBJF_WHIPUP, OBJF_HEART, OBJF_DAGGER, OBJF_SMALLHEART, OBJF_AXE, OBJF_HOLY_ITEM
+        db OBJF_WHIPUP, OBJF_HEART, OBJF_DAGGER, OBJF_SMALLHEART, OBJF_AXE_ITEM, OBJF_HOLY_ITEM
         db OBJF_WATCH_ITEM
 
 item_update:
@@ -648,6 +650,9 @@ item_update:
         ld (subweapon),a
         ld a,1
         ld (hud_dirty),a
+        push ix
+        call load_sub_patterns          ; its sprites into the window
+        pop ix
         jr .gone
 .add_hearts:
         ld a,(hearts)
@@ -1873,6 +1878,8 @@ boss_update:
         dec a
         ld (boss_inv),a
 .no_inv:
+        call in_holy_fire               ; in holy water's fire: it can't move,
+        jp c,.hits                      ; and the fire goes on hurting it (NES)
         ld a,(ix+9)
         or a
         jr z,.asleep
@@ -2294,7 +2301,7 @@ holy_update:
         call obj_fall_step
         ld (ix+6),OBJF_BOTTLE
         call sub_on_screen
-        jr nc,sub_gone
+        jp nc,sub_gone
         ld a,(ix+9)                     ; coming down onto the floor?
         or a
         jp m,sub_box16
@@ -2309,31 +2316,65 @@ holy_update:
         call solid_at
         jp nc,sub_box16
         ld a,(ix+3)                     ; it breaks: fire, standing on the tile
-        add a,16
-        and 0xF8
-        sub 16
+        add a,16                        ; (the flames are drawn 8 px down,
+        and 0xF8                        ; like the bursts)
+        sub 24
         ld (ix+3),a
         ld (ix+11),1
         ld (ix+4),0
 .burning:
+        ld a,1
+        ld (holy_fire),a
         ld a,(ix+4)
         cp HOLY_BURN
         jr nc,sub_gone
-        rrca                            ; flames: (timer / 4) mod 3
+        rrca                            ; flames: (timer / 8) mod 5, NES order
         rrca
-        and 3
-        cp 3
-        jr nz,.f
-        ld a,1
-.f:
-        add a,OBJF_FLAME
+        rrca
+        and 31
+.mod5:
+        sub 5
+        jr nc,.mod5
+        add a,5
+        ld e,a
+        ld d,0
+        ld hl,flame_frames
+        add hl,de
+        ld a,(hl)
         ld (ix+6),a
-        jp sub_box16
+        call sub_box16                  ; the fire: 16x16 from y+8
+        ld hl,(dagger_x1+4)
+        ld de,8
+        add hl,de
+        ld (dagger_x1+4),hl
+        ld hl,(dagger_x1+6)
+        add hl,de
+        ld (dagger_x1+6),hl
+        ret
+
+flame_frames:
+        db OBJF_FLAME, OBJF_FLAME+1, OBJF_FLAME+2, OBJF_FLAME4, OBJF_FLAME4+1
+
+; Carry if holy water's fire touches the object at IX (multi-hit enemies are
+; held in it)
+in_holy_fire:
+        ld a,(holy_fire)
+        or a
+        ret z
+        ld a,(dagger_on)
+        or a
+        ret z
+        ld hl,dagger_x1
+        ld de,hit_x1
+        ld bc,8
+        ldir
+        jp whip_hits_object
 
 ; the sub-weapon is gone
 sub_gone:
         xor a
         ld (dagger_on),a
+        ld (holy_fire),a
         ld (ix+0),OBJ_NONE
         ret
 
@@ -2728,12 +2769,71 @@ objects_load_patterns:
         xor a
         call .page
         ld a,1
+        call .page
+        jp load_sub_patterns
 .page:
         di
         ld hl,VRAM_SPT + PLAYER_SPRITES*32
         call vram_set_write_far
         ld hl,(area_hdr+AH_OBJSPT)
         ld bc,(area_hdr+AH_OBJSPTSZ)
+.lp:
+        ld a,(hl)
+        out (VDP_DATA),a
+        inc hl
+        dec bc
+        ld a,b
+        or c
+        jr nz,.lp
+        jp vram_r14_zero                ; (enables interrupts)
+
+; The patterns of the sub-weapon Simon holds into the area's sub-weapon window
+; (both sprite pages): only one sub-weapon can be in the air, so the dagger,
+; the axe and holy water share these slots. Area load and pickups.
+load_sub_patterns:
+        ld a,(subweapon)
+        dec a
+        cp 3
+        ret nc                          ; none, or the stopwatch (no sprites)
+        add a,a
+        ld e,a
+        ld d,0
+        ld hl,area_hdr+AH_SUB_SZ
+        add hl,de
+        ld c,(hl)
+        inc hl
+        ld b,(hl)
+        ld a,b
+        or c
+        ret z                           ; not in this area
+        ld (sub_len),bc
+        ld hl,area_hdr+AH_SUB_SPT
+        add hl,de
+        ld e,(hl)
+        inc hl
+        ld d,(hl)
+        ld (sub_src),de
+        xor a
+        call .page
+        ld a,1
+.page:
+        push af
+        ld a,(area_hdr+AH_SUB_SLOT)
+        add a,PLAYER_SPRITES
+        ld l,a
+        ld h,0
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        ld de,VRAM_SPT
+        add hl,de
+        pop af
+        di
+        call vram_set_write_far
+        ld hl,(sub_src)
+        ld bc,(sub_len)
 .lp:
         ld a,(hl)
         out (VDP_DATA),a

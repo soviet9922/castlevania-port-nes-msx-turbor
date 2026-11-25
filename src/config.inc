@@ -64,7 +64,10 @@ AH_DOOR_CAM     equ 58                  ; door: camera x while it opens (2 bytes
 AH_DOOR_VCOL    equ 60                  ; door: its 6 extra tile columns (half open, open)
 AH_WALK_END     equ 62                  ; door: Simon walks on to this x (2 bytes)
 AH_CAM_END      equ 64                  ; door: the screen scrolls on to this x (2 bytes)
-AH_SIZE         equ 66
+AH_SUB_SPT      equ 66                  ; patterns of the flying dagger, axe, holy water
+AH_SUB_SZ       equ 72                  ; their sizes in bytes (0 = not in this area)
+AH_SUB_SLOT     equ 78                  ; first object pattern of the sub-weapon window
+AH_SIZE         equ 79
 
 ; Exit sequences (measured on the NES)
 GATE_FRAMES     equ 120                 ; walking into the castle gate, 1 px every 3 frames
@@ -119,7 +122,7 @@ AXE_GRAVITY     equ 4                   ; 1/16 px per frame per frame (NES)
 AXE_VMAX        equ 112                 ; fastest fall: 7 px per frame
 HOLY_VY0        equ -20                 ; the bottle's low lob (NES)
 HOLY_GRAVITY    equ 2
-HOLY_BURN       equ 72                  ; frames the fire burns (NES: about 70)
+HOLY_BURN       equ 77                  ; frames the fire burns (NES)
 STOPWATCH_COST  equ 5                   ; hearts (NES)
 STOPWATCH_FRAMES equ 178                ; enemies stand still (NES)
 

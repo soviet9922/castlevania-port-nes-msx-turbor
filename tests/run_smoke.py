@@ -178,6 +178,25 @@ def tcl_script(syms, result_file):
                        poke {px_a} [expr {{700 & 255}}]; poke {px_a + 1} [expr {{700 >> 8}}]
                        poke {py} 128; poke {py + 1} 0 }}
     after time 74.75 {{ {dump('27b_floor_start')} }}
+    after time 78.8 {{ # holy water's fire on the boss: held in it, and hurt again and again
+                       set ::boss_hunt 0
+                       for {{set i 0}} {{$i < 8}} {{incr i}} {{
+                           set b [expr {{{objt} + $i*{obj_size}}}]
+                           if {{[peek $b] == 10}} {{ set ::bossb $b }}
+                       }}
+                       set f [expr {{{objt} + 7*{obj_size}}}]
+                       set x [expr {{[peek [expr {{$::bossb+1}}]] + 256*[peek [expr {{$::bossb+2}}]] + 16}}]
+                       poke [expr {{$f+1}}] [expr {{$x & 255}}]; poke [expr {{$f+2}}] [expr {{$x >> 8}}]
+                       poke [expr {{$f+3}}] [peek [expr {{$::bossb+3}}]]; poke [expr {{$f+4}}] 0
+                       poke [expr {{$f+11}}] 1; poke [expr {{$f+5}}] 1; poke $f 14
+                       poke {syms["sub_kind"]} 3; poke {syms["dagger_on"]} 1; poke {syms["holy_fire"]} 1
+                       }}
+    after time 78.9 {{ # (from the frame after the fire took hold)
+                       set ::stun0 "[peek [expr {{$::bossb+1}}]],[peek [expr {{$::bossb+3}}]],[peek {syms["boss_hp"]}]" }}
+    after time 79.4 {{ set f [open "{result_file}" a]
+                       puts $f "stun $::stun0 [peek [expr {{$::bossb+1}}]],[peek [expr {{$::bossb+3}}]],[peek {syms["boss_hp"]}]"
+                       close $f
+                       set fo [expr {{{objt} + 7*{obj_size}}}]; poke $fo 0; poke {syms["dagger_on"]} 0; poke {syms["holy_fire"]} 0 }}
     after time 79.6 {{ {dump('27c_floor_end')}; set ::boss_floor 0
                        # fireballs: boss hovering at the screen's left, Simon on the ledge far right
                        boss_place 512 1; poke {px_a} [expr {{750 & 255}}]; poke {px_a + 1} [expr {{750 >> 8}}]
@@ -404,6 +423,8 @@ set ::boss_hunt 0
 set ::boss_awake 0
 set ::orb_seen 0
 set ::boss_maxy 0
+set ::bossb 0
+set ::stun0 ""
 set ::boss_fire 0
 set ::boss_near_fire 0
 set ::boss_floor 0
@@ -459,7 +480,7 @@ proc wpn_watch {{}} {{
         if {{[peek $b] == 12}} {{ lappend ::dagger_xs [expr {{[peek [expr {{$b+1}}]] + 256*[peek [expr {{$b+2}}]]}}] }}
         if {{[peek $b] == 13 || [peek $b] == 14}} {{
             set y [peek [expr {{$b+3}}]]; if {{$y > 127}} {{ set y [expr {{$y - 256}}] }}
-            lappend ::sub_track "[expr {{[peek [expr {{$b+1}}]] + 256*[peek [expr {{$b+2}}]]}}]:$y:[peek [expr {{$b+11}}]]"
+            lappend ::sub_track "[expr {{[peek [expr {{$b+1}}]] + 256*[peek [expr {{$b+2}}]]}}]:$y:[peek [expr {{$b+11}}]]:[peek [expr {{$b+6}}]]"
         }}
     }}
 }}
@@ -684,6 +705,7 @@ def run():
     subs = {}
     seqs = {}
     high_item = None
+    stun = None
     whip_reach = 43                     # WHIP_HIT_X2 in src/config.inc (leather whip)
     orb_seen = clear_t = None
     panther_dead = 0
@@ -702,6 +724,9 @@ def run():
                 continue
             if tag == "seqs":
                 seqs = dict(x.split("=") for x in kv)
+                continue
+            if tag == "stun":
+                stun = (kv[0].split(","), kv[1].split(","))
                 continue
             if tag == "high_item":
                 high_item = (int(kv[0]), int(kv[1]))
@@ -909,8 +934,11 @@ def run():
           if "dagger" in weapons else []),
         *([("the axe costs one heart and flies up and forward, 2 px per frame, then down",
             weapons["axe"]["hearts"] == "9" and axe_ok(weapons["axe"]["track"])),
+           ("holy water's fire burns through the NES flame pictures (small 1-3, wide)",
+            {47, 48, 49, 52} <= {int(p.split(":")[3]) for p in weapons["holy"]["track"].split(",")
+                                 if p and p.split(":")[2] == "1"}),
            ("holy water costs one heart, lands, burns, and burns down a brazier",
-            weapons["holy"]["hearts"] == "9" and ":1" in weapons["holy"]["track"]
+            weapons["holy"]["hearts"] == "9" and ":1:" in weapons["holy"]["track"]
             and weapons["holy"]["obj1"] in ("0", "2", "3"))]
           if "holy" in weapons else []),
         *([("the HUD shows the sub-weapon's icon (stopwatch)",
@@ -928,6 +956,9 @@ def run():
         *([("an item from a candle above the playfield's top falls into view (holy water)",
             high_item[0] == 3 and high_item[1] < 176)]
           if high_item else []),
+        *([("holy water's fire holds the boss (it can't move) and keeps hurting it",
+            stun[0][:2] == stun[1][:2] and int(stun[1][2]) <= int(stun[0][2]) - 12)]
+          if stun else []),
         *([("UP at a staircase's foot climbs it to the top",
             (snaps["11_stairs_up"]["px"], snaps["11_stairs_up"]["py"]) == stair["top"]
             and snaps["11_stairs_up"]["stair_state"] == 0 and snaps["11_stairs_up"]["on_ground"] == 1),

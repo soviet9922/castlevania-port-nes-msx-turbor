@@ -259,11 +259,18 @@ a time.
 The axe and holy water work the same way (one sub-weapon in the air at a time, one
 heart each) with their own movement: the axe flies up and forward under gravity,
 goes through what it hits and leaves the screen; holy water is lobbed low and burns
-on the floor for 72 frames, hitting what touches the fire. The converter includes a
-sub-weapon's sprites only in areas where Simon can have it by then (found there or
-earlier), and folds animation frames together where an area would need more than
-the 52 free sprite patterns (stage 3: two turning frames for the axe, one walking
-frame for the zombies).
+on the floor for 77 frames through the NES's five flame pictures, hitting what
+touches the fire. A multi-hit enemy (so far only the boss) is held in the fire: it
+cannot move and is hurt again whenever its hit flash ends.
+
+Only the held sub-weapon's flying sprites are in VRAM: each area keeps a window of
+sprite patterns (`AH_SUB_SLOT`) and `load_sub_patterns` copies the held weapon's
+patterns into it when an area loads and when Simon picks one up. Patterns the window
+shares with the area's other frames are stored once. Where an area still needs more
+than the 52 free sprite patterns, the converter folds animation frames together
+(listed in `FOLDS`, least visible first; the hall shows the second wide flame as the
+first, stage 3 uses one walking frame for a zombie). A death resets the whip and the
+sub-weapon, as on the NES, so the window always matches what Simon can hold.
 
 The stopwatch (5 hearts) freezes enemies, their fireballs, the spawners and the
 timer for 178 frames, as on the NES. Frozen enemies can still be whipped. A candle

@@ -514,7 +514,7 @@ OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
 # stay empty so that the engine's frame numbers match; then the flying dagger
 OBJ_FRAMES += [f"unused{i}" for i in range(24, 40)] + ["dagger_fly_r", "dagger_fly_l"]
 OBJ_FRAMES += ["axe1", "axe2", "axe3", "axe4", "bottle", "flame1", "flame2", "flame3",
-               "holy_item", "watch_item"]
+               "holy_item", "watch_item", "flame4", "flame5", "axe_item"]
 # original placeholder art: a double-bladed throwing hatchet, turning
 _HATCHET = [
     "................", "..77........77..", ".7777......7777.", ".77777....77777.",
@@ -536,13 +536,14 @@ PLACEHOLDER_OBJECTS["axe2"] = _turn(_HATCHET)
 PLACEHOLDER_OBJECTS["axe3"] = _HATCHET
 PLACEHOLDER_OBJECTS["axe4"] = _turn(_HATCHET)
 PLACEHOLDER_OBJECTS["bottle"] = _FLASK
+PLACEHOLDER_OBJECTS["axe_item"] = _HATCHET
 PLACEHOLDER_OBJECTS["holy_item"] = _FLASK
 PLACEHOLDER_OBJECTS["watch_item"] = [r.replace("x", "f") for r in [
     "................", "......xxxx......", ".......xx.......", ".....xxxxxx.....",
     "...xxx....xxx...", "..xx........xx..", "..x.....x.....x.", ".x......x......x",
     ".x......xxxx...x", ".x.............x", "..x...........x.", "..xx........xx..",
     "...xxx....xxx...", ".....xxxxxx.....", "................", "................"]]
-for _n, _b in (("flame1", 0), ("flame2", 1), ("flame3", 2)):
+for _n, _b in (("flame1", 0), ("flame2", 1), ("flame3", 2), ("flame4", 3), ("flame5", 2)):
     PLACEHOLDER_OBJECTS[_n] = _BURSTS[_b][8:24]
 for _i in range(24, 40):
     PLACEHOLDER_OBJECTS[f"unused{_i}"] = ["." * 16]
