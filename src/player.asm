@@ -897,6 +897,11 @@ build_sat:
         ld de,PF_TOP_PX-1+PLAYER_DRAW_DY ; (the VDP shows a sprite 1 line lower;
                                         ; his pictures may end above his box's
                                         ; bottom: drawn lower to stand on the floor)
+        ld a,(stair_state)
+        cp 2
+        jr nz,.on_floor
+        ld de,PF_TOP_PX-1               ; on the stairs his y already puts his
+.on_floor:                              ; feet on the steps
         add hl,de
         ld (spr_by),hl
 
