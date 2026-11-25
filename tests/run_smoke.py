@@ -67,11 +67,11 @@ def tcl_script(syms, result_file):
     # with more than one area: walk into the exit (courtyard gate) and on
     hall = f"""
     after time 8.95 {{ keymatrixdown 8 0x01 }}
-    after time 9.0  {{ keymatrixup 8 0x01
+    after time 9 {{ keymatrixup 8 0x01
                        # in the middle of a jump at the gate: the sequence waits for the landing
                        poke {eoff} 3; poke {px_a} [peek {exit_x}]; poke {px_a + 1} [peek {exit_x + 1}] }}
     after time 12.4 {{ {dump('09_next_area')}; keymatrixdown 8 0x80 }}
-    after time 14.0 {{ {dump('10_next_area_walk')}; keymatrixup 8 0x80
+    after time 14 {{ {dump('10_next_area_walk')}; keymatrixup 8 0x80
                        # first staircase of the area (if any): stand 6 px right of its foot
                        set sp [expr {{[peek {stairs}] + 256*[peek {stairs + 1}]}}]
                        set ::nst [peek $sp]
@@ -94,9 +94,9 @@ def tcl_script(syms, result_file):
                            poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
                            poke {py} [expr {{[peek {exit_x + 8}] - 8}}]; poke {py + 1} 0
                            keymatrixdown 8 0x80 }} }}
-    after time 36.5 {{ keymatrixup 8 0x80; {dump('18_through_the_door')}
+    after time 37.1 {{ keymatrixup 8 0x80; {dump('18_through_the_door')}
                        set f [open "{result_file}" a]
-                       puts $f "seqs gate=$::gate_seen,$::gate_px0,$::gate_pxmax door=$::door_cam ys=[join $::seq_ys ,] doorstates=[join $::door_states /] gatehidden=$::gate_hidden walk=$::door_pxmax,$::door_walk_end"
+                       puts $f "seqs gate=$::gate_seen,$::gate_px0,$::gate_pxmax door=$::door_cam ys=[join $::seq_ys ,] doorstates=[join $::door_states /] gatehidden=$::gate_hidden walk=$::door_pxmax,$::door_walk_end screenx=$::door_screen_x"
                        close $f
                        # a staircase that leads to the section below (foot off the playfield)
                        set sp [expr {{[peek {stairs}] + 256*[peek {stairs + 1}]}}]
@@ -110,12 +110,12 @@ def tcl_script(syms, result_file):
                                break
                            }}
                        }} }}
-    after time 38.5 {{ keymatrixup 8 0x40; {dump('19_section_below')}; keymatrixdown 8 0x20 }}
-    after time 40.5 {{ keymatrixup 8 0x20; {dump('20_section_above')}
+    after time 39.1 {{ keymatrixup 8 0x40; {dump('19_section_below')}; keymatrixdown 8 0x20 }}
+    after time 41.1 {{ keymatrixup 8 0x20; {dump('20_section_above')}
                        # bats: enemies on, wait for one and whip it
                        set ::bat_seen 0; poke {eoff} 0; set ::hunting 1
                        poke {syms["bat_spawn_t"]} 150 }}
-    after time 44.5 {{ set ::hunting 0; poke {eoff} 3; {dump('21_bat')}
+    after time 45.1 {{ set ::hunting 0; poke {eoff} 3; {dump('21_bat')}
                        set f [open "{result_file}" a]; puts $f "bat $::bat_seen"; close $f
                        # back down into the waterway
                        set sp [expr {{[peek {stairs}] + 256*[peek {stairs + 1}]}}]
@@ -129,13 +129,13 @@ def tcl_script(syms, result_file):
                                break
                            }}
                        }} }}
-    after time 46.6 {{ keymatrixup 8 0x40
+    after time 47.2 {{ keymatrixup 8 0x40
                        # fishmen: stand on the walkway, enemies on, whip what comes
                        set ::fish_seen 0; poke {px_a} 150; poke {px_a + 1} 0; poke {py} 48; poke {py + 1} 0
                        poke {eoff} 0; set ::hunting 1 }}
-    after time 54 {{ set ::hunting 0; poke {eoff} 3; {dump('22_fishmen')}
+    after time 54.6 {{ set ::hunting 0; poke {eoff} 3; {dump('22_fishmen')}
                        set f [open "{result_file}" a]; puts $f "fish $::fish_seen"; close $f }}
-    after time 54.2 {{ # up the stairs from the waterway (foot on the playfield, top off it)
+    after time 54.8 {{ # up the stairs from the waterway (foot on the playfield, top off it)
                        set sp [expr {{[peek {stairs}] + 256*[peek {stairs + 1}]}}]
                        for {{set i 0}} {{$i < [peek $sp]}} {{incr i}} {{
                            set r [expr {{$sp + 1 + 7*$i}}]
@@ -147,53 +147,53 @@ def tcl_script(syms, result_file):
                                break
                            }}
                        }} }}
-    after time 56.5 {{ keymatrixup 8 0x20; {dump('23_back_up')}
+    after time 57.1 {{ keymatrixup 8 0x20; {dump('23_back_up')}
                        # stage 2's door: on the ledge, 24 px before the exit
                        if {{[peek {exit_x}] != 255}} {{
                            set x [expr {{[peek {exit_x}] + 256*[peek {exit_x + 1}] - 24}}]
                            poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
                            poke {py} [expr {{[peek {exit_x + 8}] - 8}}]; poke {py + 1} 0
                            keymatrixdown 8 0x80 }} }}
-    after time 62.5 {{ keymatrixup 8 0x80; {dump('24_stage3')}
+    after time 63.1 {{ keymatrixup 8 0x80; {dump('24_stage3')}
                        # a fishman's fireball at standing height, flying at crouching Simon
                        # (back at the area's start, away from the stairs)
                        poke {eoff} 3; poke {px_a} 40; poke {px_a + 1} 0
                        keymatrixdown 8 0x40; fireball_at_simon }}
-    after time 64 {{ {dump('25_crouched_fireball')}; keymatrixup 8 0x40 }}
-    after time 65.5 {{ fireball_at_simon }}
-    after time 66.8 {{ {dump('26_standing_fireball')}
+    after time 64.6 {{ {dump('25_crouched_fireball')}; keymatrixup 8 0x40 }}
+    after time 66.1 {{ fireball_at_simon }}
+    after time 67.4 {{ {dump('26_standing_fireball')}
                        # the boss: stand on the ledge at the end of stage 3
                        if {{[peek {cur}] == 4}} {{
                            poke {px_a} [expr {{711 & 255}}]; poke {px_a + 1} [expr {{711 >> 8}}]
                            poke {py} 64; poke {py + 1} 0; set ::boss_hunt 1 }} }}
-    after time 73.5 {{ set ::boss_hunt 0
+    after time 74.1 {{ set ::boss_hunt 0
                        # on the floor at the screen's left edge: unlocked, the camera would follow
                        poke {px_a} [expr {{524 & 255}}]; poke {px_a + 1} [expr {{524 >> 8}}]
                        poke {py} 128; poke {py + 1} 0; keymatrixdown 8 0x10 }}
-    after time 74 {{ keymatrixup 8 0x10; {dump('27a_boss_left')}
+    after time 74.6 {{ keymatrixup 8 0x10; {dump('27a_boss_left')}
                        poke {px_a} [expr {{711 & 255}}]; poke {px_a + 1} [expr {{711 >> 8}}]
                        poke {py} 64; poke {py + 1} 0; set ::boss_hunt 1 }}
-    after time 74.1 {{ # wait on the floor without whipping: the boss must come down
+    after time 74.7 {{ # wait on the floor without whipping: the boss must come down
                        set ::boss_hunt 0; set ::boss_floor 1
                        poke {px_a} [expr {{700 & 255}}]; poke {px_a + 1} [expr {{700 >> 8}}]
                        poke {py} 128; poke {py + 1} 0 }}
-    after time 74.15 {{ {dump('27b_floor_start')} }}
-    after time 79 {{ {dump('27c_floor_end')}; set ::boss_floor 0
+    after time 74.75 {{ {dump('27b_floor_start')} }}
+    after time 79.6 {{ {dump('27c_floor_end')}; set ::boss_floor 0
                        # fireballs: boss hovering at the screen's left, Simon on the ledge far right
                        boss_place 512 1; poke {px_a} [expr {{750 & 255}}]; poke {px_a + 1} [expr {{750 >> 8}}]
                        poke {py} 64; poke {py + 1} 0 }}
-    after time 79.3 {{ set ::boss_fire [count_type 9]
+    after time 79.9 {{ set ::boss_fire [count_type 9]
                        # and close to Simon: no fireball
                        clear_type 9; boss_place 700 0 }}
-    after time 79.6 {{ set ::boss_near_fire [count_type 9]
+    after time 80.2 {{ set ::boss_near_fire [count_type 9]
                        set f [open "{result_file}" a]; puts $f "boss_maxy $::boss_maxy"; close $f
                        poke {px_a} [expr {{711 & 255}}]; poke {px_a + 1} [expr {{711 >> 8}}]
                        poke {py} 64; poke {py + 1} 0; set ::boss_hunt 1 }}
-    after time 79.5 {{ {dump('27_boss')}
+    after time 80.1 {{ {dump('27_boss')}
                        set f [open "{result_file}" a]; puts $f "boss_hp [peek {syms["boss_hp"]}] $::boss_awake"; close $f
                        poke {syms["boss_hp"]} 1 }}
-    after time 79.7 {{ boss_place 0 0 }}
-    after time 85.5 {{ set ::boss_hunt 0; {dump('28_boss_dead')}
+    after time 80.3 {{ boss_place 0 0 }}
+    after time 86.1 {{ set ::boss_hunt 0; {dump('28_boss_dead')}
                        # walk onto the orb
                        for {{set i 0}} {{$i < 8}} {{incr i}} {{
                            set b [expr {{{objt} + $i*{obj_size}}}]
@@ -203,26 +203,26 @@ def tcl_script(syms, result_file):
                                set ::orb_seen 1
                            }}
                        }} }}
-    after time 86 {{ {dump('29_stage_clear')}
+    after time 86.6 {{ {dump('29_stage_clear')}
                        set f [open "{result_file}" a]; puts $f "orb $::orb_seen [peek {syms["clear_t"]}] $::boss_fire $::boss_near_fire"; close $f }}
-    after time 90 {{ {dump('30_restart')}; rules "after_clear"
+    after time 90.6 {{ {dump('30_restart')}; rules "after_clear"
                        # time runs out: death animation, then a life is lost
                        poke {syms["time_bcd"]} 1; poke {syms["time_bcd"] + 1} 0; poke {syms["time_t"]} 60 }}
-    after time 90.7 {{ rules "dying"; {dump('31_dying')} }}
-    after time 93 {{ rules "after_death"
+    after time 91.3 {{ rules "dying"; {dump('31_dying')} }}
+    after time 93.6 {{ rules "after_death"
                        # the last life: game over, then a new game
                        poke {syms["lives"]} 0
                        poke {syms["time_bcd"]} 1; poke {syms["time_bcd"] + 1} 0; poke {syms["time_t"]} 60 }}
-    after time 95.1 {{ rules "game_over" }}
-    after time 99 {{ rules "new_game"
+    after time 95.7 {{ rules "game_over" }}
+    after time 99.6 {{ rules "new_game"
                        # the chain whip
                        poke {syms["whip_level"]} 1; poke {fa} 0; set ::wpn_tag chain; set ::wpn_on 1
                        keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
-    after time 99.8 {{ wpn_report
+    after time 100.4 {{ wpn_report
                        # the morning star
                        poke {syms["whip_level"]} 2; set ::wpn_tag star; set ::wpn_on 1
                        keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
-    after time 100.6 {{ wpn_report
+    after time 101.2 {{ wpn_report
                        # the dagger: 60 px left of the first brazier, UP + whip
                        set bx [expr {{[peek {obj + 1}] + 256*[peek {obj + 2}] - 60}}]
                        poke {px_a} [expr {{$bx & 255}}]; poke {px_a + 1} [expr {{$bx >> 8}}]
@@ -230,13 +230,13 @@ def tcl_script(syms, result_file):
                        set ::wpn_tag dagger; set ::wpn_on 1; set ::dagger_xs {{}}
                        keymatrixdown 8 0x20; keymatrixdown 4 0x04
                        after time 0.05 {{ keymatrixup 4 0x04 }}; after time 0.3 {{ keymatrixup 8 0x20 }} }}
-    after time 101.8 {{ wpn_report
+    after time 102.4 {{ wpn_report
                        # the axe: standing still, UP + whip
                        poke {syms["subweapon"]} 2; poke {syms["hearts"]} 10; poke {fa} 0
                        set ::wpn_tag axe; set ::wpn_on 1; set ::sub_track {{}}
                        keymatrixdown 8 0x20; keymatrixdown 4 0x04
                        after time 0.05 {{ keymatrixup 4 0x04 }}; after time 0.3 {{ keymatrixup 8 0x20 }} }}
-    after time 103.5 {{ wpn_report
+    after time 104.1 {{ wpn_report
                        # holy water, 40 px left of the second brazier
                        set bx [expr {{[peek {obj + 1 + obj_size}] + 256*[peek {obj + 2 + obj_size}] - 40}}]
                        poke {px_a} [expr {{$bx & 255}}]; poke {px_a + 1} [expr {{$bx >> 8}}]
@@ -244,11 +244,11 @@ def tcl_script(syms, result_file):
                        set ::wpn_tag holy; set ::wpn_on 1; set ::sub_track {{}}; set ::brazier_x [peek {obj + 1 + obj_size}]
                        keymatrixdown 8 0x20; keymatrixdown 4 0x04
                        after time 0.05 {{ keymatrixup 4 0x04 }}; after time 0.3 {{ keymatrixup 8 0x20 }} }}
-    after time 105.5 {{ wpn_report
+    after time 106.1 {{ wpn_report
                        # the stopwatch: on the hall's floor with zombies about
                        poke {syms["subweapon"]} 4; poke {syms["hearts"]} 10 }}
-    after time 105.6 {{ sub_report "watch_hud" }}
-    after time 105.7 {{ # a zombie in front of Simon, enemies on; UP + whip
+    after time 106.2 {{ sub_report "watch_hud" }}
+    after time 106.3 {{ # a zombie in front of Simon, enemies on; UP + whip
                        poke {eoff} 2
                        for {{set i 0}} {{$i < 8}} {{incr i}} {{
                            set b [expr {{{objt} + $i*{obj_size}}}]
@@ -263,18 +263,18 @@ def tcl_script(syms, result_file):
                        }}
                        keymatrixdown 8 0x20; keymatrixdown 4 0x04
                        after time 0.05 {{ keymatrixup 4 0x04 }}; after time 0.2 {{ keymatrixup 8 0x20 }} }}
-    after time 105.9 {{ sub_report "watch_start" }}
-    after time 107.5 {{ sub_report "watch_frozen"; poke {eoff} 3; {dump('35_stopwatch')} }}
-    after time 109.5 {{ sub_report "watch_end"
+    after time 106.5 {{ sub_report "watch_start" }}
+    after time 108.1 {{ sub_report "watch_frozen"; poke {eoff} 3; {dump('35_stopwatch')} }}
+    after time 110.1 {{ sub_report "watch_end"
                        # the drop rule: an axe item while Simon holds the axe -> a heart
                        poke {syms["subweapon"]} 2
                        set b [expr {{{objt} + 7*{obj_size}}}]
                        poke [expr {{$b+1}}] 100; poke [expr {{$b+2}}] 0; poke [expr {{$b+3}}] 60
                        poke [expr {{$b+4}}] 0; poke [expr {{$b+5}}] 4; poke [expr {{$b+6}}] 2; poke $b 2 }}
-    after time 110.1 {{ sub_report "drop_rule" }}
-    after time 110.3 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
+    after time 110.7 {{ sub_report "drop_rule" }}
+    after time 110.9 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """ if areas > 1 else f"""
-    after time 9.0  {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
+    after time 9 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
     # keyboard matrix row 8: bit0 SPACE, bit4 LEFT, bit7 RIGHT
     # Times are relative to the moment the game's main loop is running.
@@ -282,25 +282,25 @@ def tcl_script(syms, result_file):
 # normal speed: with "throttle off" openMSX skips rendering and screenshots are black
 proc play {{}} {{
     set ::vbl_on 1
-    after time 0.5  {{ {dump('01_boot')}; keymatrixdown 8 0x80 }}
-    after time 3.5  {{ {dump('02_walk_right')}; keymatrixup 8 0x80 }}
-    after time 3.7  {{ keymatrixdown 8 0x01; rec_py 60 }}
-    after time 3.8  {{ keymatrixup 8 0x01 }}
-    after time 4.0  {{ {dump('03_jump')} }}
-    after time 5.0  {{ {dump('04_landed')}; keymatrixdown 8 0x10 }}
-    after time 6.0  {{ {dump('05_walk_left')}; keymatrixup 8 0x10 }}
-    after time 6.3  {{ keymatrixdown 4 0x04; rec_whip 40 }}
-    after time 6.4  {{ keymatrixup 4 0x04 }}
+    after time 0.5 {{ {dump('01_boot')}; keymatrixdown 8 0x80 }}
+    after time 3.5 {{ {dump('02_walk_right')}; keymatrixup 8 0x80 }}
+    after time 3.7 {{ keymatrixdown 8 0x01; rec_py 60 }}
+    after time 3.8 {{ keymatrixup 8 0x01 }}
+    after time 4 {{ {dump('03_jump')} }}
+    after time 5 {{ {dump('04_landed')}; keymatrixdown 8 0x10 }}
+    after time 6 {{ {dump('05_walk_left')}; keymatrixup 8 0x10 }}
+    after time 6.3 {{ keymatrixdown 4 0x04; rec_whip 40 }}
+    after time 6.4 {{ keymatrixup 4 0x04 }}
     after time 6.55 {{ {dump('06_whip_strike')} }}
     # brazier: stand 26 px left of the first one, facing right, and whip it
-    after time 7.2  {{ set bx [expr {{[peek {obj + 1}] + 256*[peek {obj + 2}] - 26}}]
+    after time 7.2 {{ set bx [expr {{[peek {obj + 1}] + 256*[peek {obj + 2}] - 26}}]
                        poke {px_a} [expr {{$bx & 255}}]; poke {px_a + 1} [expr {{$bx >> 8}}]
                        poke {fa} 0 }}
-    after time 7.3  {{ keymatrixdown 4 0x04 }}
+    after time 7.3 {{ keymatrixdown 4 0x04 }}
     after time 7.35 {{ keymatrixup 4 0x04 }}
-    after time 8.1  {{ {dump('07_brazier_hit')}; keymatrixdown 8 0x80 }}
-    after time 8.6  {{ keymatrixup 8 0x80 }}
-    after time 8.8  {{ {dump('08_item_collected')}
+    after time 8.1 {{ {dump('07_brazier_hit')}; keymatrixdown 8 0x80 }}
+    after time 8.6 {{ keymatrixup 8 0x80 }}
+    after time 8.8 {{ {dump('08_item_collected')}
                        set f [open "{result_file}" a]
                        puts $f "hud_hearts [format %c [vpeek {0x1800 + 32 + 24}]][format %c [vpeek {0x1800 + 32 + 25}]]"
                        close $f }}
@@ -481,6 +481,7 @@ set ::door_first ""
 set ::gate_hidden 0
 set ::door_pxmax 0
 set ::door_walk_end 0
+set ::door_screen_x 0
 set ::seq_ys {{}}
 proc seq_watch {{}} {{
     set k [peek {syms["seq_kind"]}]
@@ -496,6 +497,7 @@ proc seq_watch {{}} {{
     if {{$k == 2 && [peek {cur}] == 1}} {{
         if {{$x > $::door_pxmax}} {{ set ::door_pxmax $x }}
         set ::door_walk_end [expr {{[peek {syms["area_hdr"] + 62}] + 256*[peek {syms["area_hdr"] + 63}]}}]
+        set ::door_screen_x [expr {{$x - [peek {syms["cam_x"]}] - 256*[peek {syms["cam_x"] + 1}]}}]
     }}
     if {{$k == 2}} {{
         set c [expr {{[peek {syms["cam_x"]}] + 256*[peek {syms["cam_x"] + 1}]}}]
@@ -589,7 +591,7 @@ proc wait_game {{}} {{
     }}
 }}
 after time 0.1 wait_game
-after time 135 {{ exit }}
+after time 140 {{ exit }}
 """
 
 
@@ -598,15 +600,14 @@ def door_ok(states):
     open, half open, shut, where shut is the map's own door (the first entry
     can be a column the test's teleport left on screen)"""
     st = states.split("/")
-    if len(st) < 4:
-        return False
-    half, opened, half2, shut = st[-4:]
     tiles_path = os.path.join(os.path.dirname(ROM), "gen", "converted", "area_1", "level_tiles.bin")
     if not os.path.exists(tiles_path):
         return False
     t = open(tiles_path, "rb").read()
     door = f"{t[191 * 22 + 5]}.{t[192 * 22 + 5]}"    # the hall's door column (see convert_stage.py)
-    return half == half2 and opened not in (half, shut) and shut == door
+    # (later the screen scrolls on and other columns take these places)
+    return any(half == half2 and opened not in (half, shut) and shut == door
+               for half, opened, half2, shut in zip(st, st[1:], st[2:], st[3:]))
 
 
 def axe_ok(track):
@@ -794,6 +795,9 @@ def run():
            ("the door opens (half open, then open), and closes again behind Simon",
             door_ok(seqs["doorstates"])),
            ("Simon goes inside the castle gate (behind its pillar)", seqs["gatehidden"] == "1"),
+           (f"the next stage takes over without a jump: Simon's screen x at the end of the "
+            f"door is his start x there ({seqs['screenx']})",
+            int(seqs["screenx"]) in (39, 40) and snaps["18_through_the_door"]["cur_area"] == 2),
            ("after the door he walks on only to the next stage's start (not off the ledge)",
             # (the next area loads on the frame he gets there: the test sees 1 px less)
             int(seqs["walk"].split(",")[1]) > 0

@@ -298,8 +298,10 @@ The NES draws the opened door with sprites; the port has no sprite patterns to s
 in these areas, so the converter draws the half-open and open door over the wall into
 6 extra tile columns at the end of the area's map (`AH_DOOR_VCOL`, never on screen),
 and the sequence copies 3 columns of them into the name table at each step. After the
-door shuts, Simon walks on to `AH_WALK_END`, 96 px into the next stage's first columns:
-still on its ledge, which ends at x 112 or 128. The hall
+door shuts, Simon walks on to `AH_WALK_END` and the screen scrolls on to `AH_CAM_END`:
+the next stage's start x on the first of its columns, and the x where its map begins.
+So when the next stage loads (camera 0, Simon at its start), nothing on the screen
+jumps, and Simon is still on its ledge. The hall
 and stage 2's corridor include the next stage's first 8 map columns for this; their
 normal camera limit (`AH_MAXCAM`) stays where it was, so those columns only show
 during the sequence. The game logic, the timer and the enemies wait meanwhile. An exit only starts while

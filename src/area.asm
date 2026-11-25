@@ -172,7 +172,8 @@ check_area_exit:
 ;  castle gate: Simon walks into the gate, 1 px every 3 frames
 ;  door: the screen scrolls 1 px per frame to AH_DOOR_CAM while Simon stands;
 ;        the door opens, he walks through (1 px per frame), it closes, he
-;        walks on to AH_WALK_END with the screen following; then the next area
+;        walks on to AH_WALK_END and the screen scrolls on to AH_CAM_END, so that
+;        both match the next area's start; then the next area
 ; ---------------------------------------------------------------------------
 seq_tick:
         ld hl,(seq_t)
@@ -235,7 +236,7 @@ door_tick:
         jp camera_goto
 .half_open:
         ld a,1                          ; the door swings: half open
-        jr .next_phase
+        jp .next_phase
 .phase1:
         cp 1
         jr nz,.phase2
@@ -244,8 +245,10 @@ door_tick:
         cp DOOR_HALF_OPEN
         ret c
         ld a,2                          ; open
-        jr .next_phase
+        jp .next_phase
 .phase2:
+        cp 4
+        jr z,.phase4
         call door_walk
         ld a,(seq_phase)
         cp 2
@@ -283,9 +286,29 @@ door_tick:
         ld (seq_t),hl
         ret
 .phase4:
-        ld hl,(cam_x)                   ; 4: walks on, the screen following,
-        inc hl                          ; to AH_WALK_END (still on the floor
-        call camera_goto                ; at the next stage's start)
+        ; 4: he walks on to AH_WALK_END (where he starts in the next stage)
+        ; and the screen scrolls on to AH_CAM_END (where the next stage's
+        ; map begins): then the next stage loads without a jump
+        ld hl,(px)
+        ld de,(area_hdr+AH_WALK_END)
+        or a
+        sbc hl,de
+        jr nc,.stand
+        call door_walk
+        jr .scroll
+.stand:
+        xor a
+        ld (pframe),a
+.scroll:
+        ld hl,(cam_x)
+        ld de,(area_hdr+AH_CAM_END)
+        or a
+        sbc hl,de
+        jr nc,.both
+        ld hl,(cam_x)
+        inc hl
+        jp camera_goto
+.both:
         ld hl,(px)
         ld de,(area_hdr+AH_WALK_END)
         or a

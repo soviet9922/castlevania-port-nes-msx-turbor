@@ -63,7 +63,8 @@ AH_DOOR_COL     equ 56                  ; door: tile column (2 bytes)
 AH_DOOR_CAM     equ 58                  ; door: camera x while it opens (2 bytes)
 AH_DOOR_VCOL    equ 60                  ; door: its 6 extra tile columns (half open, open)
 AH_WALK_END     equ 62                  ; door: Simon walks on to this x (2 bytes)
-AH_SIZE         equ 64
+AH_CAM_END      equ 64                  ; door: the screen scrolls on to this x (2 bytes)
+AH_SIZE         equ 66
 
 ; Exit sequences (measured on the NES)
 GATE_FRAMES     equ 120                 ; walking into the castle gate, 1 px every 3 frames
