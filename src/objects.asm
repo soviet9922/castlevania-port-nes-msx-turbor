@@ -1611,13 +1611,32 @@ fish_shoot:
         ld (ix+7),KIND_FIREBALL
         ld (ix+8),0xFF
         ld (ix+9),0                     ; straight across
+        ld (ix+10),0                    ; 7 px every 4 frames
 .none:
         pop ix
         ret
 
-; The boss spits a fireball at Simon (an addition: not seen in the NES
-; recordings, see BOSS_FIRE_AT). From its mouth, across towards him, and
-; 1 px up or down every 2nd frame if he is above or below.
+; While hovering far from Simon (BOSS_FIRE_FAR px or more), the boss spits a
+; slow fireball at him (seen in a video of the NES fight: 4 px every 3 frames,
+; aimed at him; never when he is close). From its mouth, across towards him,
+; and 1 px up or down every 2nd frame if he is above or below.
+boss_fire_if_far:
+        call boss_simon_dx
+        bit 7,h
+        jr z,.pos
+        ld a,l
+        neg
+        ld l,a
+        ld a,h
+        cpl
+        ld h,a
+.pos:
+        ld a,h
+        or a
+        jr nz,boss_shoot
+        ld a,l
+        cp BOSS_FIRE_FAR
+        ret c
 boss_shoot:
         push ix
         call boss_simon_dx
@@ -1650,6 +1669,7 @@ boss_shoot:
         ld (ix+3),e
         ld (ix+5),c
         ld (ix+9),b
+        ld (ix+10),1                    ; the boss's are slower
         ld (ix+0),OBJ_FIREBALL
         ld (ix+4),0
         ld (ix+6),OBJF_FIREBALL
@@ -1659,11 +1679,24 @@ boss_shoot:
         pop ix
         ret
 
-; Fireball: 7 px every 4 frames the way it was shot. Hurts Simon on contact;
+; Fireball: 7 px every 4 frames (fishman) or 4 every 3 (boss) the way it was shot. Hurts Simon on contact;
 ; the whip destroys it.
 fireball_update:
         inc (ix+4)
-        ld a,(ix+4)
+        ld a,(ix+10)
+        or a
+        jr z,.fish
+        ld a,(ix+4)                     ; boss: 4 px every 3 frames
+.mod3:
+        sub 3
+        jr nc,.mod3
+        inc a                           ; 0 every 3rd frame: one more pixel
+        ld e,1
+        jr nz,.dx
+        ld e,2
+        jr .dx
+.fish:
+        ld a,(ix+4)                     ; fishman: 7 px every 4 frames
         and 3
         ld e,2
         jr nz,.dx
@@ -1838,7 +1871,7 @@ boss_update:
 .hovering:
         ld a,(ix+4)
         cp BOSS_FIRE_AT
-        call z,boss_shoot
+        call z,boss_fire_if_far
         ld a,(ix+4)
         cp BOSS_HOVER
         jp c,.hits

@@ -152,8 +152,10 @@ a jump). The way out only opens after the boss.
 - With Simon waiting on the floor (a local variant of `record_boss.lua`), its
   swoops come right down to his height (y up to about 197) and hit him again and
   again: a swoop aims at where Simon is, on both axes.
-- No fireball from it appeared in any recording (on the ledge, on the floor, at
-  full health and at low health). The port adds one on request (see DESIGN.md).
+- Fireballs: none appeared in the FCEUX recordings, where Simon was never more than
+  about 100 px from it. A video of the NES fight (from the player) shows them while
+  the boss hovers far from Simon (about 180 px, Simon on the ledge): a small fireball
+  aimed at him, about 4 px every 3 frames. Never when he is close.
 - Health in `$01A9`, 64 at the start, shown in the HUD's ENEMY bar. A whip hit
   (basic whip) takes 6.
 - At 0 it burns (object `$31`, flame tile `91`) for 60 frames and becomes an orb

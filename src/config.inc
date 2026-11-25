@@ -109,10 +109,9 @@ BOSS_WAKE       equ 72                  ; wakes when Simon is this close (x)
 BOSS_HOVER      equ 160                 ; frames it hovers before a swoop
 BOSS_SWOOP_MAX  equ 120                 ; a swoop ends after this many frames
 BOSS_HIGH_Y     equ 26
-BOSS_FIRE_AT    equ 80                  ; hover frame when it spits a fireball;
-                                        ; an addition (asked for): the NES
-                                        ; recordings never showed one. A value
-                                        ; >= BOSS_HOVER turns it off                  ; box top of the spots it flies back to
+BOSS_FIRE_AT    equ 80                  ; hover frame when it may spit a fireball
+BOSS_FIRE_FAR   equ 128                 ; ... if Simon is at least this far away
+                                        ; (NES video: fireballs only from afar)                  ; box top of the spots it flies back to
 STAGE_CLEAR_FRAMES equ 180              ; after the orb, then the game restarts                  ; top of crouching Simon, for fireballs
 ENEMY_FISH      equ 0x03
 FISH_MAX        equ 2                   ; fishmen about at once
