@@ -199,4 +199,4 @@ RAM_END         equ drg_parts+36
         ASSERT RAM_END < 0xF380
         ASSERT RAM_END <= RAMCODE
 RAMCODE         equ 0xC600              ; code copied from ROM (src/ramcode.asm)
-RAMCODE_TOP     equ 0xEC00              ; (the stack is above, from about 0xF370 down)
+RAMCODE_TOP     equ 0xF000              ; (the stack is above, from about 0xF370 down: 880 bytes)

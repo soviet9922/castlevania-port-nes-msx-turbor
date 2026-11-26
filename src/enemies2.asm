@@ -3643,6 +3643,8 @@ frank_spawn:
         add ix,de
         djnz .gone
         pop ix
+        ld a,1                          ; his patterns in the corridor
+        call load_swap_patterns         ; enemies' place (swap window)
         pop ix
         ld (ix+0),OBJ_FRANK
         ld (ix+7),KIND_MUMMY            ; 16x44 box
@@ -3891,6 +3893,11 @@ frank_igor:
         ret z
         ld a,(iy+0)
         cp OBJ_IGOR
+        jr z,.there
+        xor a                           ; (gone: Z)
+        ret
+.there:
+        or a                            ; (NZ)
         ret
 
 ; x += 3/4 px along A (+1 / -1)

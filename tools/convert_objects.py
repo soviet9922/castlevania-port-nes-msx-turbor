@@ -526,6 +526,12 @@ SWAP_PAIRS = [
      ["mummy_l", "mummy_r", "mummy_fl", "mummy_fr", "mummy2_l", "mummy3_l", "mummy2_r", "mummy3_r",
       "bandage1", "bandage2", "orb"]],
 ]
+# stage 12: the corridor's enemies until Frankenstein (every other enemy goes
+# when he appears)
+SWAP_PAIRS.append(
+    [["rskel1_l", "rskel2_l", "rskel1_r", "rskel2_r", "rpile_l", "rhalf_l", "rpile_r",
+      "rhalf_r", "dhead", "dhead2", "vert", "skel1_l", "skel2_l", "skel1_r", "skel2_r", "bone"],
+     ["frank1_l", "frank2_l", "frank3_l", "frank1_r", "frank2_r", "frank3_r", "orb"]])
 SWAP_SETS = SWAP_PAIRS[0]           # (the pair an area uses: swap_sets(need))
 
 
