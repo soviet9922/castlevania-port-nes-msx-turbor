@@ -61,6 +61,7 @@ main_loop:
         push af                         ; waits a frame (both at once can
         call upload_column              ; overrun the vertical blank)
         call door_vram
+        call medusa_vram
         call flip_sprites
         pop af
         or a

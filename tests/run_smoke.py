@@ -395,7 +395,22 @@ def tcl_script(syms, result_file):
                        set x 680; poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
                        poke {py} 96; poke {py + 1} 0; set ::crushed 0; crush_watch 200 }}
     after time 142 {{ set f [open "{result_file}" a]; puts $f "crush [peek {cur}] $::crushed"; close $f }}
-    after time 142.2 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}] $::vbl_worst_fc"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
+    # Medusa: in her room she wakes (the statue's tiles go blank, the screen
+    # locks); with little health left a whip hit burns her into the orb
+    after time 142.1 {{ poke {eoff} 3; poke {syms["area_hdr"] + 44} 10; poke {syms["clear_t"]} 1; poke {syms["clear_phase"]} 4 }}
+    after time 142.6 {{ set x 372; poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
+                       poke {py} 96; poke {py + 1} 0; poke {syms["invuln_t"]} 250 }}
+    after time 143.6 {{ set m [find_type 18]
+                       set col [expr {{[peek {syms["med_col"]}] & 31}}]
+                       set row [expr {{[peek {syms["med_row"]}] + 2}}]
+                       set f [open "{result_file}" a]
+                       puts $f "medusa_wake [expr {{$m >= 0 ? [peek [expr {{$m + 9}}]] : -1}}] [peek {syms["cam_lock"]}] [vpeek [expr {{0x1800 + $row*32 + $col}}]] [peek {syms["area_hdr"] + 45}] [peek {syms["boss_hp"]}]"
+                       close $f
+                       for {{set i 0}} {{$i < 8}} {{incr i}} {{ set b [expr {{{objt} + $i*{obj_size}}}]; if {{[peek $b] == 19}} {{ poke $b 0 }} }}
+                       poke {syms["boss_hp"]} 3; poke {syms["invuln_t"]} 250; poke {fa} 0; medusa_pin 80 }}
+    after time 143.9 {{ keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
+    after time 146 {{ set f [open "{result_file}" a]; puts $f "medusa_dead [peek {syms["boss_hp"]}] [count_type 11]"; close $f }}
+    after time 146.2 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}] $::vbl_worst_fc"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
 """ if areas > 1 else f"""
     after time 9 {{ snd_report; set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
@@ -667,6 +682,16 @@ proc seq_watch {{}} {{
     }}
 }}
 debug set_watchpoint write_mem {fc} {{}} seq_watch
+proc medusa_pin {{n}} {{
+    if {{$n <= 0}} return
+    set b [find_type 18]
+    if {{$b >= 0 && [peek [expr {{$b + 9}}]] != 4}} {{
+        set x [expr {{[peek {px_a}] + 256*[peek {px_a + 1}] + 12}}]
+        poke [expr {{$b + 1}}] [expr {{$x & 255}}]; poke [expr {{$b + 2}}] [expr {{$x >> 8}}]
+        poke [expr {{$b + 10}}] 90
+    }}
+    after frame "medusa_pin [expr {{$n - 1}}]"
+}}
 proc crush_watch {{n}} {{
     if {{$n <= 0}} return
     if {{[peek {syms["dying_t"]}] > 0}} {{ set ::crushed 1; return }}
@@ -753,7 +778,7 @@ proc wait_game {{}} {{
     }}
 }}
 after time 0.1 wait_game
-after time 175 {{ exit }}
+after time 180 {{ exit }}
 """
 
 
@@ -916,7 +941,8 @@ def run():
             if tag == "fish":
                 fish_seen = int(kv[0])
                 continue
-            if tag in ("medusa", "s4enemies", "hbat", "knight1", "knight2", "crush"):
+            if tag in ("medusa", "s4enemies", "hbat", "knight1", "knight2", "crush",
+                       "medusa_wake", "medusa_dead"):
                 block2_enemies[tag] = kv
                 continue
             if tag == "bat":
@@ -1148,6 +1174,13 @@ def run():
         *([("stage 6's ceiling crushers crush Simon standing under one",
             block2_enemies["crush"] == ["9", "1"])]
           if block2 and "crush" in block2_enemies else []),
+        *([("Medusa wakes in her room: the statue goes, the screen locks, her health in the HUD",
+            block2_enemies["medusa_wake"][0] == "1" and block2_enemies["medusa_wake"][1] == "1"
+            and block2_enemies["medusa_wake"][2] == block2_enemies["medusa_wake"][3]
+            and block2_enemies["medusa_wake"][4] == "64"),
+           ("beaten, Medusa burns and leaves the orb",
+            block2_enemies["medusa_dead"] == ["0", "1"])]
+          if block2 and "medusa_dead" in block2_enemies else []),
         *([("the chain whip has its own poses, the same reach as the leather whip",
             any(16 <= int(p) < 24 for p in weapons["chain"]["poses"].split(","))
             and int(weapons["chain"]["reach"]) == whip_reach),

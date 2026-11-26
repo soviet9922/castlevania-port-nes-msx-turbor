@@ -354,8 +354,16 @@ height) and lists each crusher's x and cycle (`AH_CRUSHERS`). Each frame every c
 steps through its cycle, and spikes that reach Simon kill him. In the vertical blank
 one crusher whose height changed is copied into the name table (only when the HUD has
 nothing to redraw and no map column is uploaded, so the vertical blank stays short);
-a new map column shows them at rest, so it marks them all to be drawn again. Medusa
-(the boss) is not converted yet.
+a new map column shows them at rest, so it marks them all to be drawn again.
+
+Medusa is placed like the stage 3 boss (candle list kind 8) and shares its health bar,
+hit, burn and orb code (`boss_update.hits`, `.burning`). Asleep she is the statue in the
+map and draws no sprites. She wakes when Simon is near and the screen has reached her
+room at the area's left end: the boss music starts, the camera locks (its least and
+greatest x both set to where it is), and `medusa_vram` blanks the statue's 4x3 tiles
+in the next vertical blank. She flies with the bat's wave, stops now and then and drops
+a snake, which falls to the floor and slides at Simon. Taking her orb clears the
+stage; block 3 is not converted, so the game then goes back to the courtyard.
 
 `load_area` turns the display off, loads the palette, tiles and object
 patterns, resets objects and the player, redraws the screen and turns

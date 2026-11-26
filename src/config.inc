@@ -189,6 +189,13 @@ KNIGHT_TURN     equ 192                 ; it faces Simon every 192-255 frames
 KNIGHT_FLASH    equ 16                  ; frames it can't be hit again
 HBAT_WAKE       equ 96                  ; a hanging bat flies at Simon this close
 HBAT_WAKE_DY    equ 48                  ; ... and this near its height
+; Medusa (stage 6 boss, recorded on the NES)
+MEDUSA_WAKE     equ 80                  ; wakes when Simon is this close
+MEDUSA_DAMAGE   equ 3                   ; per whip hit (NES: 64 -> 61 -> 58)
+MEDUSA_LEFT     equ 40                  ; she turns at these screen x (centre)
+MEDUSA_RIGHT    equ 235
+MEDUSA_PAUSE    equ 64                  ; she stops this long and drops a snake
+SNAKE_MAX       equ 2
 FISH_MAX        equ 2                   ; fishmen about at once
 FISH_DELAY      equ 32                  ; frames before the next one jumps out
 FISH_AWAY       equ 48                  ; not right under Simon

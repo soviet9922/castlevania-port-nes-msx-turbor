@@ -44,7 +44,8 @@ OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
               "axe1", "axe2", "axe3", "axe4", "bottle", "flame1", "flame2", "flame3",
               "holy_item", "watch_item", "flame4", "flame5", "axe_item", "boss_sleep",
               "mhead1_l", "mhead2_l", "mhead1_r", "mhead2_r",
-              "hbat_hang", "hbat1_l", "hbat2_l", "hbat3_l", "hbat1_r", "hbat2_r", "hbat3_r"]
+              "hbat_hang", "hbat1_l", "hbat2_l", "hbat3_l", "hbat1_r", "hbat2_r", "hbat3_r",
+              "medusa1", "medusa2", "snake_l", "snake_r"]
 
 # Black panther: 32x16, palette 3, art faces left (recorded in the hall).
 # Run cycle run1 -> run2 -> run3, 7 frames each; the leap shows run2.
@@ -58,6 +59,8 @@ PANTHER_LEFT = {
 KIND_BRAZIER, KIND_CANDLE, KIND_PANTHER = 0, 1, 2
 KIND_BOSS = 5
 KIND_KNIGHT, KIND_HBAT = 6, 7   # block 2's placed enemies (16x32, 16x16)
+KIND_MEDUSA = 8                 # the stage 6 boss (box as the stage 3 boss's)
+ENEMY_MEDUSA_BOSS = 0x5B        # its enemy group record (object $1B)
 ENEMY_BOSS = 0x59               # enemy group record type: the stage 3 boss
 ENEMY_KNIGHT = 0x48             # block 2: a spear knight (object $08)
 ENEMY_HBAT = 0x47               # block 2: a bat hanging until Simon comes (object $07)
@@ -157,6 +160,19 @@ FRAME_SPRITES["hbat_hang"] = [(0x9C, 0, 0, 1, 0), (0x9C, 8, 0, 1, 1)]
 for _n, _t in (("hbat1", 0x90), ("hbat2", 0x94), ("hbat3", 0x98)):
     FRAME_SPRITES[_n + "_l"] = [(_t, 0, 0, 1, 0), (_t + 2, 8, 0, 1, 0)]
     FRAME_SPRITES[_n + "_r"] = [(_t + 2, 0, 0, 1, 1), (_t, 8, 0, 1, 1)]
+# Medusa (recorded in stage 6): 32x32, symmetric, two pictures (palette 1 and
+# palette 2), drawn 8 px into a 48-px box like the stage 3 boss's; her snakes
+# 16x16, palette 2, art facing left
+FRAME_SPRITES["medusa1"] = ([(t, 8 + 8 * i, dy, 1, 0) for dy, ts in ((0, (0xD0, 0xD2)), (16, (0xD4, 0xD6)))
+                             for i, t in enumerate(ts)]
+                            + [(t, 32 - 8 * i, dy, 1, 1) for dy, ts in ((0, (0xD0, 0xD2)), (16, (0xD4, 0xD6)))
+                               for i, t in enumerate(ts)])
+FRAME_SPRITES["medusa2"] = ([(t, 8 + 8 * i, dy, 2, 0) for dy, ts in ((0, (0xD8, 0xDA)), (16, (0xDC, 0xDE)))
+                             for i, t in enumerate(ts)]
+                            + [(t, 32 - 8 * i, dy, 2, 1) for dy, ts in ((0, (0xD8, 0xDA)), (16, (0xDC, 0xDE)))
+                               for i, t in enumerate(ts)])
+FRAME_SPRITES["snake_l"] = [(0xF0, 0, 0, 2, 0), (0xF2, 8, 0, 2, 0)]
+FRAME_SPRITES["snake_r"] = [(0xF2, 0, 0, 2, 1), (0xF0, 8, 0, 2, 1)]
 # (the spear knight uses the zombie's frames: block 2's graphics have the
 # knight in the zombie's tiles, 80-8A, palette 1)
 
@@ -219,6 +235,12 @@ def candles(rom, stage, section, level_px):
             cx, cy = (chunk - 1) * 64 + rom.fixed(p + 1) - 1, rom.fixed(p + 2)
             out.append((cx - 24, cy - 56, ITEM_NONE, KIND_BOSS))
             continue
+        if kind == ENEMY_MEDUSA_BOSS:
+            # asleep she is the statue in the map; her 48x32 box: sprite top
+            # = NES y - 15 (as the engine's y: - 65), centred on the record x
+            cx, cy = (chunk - 1) * 64 + rom.fixed(p + 1), rom.fixed(p + 2)
+            out.append((cx - 24, cy - 65, ITEM_NONE, KIND_MEDUSA))
+            continue
         if kind in (ENEMY_KNIGHT, ENEMY_HBAT):
             # knight: 16x32 box on the floor at record y (feet, as Simon's y);
             # bat: 16x16 box, its centre line at record y
@@ -273,6 +295,8 @@ def needed_frames(candle_list, spawners, carried=()):
             need |= {"candle1", "candle2"}
         elif kind == KIND_BOSS:
             need |= {"boss_sleep", "boss_open", "boss_up", "orb", "fireball"}
+        elif kind == KIND_MEDUSA:
+            need |= {"medusa1", "medusa2", "snake_l", "snake_r", "orb"}
         elif kind == KIND_KNIGHT:
             need |= {n for n in OBJ_FRAMES if n.startswith("zombie")}
         elif kind == KIND_HBAT:

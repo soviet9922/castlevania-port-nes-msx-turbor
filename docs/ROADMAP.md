@@ -33,7 +33,8 @@
 - [x] Block 2's maps (stages 4-6): graphics, collision, stairs, candles, doors at the left, music
 - [x] Block 2's enemies: Medusa heads, spear knights, hanging bats
 - [x] Stage 6's ceiling crushers
-- [ ] Medusa; the castle map between blocks
+- [x] Medusa (stage 6 boss) and her snakes
+- [ ] Block 3 and up; the castle map between blocks
 - [ ] Palette selection table, stages 2 and up
 
 ## Milestone 2: Simon (in progress)

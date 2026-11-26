@@ -41,6 +41,8 @@ OBJ_HOLY        equ 14                  ; holy water: bottle, then fire
 OBJ_KNIGHT      equ 15                  ; block 2: spear knight
 OBJ_MHEAD       equ 16                  ; block 2: Medusa head
 OBJ_HBAT        equ 17                  ; block 2: a bat hanging until Simon comes
+OBJ_MEDUSA      equ 18                  ; the stage 6 boss
+OBJ_SNAKE       equ 19                  ; her snakes
 
 KIND_BRAZIER    equ 0
 KIND_CANDLE     equ 1
@@ -50,6 +52,7 @@ KIND_FIREBALL   equ 4                   ; 8x8 box at +4,+4
 KIND_BOSS       equ 5                   ; 48x32 sprite, 32x24 box at +8
 KIND_KNIGHT     equ 6                   ; candle list only: a spear knight
 KIND_HBAT       equ 7                   ; candle list only: a hanging bat
+KIND_MEDUSA     equ 8                   ; candle list only: Medusa
 
 ; object frame numbers (OBJ_FRAMES in tools/convert_objects.py)
 OBJF_BRAZIER    equ 0
@@ -78,6 +81,8 @@ OBJF_AXE_ITEM   equ 54
 OBJF_MHEAD      equ 56                  ; Medusa head 1/2 flying left, then right
 OBJF_HBAT_HANG  equ 60
 OBJF_HBAT       equ 61                  ; wings 1-3 flying left, then right
+OBJF_MEDUSA     equ 67                  ; her two pictures
+OBJF_SNAKE      equ 69                  ; left, right
 
 ITEM_WHIPUP     equ 0
 ITEM_HEART      equ 1
@@ -261,6 +266,8 @@ spawn_candle:
         jr z,.placed                    ; hanging bats)
         cp KIND_KNIGHT
         jr c,.allowed
+        cp KIND_MEDUSA                  ; (not the boss)
+        jr nc,.allowed
 .placed:
         ld a,(enemies_off)
         and 2
@@ -304,6 +311,8 @@ spawn_candle:
         jr z,.knight
         cp KIND_HBAT
         jr z,.hbat
+        cp KIND_MEDUSA
+        jr z,.medusa
         ld (ix+0),OBJ_CANDLE
         ld (ix+6),OBJF_CANDLE
         ret
@@ -321,6 +330,10 @@ spawn_candle:
         add a,KNIGHT_TURN
         ld (ix+10),a
         jp knight_frame
+.medusa:
+        ld (ix+0),OBJ_MEDUSA
+        ld (ix+6),OBJF_MEDUSA
+        jr .boss_common
 .hbat:
         ld (ix+0),OBJ_HBAT
         ld (ix+7),KIND_BAT              ; 16x16 box
@@ -329,6 +342,7 @@ spawn_candle:
 .boss:
         ld (ix+0),OBJ_BOSS
         ld (ix+6),OBJF_BOSS_SLEEP
+.boss_common:
         ld a,BOSS_HP
         ld (boss_hp),a
         xor a
@@ -461,6 +475,16 @@ objects_update:
         call hbat_update
         jp .next
 .not_hbat:
+        cp OBJ_MEDUSA
+        jr nz,.not_medusa
+        call medusa_update
+        jp .next
+.not_medusa:
+        cp OBJ_SNAKE
+        jr nz,.not_snake
+        call snake_update
+        jp .next
+.not_snake:
         cp OBJ_ITEM
         call z,item_update
 .next:
@@ -1824,6 +1848,367 @@ knight_frame:
         ret
 
 ; ---------------------------------------------------------------------------
+; Medusa (stage 6 boss, recorded on the NES). Asleep she is the statue in the
+; map. When Simon comes within MEDUSA_WAKE px and the screen has reached her
+; room at the area's left end, she wakes: the statue's tiles go
+; blank, the screen locks, the boss music starts and her first snake drops.
+; She drifts 7 px every 8 frames, bobbing along the bat's 96-frame wave, turns
+; at the room's edges and follows Simon's height; every 150-277 frames she
+; stops for MEDUSA_PAUSE frames and drops a snake. Health in the HUD's enemy bar
+; (MEDUSA_DAMAGE a whip hit); beaten, she burns and leaves the orb (as the
+; stage 3 boss: boss_update's hit, burn and orb code).
+;   +4 timer  +9 state (0 asleep, 1 flying, 2 stopped, 4 burning)
+;   +10 the wave's top y  +5 direction
+; ---------------------------------------------------------------------------
+medusa_update:
+        inc (ix+4)
+        ld a,(boss_inv)
+        or a
+        jr z,.no_inv
+        dec a
+        ld (boss_inv),a
+.no_inv:
+        ld a,(ix+9)
+        cp 4
+        jp z,boss_update.burning
+        ld a,(ix+4)                     ; her two pictures, 8 frames each
+        rrca
+        rrca
+        rrca
+        and 1
+        add a,OBJF_MEDUSA
+        ld (ix+6),a
+        ld a,(ix+9)
+        or a
+        jr nz,.awake
+        call boss_simon_dx              ; asleep: Simon near?
+        bit 7,h
+        jr z,.pos
+        ld a,l
+        neg
+        ld l,a
+        ld a,h
+        cpl
+        ld h,a
+.pos:
+        ld a,h
+        or a
+        ret nz
+        ld a,l
+        cp MEDUSA_WAKE
+        ret nc
+        ld hl,(cam_x)                   ; and the screen is at her room (the
+        ld de,(area_hdr+AH_MINCAM)      ; area's left end)
+        or a
+        sbc hl,de
+        ret nz
+        ld a,SND_BOSS                   ; awake
+        call music_restart
+        ld hl,(cam_x)                   ; the screen locks
+        ld (cam_min),hl
+        ld (area_hdr+AH_MAXCAM),hl
+        ld a,1
+        ld (cam_lock),a
+        ld l,(ix+1)                     ; the statue's tiles: 4 x 3 from
+        ld h,(ix+2)                     ; box x + 8, y + 9
+        ld de,8
+        add hl,de
+        call hl_shr3
+        ld (med_col),hl
+        ld a,(ix+3)
+        add a,9
+        rrca
+        rrca
+        rrca
+        and 31
+        ld (med_row),a
+        ld a,1
+        ld (med_erase),a
+        ld a,(ix+3)
+        ld (ix+10),a
+        call boss_simon_dx              ; first towards Simon
+        ld (ix+5),1
+        bit 7,h
+        jr z,.dir
+        ld (ix+5),-1
+.dir:
+        ld (ix+9),1
+        ld (ix+4),0
+        call medusa_next_pause
+        call snake_drop
+        jp boss_update.hits
+
+.awake:
+        cp 2
+        jr z,.stopped
+        ld hl,med_t                     ; flying
+        dec (hl)
+        jr nz,.fly
+        ld (ix+9),2
+        ld (hl),MEDUSA_PAUSE
+        jr .wave
+.fly:
+        ld a,(ix+4)                     ; x: 7 px every 8 frames
+        and 7
+        cp 7
+        jr z,.edges
+        ld a,(ix+5)
+        ld e,a
+        rla
+        sbc a,a
+        ld d,a
+        ld l,(ix+1)
+        ld h,(ix+2)
+        add hl,de
+        ld (ix+1),l
+        ld (ix+2),h
+.edges:
+        ld l,(ix+1)                     ; turn at the room's edges
+        ld h,(ix+2)
+        ld de,24
+        add hl,de
+        ld de,(cam_x)
+        or a
+        sbc hl,de                       ; HL = her centre on the screen
+        ld a,h
+        or a
+        jr nz,.go_left
+        ld a,l
+        cp MEDUSA_LEFT
+        jr nc,.not_left
+        ld (ix+5),1
+        jr .wave
+.not_left:
+        cp MEDUSA_RIGHT
+        jr c,.wave
+.go_left:
+        ld (ix+5),-1
+        jr .wave
+
+.stopped:
+        ld hl,med_t
+        dec (hl)
+        ld a,(hl)
+        cp MEDUSA_PAUSE/2
+        call z,snake_drop
+        ld a,(med_t)
+        or a
+        jr nz,.wave
+        ld (ix+9),1
+        call medusa_next_pause
+
+.wave:
+        ld a,(ix+4)                     ; follow Simon's height, 1 px every
+        and 7                           ; 8 frames
+        jr nz,.no_follow
+        ld a,(py)
+        sub 4
+        cp (ix+10)
+        jr z,.no_follow
+        jr c,.up
+        inc (ix+10)
+        jr .no_follow
+.up:
+        dec (ix+10)
+.no_follow:
+        ld a,(ix+4)                     ; y: the wave's top + bat wave
+.mod96:
+        sub 96
+        jr nc,.mod96
+        add a,96
+        ld e,a
+        ld d,0
+        ld hl,bat_wave
+        add hl,de
+        ld a,(ix+10)
+        add a,(hl)
+        ld (ix+3),a
+        jp boss_update.hits
+
+medusa_next_pause:
+        ld a,(frame_count)
+        and 127
+        add a,150
+        ld (med_t),a
+        ret
+
+; a snake drops from Medusa (IX), at most SNAKE_MAX about
+snake_drop:
+        push ix
+        ld l,(ix+1)
+        ld h,(ix+2)
+        ld de,16
+        add hl,de
+        ld b,(ix+3)
+        push hl
+        push bc
+        ld ix,obj_table
+        ld de,OBJ_SIZE
+        ld bc,OBJ_MAX*256
+.count:
+        ld a,(ix+0)
+        cp OBJ_SNAKE
+        jr nz,.not_snake
+        inc c
+.not_snake:
+        add ix,de
+        djnz .count
+        ld a,c
+        pop bc
+        pop hl
+        cp SNAKE_MAX
+        jr nc,.done
+        call obj_free_slot
+        jr c,.done
+        ld (ix+1),l
+        ld (ix+2),h
+        ld a,b
+        add a,8
+        ld (ix+3),a
+        ld (ix+0),OBJ_SNAKE
+        ld (ix+4),0
+        ld (ix+5),-1
+        ld (ix+6),OBJF_SNAKE
+        ld (ix+7),KIND_BAT              ; 16x16 box
+        ld (ix+8),0xFF
+        ld (ix+9),0
+        ld (ix+10),0
+        ld (ix+11),0
+.done:
+        pop ix
+        ret
+
+; ---------------------------------------------------------------------------
+; Snake (Medusa's): falls to the floor, then slides at Simon 3 px every 2
+; frames. One whip hit; touching Simon hurts him.
+;   +9 state (0 falling, 1 sliding)  +10 fall speed / x fraction  +11 fraction
+; ---------------------------------------------------------------------------
+snake_update:
+        inc (ix+4)
+        ld a,(ix+9)
+        or a
+        jr nz,.slide
+        ld a,(ix+10)                    ; falling: vy += 2/16, y += vy / 16
+        add a,2
+        cp 64
+        jr c,.vy
+        ld a,64
+.vy:
+        ld (ix+10),a
+        add a,(ix+11)
+        ld c,a
+        rrca
+        rrca
+        rrca
+        rrca
+        and 15
+        add a,(ix+3)
+        ld (ix+3),a
+        ld a,c
+        and 15
+        ld (ix+11),a
+        ld a,(ix+3)
+        cp MT_ROWS*16
+        jp nc,.gone
+        call snake_ground
+        jr nc,.frame
+        ld a,(ix+3)                     ; on the floor: slide at Simon
+        add a,16
+        and 0xF8
+        sub 16
+        ld (ix+3),a
+        ld (ix+9),1
+        ld (ix+10),0
+        call simon_dx
+        ld de,8                         ; (simon_dx is for a 32-wide box)
+        add hl,de
+        ld (ix+5),1
+        bit 7,h
+        jr z,.frame
+        ld (ix+5),-1
+        jr .frame
+.slide:
+        ld a,(ix+10)                    ; 1 + 1/2 px per frame
+        add a,0x80
+        ld (ix+10),a
+        ld a,1
+        adc a,0
+        bit 7,(ix+5)
+        jr z,.dx
+        neg
+.dx:
+        ld e,a
+        rla
+        sbc a,a
+        ld d,a
+        ld l,(ix+1)
+        ld h,(ix+2)
+        add hl,de
+        ld (ix+1),l
+        ld (ix+2),h
+.frame:
+        ld a,OBJF_SNAKE
+        bit 7,(ix+5)
+        jr nz,.left
+        inc a
+.left:
+        ld (ix+6),a
+        jp bat_update.checks
+.gone:
+        ld (ix+0),OBJ_NONE
+        ret
+
+; Carry if there is floor under the snake at IX (its middle, feet at y+16)
+snake_ground:
+        ld l,(ix+1)
+        ld h,(ix+2)
+        ld de,8
+        add hl,de
+        ld a,(ix+3)
+        add a,16
+        ld e,a
+        ld d,0
+        jp solid_at
+
+; VBLANK: Medusa woke: her statue's 4 x 3 tiles go blank
+medusa_vram:
+        ld a,(med_erase)
+        or a
+        ret z
+        xor a
+        ld (med_erase),a
+        ld a,(med_row)
+        ld l,a
+        ld h,0
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        ld de,VRAM_PNT+HUD_ROWS*32
+        add hl,de
+        ld a,(med_col)
+        and 31
+        ld e,a
+        ld d,0
+        add hl,de
+        ld c,3
+.row:
+        push hl
+        call vram_set_write
+        ld a,(area_hdr+AH_BLANK)
+        ld b,4
+.t:
+        out (VDP_DATA),a
+        djnz .t
+        pop hl
+        ld de,32
+        add hl,de
+        dec c
+        jr nz,.row
+        ret
+
+; ---------------------------------------------------------------------------
 ; Fishman (measured in the NES stage 2 waterway). While fewer than FISH_MAX
 ; are about, one jumps out of the water every FISH_DELAY frames, from a
 ; spawner on the screen at least FISH_AWAY px from Simon. +9 = state:
@@ -2506,8 +2891,14 @@ boss_update:
         ld (boss_inv),a
         ld a,1
         ld (hud_dirty),a
+        ld b,BOSS_DAMAGE
+        ld a,(ix+0)
+        cp OBJ_MEDUSA
+        jr nz,.damage
+        ld b,MEDUSA_DAMAGE
+.damage:
         ld a,(boss_hp)
-        sub BOSS_DAMAGE
+        sub b
         jr z,.dead
         jr c,.dead
         ld (boss_hp),a
@@ -3157,6 +3548,12 @@ objects_draw:
         ld a,(ix+0)
         or a
         jp z,.next_obj
+        cp OBJ_MEDUSA                   ; asleep, Medusa is the statue in the
+        jr nz,.drawn                    ; map: no sprites
+        ld a,(ix+9)
+        or a
+        jp z,.next_obj
+.drawn:
         ld l,(ix+1)                     ; screen x of the box
         ld h,(ix+2)
         ld de,(cam_x)

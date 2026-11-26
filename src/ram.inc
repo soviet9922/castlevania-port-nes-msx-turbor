@@ -151,5 +151,9 @@ medusa_t        equ psg_buf+11          ; 1  frames to the next Medusa head chec
 crush_state     equ medusa_t+1          ; 2*CRUSH_MAX  per crusher: cycle step, frames left
 crush_next      equ crush_state+8       ; 1  crusher redrawn in the next VBLANK
 crush_drawn     equ crush_next+1        ; CRUSH_MAX  spike row last drawn (0xFF = redraw)
-RAM_END         equ crush_drawn+CRUSH_MAX
+med_t           equ crush_drawn+CRUSH_MAX ; 1  Medusa: frames to her next pause / in it
+med_erase       equ med_t+1             ; 1  VBLANK: erase her statue
+med_col         equ med_erase+1         ; 2  the statue's first tile column
+med_row         equ med_col+2           ; 1  ... and playfield row
+RAM_END         equ med_row+1
         ASSERT RAM_END < 0xF380

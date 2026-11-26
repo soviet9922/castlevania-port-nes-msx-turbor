@@ -328,7 +328,17 @@ boss and the tally), and by reading the tables below.
     row 14; the chain (`00 1A 1B 00`) fills the rows above them. Spikes that reach
     Simon crush him (`$046C` = 8): he dies whatever his health. The records `$0D` and
     `$8D` are at two of them; `$4E` (two, left of them) is not identified yet.
-  - `$5B`: Medusa, the boss (bank 6 `$8425`, object `$1B`).
+  - `$5B` **Medusa**, the boss (bank 6 `$8425`, object `$1B`), recorded from a start
+    patched into her room (the start table at `$CA0C`, changed in the emulator's copy
+    of the ROM only). Asleep she is the statue, background tiles (nametable rows 17-19,
+    x 96-127); she woke about 100 frames after Simon arrived, about 40 px away, and
+    the statue's tiles became `00`. She is 32x32 (tiles `D0 D2 / D4 D6` palette 1 and
+    `D8 DA / DC DE` palette 2, mirrored), drifts 7 px every 8 frames, bobbing about 9 px
+    up and down, turns at the room's edges, follows Simon's height, and now and then
+    stops for about 70 frames. Snakes (object `$09`, tiles `F0 F2`, palette 2) drop from
+    her at intervals of 80-250 frames, fall to the floor and slide at Simon 3 px every 2
+    frames. Health 64 (`$01A9`), 3 a leather-whip hit; beaten, she burns (`$31`) and
+    leaves the orb (`$2F`), 3000 points. The camera stayed at 0 in her room.
 
 ## Exit sequences
 
