@@ -515,8 +515,9 @@ Recorded in the entrance hall (`tools/nes_probe/record_hall.lua`):
   - they appear at the screen edges (screen x 248 / 8), alternating sides, 32 frames
     apart, at most 3 at a time, while their spawner is near;
   - they come in waves: in two hall recordings, 3 appear (frames 1520, 1552, 1584),
-    then nothing until the wave is gone; the next wave starts about 100-140 frames
-    after the last zombie of the previous one left (1921 after 1815, 2272 after 2135);
+    then a pause. The code (6:$805D, see NES_ENEMIES.md) gives 32 frames between
+    zombies and 288 after every third, counted from the spawn (not from the wave
+    being gone); each spawner has its own timer and starts at once on the screen;
   - they walk straight across at 7 px every 8 frames and vanish off-screen;
   - one whip hit destroys one (burst).
   - in stage 3 their spawners are on the floor and on the upper platform (record y

@@ -1,4 +1,4 @@
-# Castlevania (NES): the enemies of stages 4-9, read from the code
+# Castlevania (NES): the enemies, read from the code
 
 What the port's enemies (src/enemies2.asm) follow. Read from the disassembly
 of your own ROM (`make disasm`); the engine's helpers are described in
@@ -35,6 +35,39 @@ is (px+8, py+16), and port y = NES y - 48.
   skeleton survive up to 64 px beyond it).
 - **The random byte** `$6F` (`$C030`): `$6F = T[($6F | frame) & 15]`, stepped in
   the idle loop; the port steps it once a frame (`rng_step`).
+
+## Block 1
+
+- **Spawners** (`$F382`): every record on the screen (x 8..`$F8`) runs, each
+  with its own timer, counted down every other frame while it is on the screen.
+- **Zombie** (`$01`, spawner `6:$805D`, AI `5:$8030`): at most 3; a random edge
+  (not the one within 64 px of Simon) with floor there; 32 frames to the next,
+  288 after every third (a global counter, `$63`, never reset: the first wave
+  after power-on has 4). It walks 7/8 px a frame, turns at a wall 16 px ahead,
+  falls off ledges. (The hall recordings fit: the next wave comes 288 frames
+  after the last one's third zombie, not after it is gone.)
+- **Bat** (`$02`, `6:$80E7`): every 384 frames, at most 3, not while Simon is
+  on the stairs; at the edge he faces (the other when that one is within 64
+  px), at his middle -19, -11, -3 or +1 (by the frame), 1 1/8 px a frame on a
+  spring dipping 18 px.
+- **Fishman** (`$03`, `6:$8182`, `$F08D`): 168 frames after its record comes on
+  the screen, then every 510; at most 2; not within 40 px of Simon. It leaps
+  5 1/2 px up, lands on a 16-px row, stands 8 frames, walks 3/4 px a frame for
+  79/121/93/144 frames (random), aims 16 frames, shoots (from 8 px above its
+  middle, 1 3/4 px a frame), waits 16.
+- **Black panther** (`$11`, `5:$8275`): wakes when Simon is within 64 px
+  across, runs 2 px a frame, leaps (1 1/2 px up, gravity 1/8) at an edge, runs
+  at him again after landing; once awake, gone when it leaves the screen.
+- **Giant bat** (`$19`, `5:$80EF`): asleep 120 frames after the screen locks;
+  then flies (3/4 px a frame on the long axis) to Simon's middle +72 or -73
+  across and 41 px above; hovers 123/32/61/199 frames; every 16 frames of a
+  hover, if Simon faces it within 88 px and 20 px of its height, rises 2 1/2 px
+  a frame for 7 frames; at the end, Simon's middle above its middle: a
+  fireball at him (1 1/2 px a frame), else a swoop aimed 25 px below him (2 px
+  across, the downward speed falling 6/256 a frame: a U through and past him)
+  until it rises above NES y 112. A hit takes the weapon's full damage and
+  stops it 8 frames. The orb shows at the screen's middle (128, 128) 60 frames
+  after the burn, flashes 32 frames, then falls.
 
 ## Block 2
 
