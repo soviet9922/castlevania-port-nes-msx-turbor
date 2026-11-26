@@ -219,7 +219,13 @@ def tcl_script(syms, result_file):
                        # a dive that goes below his middle)
                        for {{set i 0}} {{$i < 8}} {{incr i}} {{
                            set b [expr {{{objt} + $i*{obj_size}}}]
-                           if {{[peek $b] == 10}} {{ poke [expr {{$b + 9}}] 3; poke {syms["boss_t"]} 30 }}
+                           if {{[peek $b] == 10}} {{
+                               # (hovering at the NES's spot for him on the floor:
+                               # 72 px across, 41 px above his middle)
+                               set x [expr {{700 + 8 + 72 - 24}}]
+                               poke [expr {{$b + 1}}] [expr {{$x & 255}}]; poke [expr {{$b + 2}}] [expr {{$x >> 8}}]
+                               poke [expr {{$b + 3}}] [expr {{128 + 16 - 41 - 7}}]
+                               poke [expr {{$b + 9}}] 3; poke {syms["boss_t"]} 30 }}
                        }} }}
     after time 74.75 {{ {dump('27b_floor_start')} }}
     after time 78.8 {{ # holy water's fire on the boss: held in it, and hurt again and again
