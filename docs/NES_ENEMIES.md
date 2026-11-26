@@ -95,3 +95,16 @@ is (px+8, py+16), and port y = NES y - 48.
   frames, throw a bandage (at the middle y +/- 8, 1 1/2 px a frame on a spring
   ~24 px up and down), stand 8 and walk on. Both burn 60 frames when beaten;
   the last leaves the orb.
+
+## Frames
+
+`tools/nes_frames.py ROM FRAME [FACING]` runs the NES's own sprite builder
+(bank 0 `$8052`, frame tables `$8FBE` / `$90BE`) and lists a frame's sprites.
+From it: the knight walks on frames `$9A`-`$9D` (legs 84, 88, 8C, 88, the body
+1 px lower on the first and third); the skeleton has its own frames `$B1`
+(80-86) and `$B2` (88-8E); the mummies walk on `$67`, `$68`, `$69`, `$68`; the
+snake's frame `$75` draws F2 before F0; the bone pillar's skulls face Simon
+(frame `$9E` mirrored by the facing). An object's `obj_attr` 3 (the pillar's
+flash) or `$43` (the mummy winding up) only changes palette 1 to palette 3.
+Where an area's sprite patterns run short, the converter folds the frames
+added from this table first (tools/convert_objects.py FOLDS).
