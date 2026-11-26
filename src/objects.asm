@@ -105,6 +105,11 @@ OBJF_RAVEN_PERCH equ 77
 OBJF_RAVEN      equ 78                  ; wings 1-3 left, then right
 OBJF_MUMMY      equ 84                  ; left, right
 OBJF_BANDAGE    equ 86                  ; two pictures
+OBJF_KNIGHT     equ 88                  ; legs 1-3 facing left, then right
+OBJF_SKEL       equ 94                  ; two pictures facing left, then right
+OBJF_MUMMY2     equ 98                  ; pictures 2-3 facing left, then right
+OBJF_PILLAR_R   equ 102                 ; facing right; flashing left, right
+OBJF_MUMMY_F    equ 105                 ; flickering: left, right
 
 ITEM_WHIPUP     equ 0
 ITEM_HEART      equ 1

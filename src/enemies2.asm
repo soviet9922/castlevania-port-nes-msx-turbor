@@ -500,11 +500,30 @@ knight_face:
         ld (ix+5),-1
         ret
 
-; the zombie's frames (block 2's graphics have the knight there). The NES
-; steps 4 frames 17 frames apart (legs 84, 88, 8C, 88 with a 1 px bob); the
-; port has two of the poses: they change every 8 px walked.
+; the knight's walk: the NES's frames $9A, $9B, $9C, $9B (17 frames each,
+; about 8 px walked): a picture every 8 px
 knight_frame:
         ld a,(ix+1)
+        rrca
+        rrca
+        rrca
+        and 3
+        cp 3
+        jr nz,.step
+        ld a,1
+.step:
+        bit 7,(ix+5)
+        jr nz,.left
+        add a,3
+.left:
+        add a,OBJF_KNIGHT
+        ld (ix+6),a
+        ret
+
+; the skeleton's two pictures (NES $B1, $B2, 17 frames each: every 16 here)
+skel_frame:
+        ld a,(frame_count)
+        rrca
         rrca
         rrca
         rrca
@@ -513,7 +532,7 @@ knight_frame:
         jr nz,.left
         add a,2
 .left:
-        add a,OBJF_ZOMBIE
+        add a,OBJF_SKEL
         ld (ix+6),a
         ret
 
@@ -2012,7 +2031,7 @@ skel_update:
         sbc hl,de
         jp nc,b3_gone_dead
 .hits:
-        call knight_frame
+        call skel_frame
         call b3_offscreen               ; no collision off the screen
         ret c
         call weapon_hits
@@ -2163,7 +2182,7 @@ pillar_update:
         call b3_offscreen
         jp c,obj_release                ; it comes back when on the screen
 .hits:
-        ld (ix+6),OBJF_PILLAR
+        call pillar_frame
         call weapon_hits
         jr nc,.touch
         call hit_damage
@@ -2189,6 +2208,33 @@ pillar_update:
         jp b3_touch
 
 pillar_waits:   db 240, 60, 120, 180
+
+; the skulls face Simon; before firing it flashes (palette 3 every other
+; frame, NES state 1)
+pillar_frame:
+        ld c,0
+        bit 7,(ix+5)
+        jr nz,.left
+        inc c
+.left:
+        ld a,(ix+9)
+        cp 2
+        jr nz,.no_flash
+        ld a,(frame_count)
+        and 1
+        jr z,.no_flash
+        inc c
+        inc c
+.no_flash:
+        ld a,c
+        or a
+        ld a,OBJF_PILLAR
+        jr z,.set
+        ld a,c
+        add a,OBJF_PILLAR_R-1
+.set:
+        ld (ix+6),a
+        ret
 
 ; a fireball from the pillar's middle, 2 px a frame its way
 pillar_fire:
@@ -2219,6 +2265,8 @@ pillar_fire:
 ; frame by kind and direction
 block3_frame:
         ld a,(ix+0)
+        cp OBJ_SKEL
+        jp z,skel_frame
         ld c,OBJF_FLEA
         cp OBJ_FLEA
         jr z,.lr
@@ -2248,8 +2296,7 @@ block3_frame:
         add a,OBJF_RAVEN
         jr .set
 .pillar:
-        ld a,OBJF_PILLAR
-        jr .set
+        jp pillar_frame
 .lr:
         ld a,c
         bit 7,(ix+5)
@@ -2704,12 +2751,7 @@ mummy_update:
         ld (ix+1),l
         ld (ix+2),h
 .frame:
-        ld a,OBJF_MUMMY
-        bit 7,(ix+5)
-        jr nz,.left
-        inc a
-.left:
-        ld (ix+6),a
+        call mummy_frame
         ld a,(ix+9)                     ; asleep or getting up: no harm, no hits
         cp 2
         ret c
@@ -2762,6 +2804,57 @@ mummy_update:
         cp 60
         jp c,boss_update.burning
         ld (ix+0),OBJ_NONE
+        ret
+
+; its walk (NES $67, $68, $69, $68, 17 frames each: 16 here); one picture
+; while asleep and getting up, none moving while frozen by a hit
+mummy_frame:
+        ld a,(ix+9)
+        cp 3                            ; winding up: it flickers
+        jr nz,.not_wind
+        ld a,(frame_count)
+        and 2
+        jr z,.first
+        ld a,OBJF_MUMMY_F
+        bit 7,(ix+5)
+        jr nz,.fl
+        inc a
+.fl:
+        ld (ix+6),a
+        ret
+.not_wind:
+        ld a,(ix+9)
+        cp 2
+        jr c,.first
+        ld a,(ix+11)
+        or a
+        ret nz
+        ld a,(frame_count)
+        rrca
+        rrca
+        rrca
+        rrca
+        and 3
+        jr z,.first
+        cp 3
+        jr nz,.other
+        ld a,1
+.other:
+        dec a                           ; 0: picture 2, 1: picture 3
+        bit 7,(ix+5)
+        jr nz,.l2
+        add a,2
+.l2:
+        add a,OBJF_MUMMY2
+        ld (ix+6),a
+        ret
+.first:
+        ld a,OBJF_MUMMY
+        bit 7,(ix+5)
+        jr nz,.l1
+        inc a
+.l1:
+        ld (ix+6),a
         ret
 
 ; Carry if IX's partner is no longer a mummy (not there or burning)

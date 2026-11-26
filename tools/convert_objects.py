@@ -48,7 +48,11 @@ OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
               "medusa1", "medusa2", "snake_l", "snake_r",
               "flea_l", "flea_r", "ghost_l", "ghost_r", "bone", "pillar",
               "raven_perch", "raven1_l", "raven2_l", "raven3_l", "raven1_r", "raven2_r", "raven3_r",
-              "mummy_l", "mummy_r", "bandage1", "bandage2"]
+              "mummy_l", "mummy_r", "bandage1", "bandage2",
+              "knight1_l", "knight2_l", "knight3_l", "knight1_r", "knight2_r", "knight3_r",
+              "skel1_l", "skel2_l", "skel1_r", "skel2_r",
+              "mummy2_l", "mummy3_l", "mummy2_r", "mummy3_r",
+              "pillar_r", "pillar_fl", "pillar_fr", "mummy_fl", "mummy_fr"]
 
 # Black panther: 32x16, palette 3, art faces left (recorded in the hall).
 # Run cycle run1 -> run2 -> run3, 7 frames each; the leap shows run2.
@@ -180,8 +184,9 @@ FRAME_SPRITES["medusa2"] = ([(t, 8 + 8 * i, dy, 2, 0) for dy, ts in ((0, (0xD8, 
                              for i, t in enumerate(ts)]
                             + [(t, 32 - 8 * i, dy, 2, 1) for dy, ts in ((0, (0xD8, 0xDA)), (16, (0xDC, 0xDE)))
                                for i, t in enumerate(ts)])
-FRAME_SPRITES["snake_l"] = [(0xF0, 0, 0, 2, 0), (0xF2, 8, 0, 2, 0)]
-FRAME_SPRITES["snake_r"] = [(0xF2, 0, 0, 2, 1), (0xF0, 8, 0, 2, 1)]
+# (the NES's frame $75: tiles F2 F0, in that order; tools/nes_frames.py)
+FRAME_SPRITES["snake_l"] = [(0xF2, 0, 0, 2, 0), (0xF0, 8, 0, 2, 0)]
+FRAME_SPRITES["snake_r"] = [(0xF0, 0, 0, 2, 1), (0xF2, 8, 0, 2, 1)]
 # block 3 (recorded in stages 7-9, CHR sets 3 and 5): fleaman 16x16 palette 3,
 # ghost 16x16 palette 1, the skeleton's bone 8x16 palette 1, the bone pillar
 # (two skulls, 16x32, palette 1), the raven 16x16 palette 3 (perched, then three
@@ -194,6 +199,11 @@ FRAME_SPRITES["ghost_r"] = [(0xB2, 0, 0, 1, 1), (0xB0, 8, 0, 1, 1)]
 FRAME_SPRITES["bone"] = [(0x92, 4, 0, 1, 0)]
 FRAME_SPRITES["pillar"] = [(0xE0, 0, 0, 1, 0), (0xE2, 8, 0, 1, 0),
                            (0xE2, 0, 16, 1, 1), (0xE0, 8, 16, 1, 1)]
+# (NES frame $9E: the skulls face Simon; flashing before it fires = palette 3)
+FRAME_SPRITES["pillar_r"] = [(0xE2, 0, 0, 1, 1), (0xE0, 8, 0, 1, 1),
+                             (0xE0, 0, 16, 1, 0), (0xE2, 8, 16, 1, 0)]
+FRAME_SPRITES["pillar_fl"] = [(t, x, y, 3, f) for t, x, y, _, f in FRAME_SPRITES["pillar"]]
+FRAME_SPRITES["pillar_fr"] = [(t, x, y, 3, f) for t, x, y, _, f in FRAME_SPRITES["pillar_r"]]
 FRAME_SPRITES["raven_perch"] = [(0xAC, 0, 0, 3, 0), (0xAE, 8, 0, 3, 0)]
 for _n, _t in (("raven1", 0xA0), ("raven2", 0xA4), ("raven3", 0xA8)):
     FRAME_SPRITES[_n + "_l"] = [(_t, 0, 0, 3, 0), (_t + 2, 8, 0, 3, 0)]
@@ -203,10 +213,35 @@ for _n, _t in (("raven1", 0xA0), ("raven2", 0xA4), ("raven3", 0xA8)):
 _MUMMY = [(0xD0, 0xD2), (0xD4, 0xD6), (0xD8, 0xDA)]
 FRAME_SPRITES["mummy_l"] = [(t, 8 * i, 16 * r, 1, 0) for r, ts in enumerate(_MUMMY) for i, t in enumerate(ts)]
 FRAME_SPRITES["mummy_r"] = [(t, 8 - 8 * i, 16 * r, 1, 1) for r, ts in enumerate(_MUMMY) for i, t in enumerate(ts)]
+# winding up a throw it flickers in palette 3 (NES obj_attr $43)
+FRAME_SPRITES["mummy_fl"] = [(t, x, y, 3, f) for t, x, y, _, f in FRAME_SPRITES["mummy_l"]]
+FRAME_SPRITES["mummy_fr"] = [(t, x, y, 3, f) for t, x, y, _, f in FRAME_SPRITES["mummy_r"]]
 FRAME_SPRITES["bandage1"] = [(0xF4, 0, 0, 1, 0), (0xF6, 8, 0, 1, 0)]
 FRAME_SPRITES["bandage2"] = [(0xF8, 0, 0, 1, 0), (0xFA, 8, 0, 1, 0)]
-# (the spear knight uses the zombie's frames: block 2's graphics have the
-# knight in the zombie's tiles, 80-8A, palette 1)
+
+# From the NES's own frame table (tools/nes_frames.py runs its sprite builder):
+# 16x32 frames of two 16x16 rows, art facing left (mirrored facing right).
+def _tall(rows):
+    """rows: (dy, left tile, right tile), palette 1 -> facing left, right"""
+    left = [s for dy, a, b in rows for s in ((a, 0, dy, 1, 0), (b, 8, dy, 1, 0))]
+    right = [s for dy, a, b in rows for s in ((b, 0, dy, 1, 1), (a, 8, dy, 1, 1))]
+    return left, right
+# spear knight: NES frames $9A-$9D (legs 84, 88, 8C, 88; the body 1 px lower
+# with the first and third), 17 frames each
+for _n, _rows in (("knight1", ((1, 0x80, 0x82), (16, 0x84, 0x86))),
+                  ("knight2", ((0, 0x80, 0x82), (16, 0x88, 0x8A))),
+                  ("knight3", ((1, 0x80, 0x82), (16, 0x8C, 0x8E)))):
+    FRAME_SPRITES[_n + "_l"], FRAME_SPRITES[_n + "_r"] = _tall(_rows)
+# skeleton: NES frames $B1, $B2, 17 frames each
+for _n, _rows in (("skel1", ((0, 0x80, 0x82), (16, 0x84, 0x86))),
+                  ("skel2", ((0, 0x88, 0x8A), (16, 0x8C, 0x8E)))):
+    FRAME_SPRITES[_n + "_l"], FRAME_SPRITES[_n + "_r"] = _tall(_rows)
+# the mummies' other two walking pictures: NES frames $68, $69 (the walk: $67,
+# $68, $69, $68, 17 frames each)
+for _n, _ts in (("mummy2", [(0xDC, 0xDE), (0xC0, 0xC2), (0xC4, 0xC6)]),
+                ("mummy3", [(0xC8, 0xCA), (0xCC, 0xCE), (0xF0, 0xF2)])):
+    FRAME_SPRITES[_n + "_l"] = [(t, 8 * i, 16 * r, 1, 0) for r, ts in enumerate(_ts) for i, t in enumerate(ts)]
+    FRAME_SPRITES[_n + "_r"] = [(t, 8 - 8 * i, 16 * r, 1, 1) for r, ts in enumerate(_ts) for i, t in enumerate(ts)]
 
 ENEMY_ZOMBIE = 0x01             # spawner types in the enemy group records
 ENEMY_BAT = 0x02
@@ -321,7 +356,14 @@ ITEM_FRAMES = {ITEM_WHIPUP: "whipup", ITEM_HEART: "heart",
 
 # Frames to fold into another one when an area is over the pattern budget,
 # least visible loss first.
-FOLDS = [("panther_run3_l", "panther_run1_l"), ("panther_run3_r", "panther_run1_r"),
+FOLDS = [  # (the NES frames added last go first)
+         ("pillar_fl", "pillar"), ("pillar_fr", "pillar_r"),
+         ("mummy_fl", "mummy_l"), ("mummy_fr", "mummy_r"),
+         ("knight3_l", "knight1_l"), ("knight3_r", "knight1_r"),
+         ("skel2_l", "skel1_l"), ("skel2_r", "skel1_r"),
+         ("mummy3_l", "mummy_l"), ("mummy3_r", "mummy_r"),
+         ("mummy2_l", "mummy_l"), ("mummy2_r", "mummy_r"),
+         ("panther_run3_l", "panther_run1_l"), ("panther_run3_r", "panther_run1_r"),
          ("panther_sit_r", "panther_sit_l"), ("axe3", "axe1"), ("axe4", "axe2"),
          ("candle2", "candle1"),
          ("flame5", "flame4"),          # (the fire's two wide flames look alike)
@@ -353,19 +395,19 @@ def needed_frames(candle_list, spawners, carried=()):
         elif kind == KIND_MEDUSA:
             need |= {"medusa1", "medusa2", "snake_l", "snake_r", "orb"}
         elif kind == KIND_MUMMY:
-            need |= {"mummy_l", "mummy_r", "bandage1", "bandage2", "orb"}
+            need |= {n for n in OBJ_FRAMES if n.startswith("mummy")} | {"bandage1", "bandage2", "orb"}
         elif kind == KIND_FLEA:
             need |= {"flea_l", "flea_r"}
         elif kind == KIND_GHOST:
             need |= {"ghost_l", "ghost_r"}
         elif kind == KIND_SKEL:
-            need |= {n for n in OBJ_FRAMES if n.startswith("zombie")} | {"bone"}
+            need |= {n for n in OBJ_FRAMES if n.startswith("skel")} | {"bone"}
         elif kind == KIND_PILLAR:
-            need |= {"pillar", "fireball"}
+            need |= {n for n in OBJ_FRAMES if n.startswith("pillar")} | {"fireball"}
         elif kind == KIND_RAVEN:
             need |= {n for n in OBJ_FRAMES if n.startswith("raven")}
         elif kind == KIND_KNIGHT:
-            need |= {n for n in OBJ_FRAMES if n.startswith("zombie")}
+            need |= {n for n in OBJ_FRAMES if n.startswith("knight")}
         elif kind == KIND_HBAT:
             need |= {n for n in OBJ_FRAMES if n.startswith("hbat")}
         else:
@@ -402,10 +444,12 @@ SWAP_PAIRS = [
      ["boss_open", "boss_up", "orb"]],
     # stage 9: the bridge's enemies until the mummies wake
     [["raven_perch", "raven1_l", "raven2_l", "raven3_l", "raven1_r", "raven2_r", "raven3_r",
-      "pillar", "fireball", "mhead1_l", "mhead2_l", "mhead1_r", "mhead2_r",
+      "pillar", "pillar_r", "pillar_fl", "pillar_fr", "fireball", "mhead1_l", "mhead2_l", "mhead1_r", "mhead2_r",
       "zombie_l1", "zombie_l2", "zombie_r1", "zombie_r2", "bone",
+      "skel1_l", "skel2_l", "skel1_r", "skel2_r",
       "flea_l", "flea_r", "ghost_l", "ghost_r"],
-     ["mummy_l", "mummy_r", "bandage1", "bandage2", "orb"]],
+     ["mummy_l", "mummy_r", "mummy_fl", "mummy_fr", "mummy2_l", "mummy3_l", "mummy2_r", "mummy3_r",
+      "bandage1", "bandage2", "orb"]],
 ]
 SWAP_SETS = SWAP_PAIRS[0]           # (the pair an area uses: swap_sets(need))
 
