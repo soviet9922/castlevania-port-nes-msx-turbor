@@ -43,6 +43,12 @@ OBJ_MHEAD       equ 16                  ; block 2: Medusa head
 OBJ_HBAT        equ 17                  ; block 2: a bat hanging until Simon comes
 OBJ_MEDUSA      equ 18                  ; the stage 6 boss
 OBJ_SNAKE       equ 19                  ; her snakes
+OBJ_FLEA        equ 20                  ; block 3: fleaman
+OBJ_SKEL        equ 21                  ; skeleton
+OBJ_BONE        equ 22                  ; its bones
+OBJ_PILLAR      equ 23                  ; bone pillar
+OBJ_RAVEN       equ 24                  ; raven
+OBJ_GHOST       equ 25                  ; ghost
 
 KIND_BRAZIER    equ 0
 KIND_CANDLE     equ 1
@@ -53,6 +59,11 @@ KIND_BOSS       equ 5                   ; 48x32 sprite, 32x24 box at +8
 KIND_KNIGHT     equ 6                   ; candle list only: a spear knight
 KIND_HBAT       equ 7                   ; candle list only: a hanging bat
 KIND_MEDUSA     equ 8                   ; candle list only: Medusa
+KIND_FLEA       equ 9                   ; candle list only: block 3's enemies
+KIND_SKEL       equ 10
+KIND_PILLAR     equ 11
+KIND_RAVEN      equ 12
+KIND_GHOST      equ 13
 
 ; object frame numbers (OBJ_FRAMES in tools/convert_objects.py)
 OBJF_BRAZIER    equ 0
@@ -83,6 +94,12 @@ OBJF_HBAT_HANG  equ 60
 OBJF_HBAT       equ 61                  ; wings 1-3 flying left, then right
 OBJF_MEDUSA     equ 67                  ; her two pictures
 OBJF_SNAKE      equ 69                  ; left, right
+OBJF_FLEA       equ 71                  ; left, right
+OBJF_GHOST      equ 73                  ; left, right
+OBJF_BONE       equ 75
+OBJF_PILLAR     equ 76
+OBJF_RAVEN_PERCH equ 77
+OBJF_RAVEN      equ 78                  ; wings 1-3 left, then right
 
 ITEM_WHIPUP     equ 0
 ITEM_HEART      equ 1
@@ -267,7 +284,7 @@ spawn_candle:
         cp KIND_KNIGHT
         jr c,.allowed
         cp KIND_MEDUSA                  ; (not the boss)
-        jr nc,.allowed
+        jr z,.allowed
 .placed:
         ld a,(enemies_off)
         and 2
@@ -313,6 +330,8 @@ spawn_candle:
         jr z,.hbat
         cp KIND_MEDUSA
         jr z,.medusa
+        cp KIND_FLEA
+        jp nc,block3_spawn
         ld (ix+0),OBJ_CANDLE
         ld (ix+6),OBJF_CANDLE
         ret
@@ -485,6 +504,11 @@ objects_update:
         call snake_update
         jp .next
 .not_snake:
+        cp OBJ_FLEA
+        jr c,.not_block3
+        call block3_update
+        jp .next
+.not_block3:
         cp OBJ_ITEM
         call z,item_update
 .next:
@@ -1492,721 +1516,7 @@ bat_wave:
         db 4, 4, 4, 3, 3, 2, 2, 2, 1, 1, 1, 0, 0, 0, 0, 0
 
 
-; ---------------------------------------------------------------------------
-; Block 2's enemies (measured on the NES in stages 4 and 5)
-;
-; Medusa heads: while a Medusa head spawner is near, every MEDUSA_EVERY frames
-; one starts at the screen edge Simon faces (as the NES: x $F8 or $08) and flies
-; at him 5 px every 4 frames, in a wave around his height: 34 px up and down,
-; every 100 frames, starting at the top. One whip hit, 300 points; touching
-; Simon hurts him (8) and the head is gone.
-;   +4 timer   +5 direction   +9 centre y   +10 x fraction
-; ---------------------------------------------------------------------------
-medusa_spawner:
-        ld hl,medusa_t
-        inc (hl)
-        ld a,(hl)
-        cp MEDUSA_EVERY
-        ret c
-        ld (hl),0
-        ld a,(stair_state)              ; (NES: not while Simon is on the stairs)
-        ld hl,hurt_state
-        or (hl)
-        ret nz
-        ld ix,obj_table                 ; how many heads are about?
-        ld de,OBJ_SIZE
-        ld bc,OBJ_MAX*256
-.count:
-        ld a,(ix+0)
-        cp OBJ_MHEAD
-        jr nz,.not_head
-        inc c
-.not_head:
-        add ix,de
-        djnz .count
-        ld a,c
-        cp MEDUSA_MAX
-        ret nc
-        call obj_free_slot
-        ret c
-        ld hl,(cam_x)
-        ld a,(facing)
-        or a
-        jr nz,.left_edge
-        ld de,240                       ; facing right: from the right edge
-        add hl,de
-        ld (ix+5),-1
-        jr .place
-.left_edge:
-        ld (ix+5),1
-.place:
-        ld (ix+1),l
-        ld (ix+2),h
-        ld a,(py)                       ; wave centre: Simon's head
-        add a,7
-        ld (ix+9),a
-        ld (ix+0),OBJ_MHEAD
-        ld (ix+4),0
-        ld (ix+7),KIND_BAT              ; 16x16 box
-        ld (ix+8),0xFF
-        ld (ix+10),0
-        jr mhead_place
-
-mhead_update:
-        ld a,(freeze_t)                 ; the stopwatch holds it
-        or a
-        jp nz,bat_update.checks
-        inc (ix+4)
-        ld a,(ix+10)                    ; x: 1 + 1/4 px per frame
-        add a,0x40
-        ld (ix+10),a
-        ld a,1
-        adc a,0
-        bit 7,(ix+5)
-        jr z,.dx
-        neg
-.dx:
-        ld e,a
-        rla
-        sbc a,a
-        ld d,a
-        ld l,(ix+1)
-        ld h,(ix+2)
-        add hl,de
-        ld (ix+1),l
-        ld (ix+2),h
-mhead_place:
-        ld a,(ix+4)                     ; y: centre - 34 cos(2 pi t / 100)
-.mod100:
-        sub 100
-        jr nc,.mod100
-        add a,100
-        ld e,a
-        ld d,0
-        ld hl,mhead_wave
-        add hl,de
-        ld a,(ix+9)
-        add a,(hl)
-        ld (ix+3),a
-        ld a,(ix+4)                     ; frame: 8 frames each
-        rrca
-        rrca
-        rrca
-        and 1
-        bit 7,(ix+5)
-        jr nz,.left
-        add a,2
-.left:
-        add a,OBJF_MHEAD
-        ld (ix+6),a
-        jp bat_update.checks
-
-; -34 cos(2 pi t / 100)
-mhead_wave:
-        db -34, -34, -34, -33, -33, -32, -32, -31, -29, -28
-        db -27, -26, -24, -22, -21, -19, -17, -15, -13, -11
-        db -9, -7, -4, -2, 0, 0, 2, 4, 7, 9
-        db 11, 13, 15, 17, 19, 21, 22, 24, 26, 27
-        db 28, 29, 31, 32, 32, 33, 33, 34, 34, 34
-        db 34, 34, 34, 33, 33, 32, 32, 31, 29, 28
-        db 27, 26, 24, 22, 21, 19, 17, 15, 13, 11
-        db 9, 7, 4, 2, 0, 0, -2, -4, -7, -9
-        db -11, -13, -15, -17, -19, -21, -22, -24, -26, -27
-        db -28, -29, -31, -32, -32, -33, -33, -34, -34, -34
-
-; ---------------------------------------------------------------------------
-; Hanging bat (object $07): hangs under the ceiling until Simon is within
-; HBAT_WAKE px across and HBAT_WAKE_DY px of its height, then flies at him 3 px every 2 frames across, dropping about
-; 30 px to his height (the recorded steps, hbat_drop), and on. Like the stage 2
-; bat, touching Simon hurts him and the bat is gone; once awake it never comes
-; back. +9 = state (0 hanging, 1 flying), +10 = x fraction, +11 = drop step.
-; ---------------------------------------------------------------------------
-hbat_update:
-        ld a,(ix+9)
-        or a
-        jr nz,.flying
-        call simon_dx                   ; HL = Simon centre - bat centre
-        ld (ix+5),1
-        bit 7,h
-        jr z,.pos
-        ld (ix+5),-1
-        ld a,l
-        neg
-        ld l,a
-        ld a,h
-        cpl
-        ld h,a
-.pos:
-        ld a,h
-        or a
-        jr nz,.hang
-        ld a,l
-        cp HBAT_WAKE
-        jr nc,.hang
-        ld a,(freeze_t)
-        or a
-        jr nz,.hang
-        ld a,(py+1)                     ; and near its height (NES: it stays
-        or a                            ; put while Simon is on the floor below)
-        jr nz,.hang
-        ld a,(py)
-        sub (ix+3)
-        jr nc,.dy
-        neg
-.dy:
-        cp HBAT_WAKE_DY
-        jr nc,.hang
-        ld (ix+9),1                     ; awake: it never comes back
-        ld (ix+4),0
-        ld (ix+11),0
-        ld a,(ix+8)
-        cp 0xFF
-        jr z,.flying
-        call candle_bit
-        ld a,(hl)
-        or b
-        ld (hl),a
-        jr .flying
-.hang:
-        ld (ix+6),OBJF_HBAT_HANG
-        jp bat_update.checks
-.flying:
-        ld a,(freeze_t)
-        or a
-        jp nz,bat_update.checks
-        inc (ix+4)
-        ld a,(ix+10)                    ; x: 1 + 1/2 px per frame
-        add a,0x80
-        ld (ix+10),a
-        ld a,1
-        adc a,0
-        bit 7,(ix+5)
-        jr z,.dx
-        neg
-.dx:
-        ld e,a
-        rla
-        sbc a,a
-        ld d,a
-        ld l,(ix+1)
-        ld h,(ix+2)
-        add hl,de
-        ld (ix+1),l
-        ld (ix+2),h
-        ld a,(ix+11)                    ; y: the recorded drop
-        cp hbat_drop_end-hbat_drop
-        jr nc,.level
-        inc (ix+11)
-        ld e,a
-        ld d,0
-        ld hl,hbat_drop
-        add hl,de
-        ld a,(ix+3)
-        add a,(hl)
-        ld (ix+3),a
-.level:
-        call bat_frame                  ; wings as the stage 2 bat's
-        sub OBJF_BAT-OBJF_HBAT
-        ld (ix+6),a
-        jp bat_update.checks
-
-hbat_drop:
-        db 1, 1, 2, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1
-        db 0, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1
-hbat_drop_end:
-
-; ---------------------------------------------------------------------------
-; Spear knight (object $08): paces its floor at 1/2 px per frame and turns to
-; face Simon every 192-255 frames (NES: 200-260), and at the edge of its floor
-; or a wall. KNIGHT_HP whip hits kill it (400 points); after a hit it can't be
-; hit again for KNIGHT_FLASH frames. Touching it hurts Simon (8).
-;   +4 timer  +5 direction  +9 hits taken  +10 frames to the next turn
-;   +11 frames it can't be hit
-; ---------------------------------------------------------------------------
-knight_update:
-        ld a,(freeze_t)
-        or a
-        jr nz,.hits
-        inc (ix+4)
-        dec (ix+10)
-        jr nz,.no_turn
-        ld a,(frame_count)
-        and 63
-        add a,KNIGHT_TURN
-        ld (ix+10),a
-        call simon_dx                   ; face Simon
-        ld (ix+5),1
-        bit 7,h
-        jr z,.no_turn
-        ld (ix+5),-1
-.no_turn:
-        ld a,(ix+4)                     ; a step every other frame
-        and 1
-        jr z,.frame
-        call knight_blocked             ; floor ends or a wall: turn round
-        jr nc,.step
-        ld a,(ix+5)
-        neg
-        ld (ix+5),a
-        jr .frame
-.step:
-        ld a,(ix+5)
-        ld e,a
-        rla
-        sbc a,a
-        ld d,a
-        ld l,(ix+1)
-        ld h,(ix+2)
-        add hl,de
-        ld (ix+1),l
-        ld (ix+2),h
-.frame:
-        call knight_frame
-.hits:
-        ld a,(ix+11)
-        or a
-        jr z,.can_hit
-        dec (ix+11)
-        jr .touch
-.can_hit:
-        call weapon_hits
-        jr nc,.touch
-        ld a,SND_HIT
-        call sfx_play
-        inc (ix+9)
-        ld a,(ix+9)
-        cp KNIGHT_HP
-        jr nc,.dead
-        ld (ix+11),KNIGHT_FLASH
-        jr .touch
-.dead:
-        ld a,(ix+8)                     ; it stays dead
-        cp 0xFF
-        jr z,.burst
-        call candle_bit
-        ld a,(hl)
-        or b
-        ld (hl),a
-.burst:
-        ld a,SCORE_KNIGHT
-        call add_score
-        ld (ix+0),OBJ_BURST
-        ld (ix+4),0
-        ld (ix+6),OBJF_BURST
-        ld (ix+5),ITEM_NONE
-        ret
-.touch:
-        jp zombie_update.touch
-
-; Carry if the knight at IX can't step on: no floor ahead of its feet, or a
-; wall ahead at its waist
-knight_blocked:
-        ld l,(ix+1)
-        ld h,(ix+2)
-        ld de,8+4                       ; 4 px ahead of its middle
-        bit 7,(ix+5)
-        jr z,.ahead
-        ld de,8-4
-.ahead:
-        add hl,de
-        push hl
-        ld a,(ix+3)
-        add a,32
-        ld e,a
-        ld d,0
-        call solid_at
-        pop hl
-        ccf
-        ret c                           ; no floor there
-        ld de,4                         ; a wall: 8 px ahead at its waist
-        bit 7,(ix+5)
-        jr z,.wall
-        ld de,-4
-.wall:
-        add hl,de
-        ld a,(ix+3)
-        add a,16
-        ld e,a
-        ld d,0
-        jp solid_at
-
-; the zombie's frames (block 2's graphics have the knight there): legs every
-; 16 frames, +2 facing right
-knight_frame:
-        ld a,(ix+4)
-        rrca
-        rrca
-        rrca
-        rrca
-        and 1
-        bit 7,(ix+5)
-        jr nz,.left
-        add a,2
-.left:
-        add a,OBJF_ZOMBIE
-        ld (ix+6),a
-        ret
-
-; ---------------------------------------------------------------------------
-; Medusa (stage 6 boss, recorded on the NES). Asleep she is the statue in the
-; map. When Simon comes within MEDUSA_WAKE px and the screen has reached her
-; room at the area's left end, she wakes: the statue's tiles go
-; blank, the screen locks, the boss music starts and her first snake drops.
-; She drifts 7 px every 8 frames, bobbing along the bat's 96-frame wave, turns
-; at the room's edges and follows Simon's height; every 150-277 frames she
-; stops for MEDUSA_PAUSE frames and drops a snake. Health in the HUD's enemy bar
-; (MEDUSA_DAMAGE a whip hit); beaten, she burns and leaves the orb (as the
-; stage 3 boss: boss_update's hit, burn and orb code).
-;   +4 timer  +9 state (0 asleep, 1 flying, 2 stopped, 4 burning)
-;   +10 the wave's top y  +5 direction
-; ---------------------------------------------------------------------------
-medusa_update:
-        inc (ix+4)
-        ld a,(boss_inv)
-        or a
-        jr z,.no_inv
-        dec a
-        ld (boss_inv),a
-.no_inv:
-        ld a,(ix+9)
-        cp 4
-        jp z,boss_update.burning
-        ld a,(ix+4)                     ; her two pictures, 8 frames each
-        rrca
-        rrca
-        rrca
-        and 1
-        add a,OBJF_MEDUSA
-        ld (ix+6),a
-        ld a,(ix+9)
-        or a
-        jr nz,.awake
-        call boss_simon_dx              ; asleep: Simon near?
-        bit 7,h
-        jr z,.pos
-        ld a,l
-        neg
-        ld l,a
-        ld a,h
-        cpl
-        ld h,a
-.pos:
-        ld a,h
-        or a
-        ret nz
-        ld a,l
-        cp MEDUSA_WAKE
-        ret nc
-        ld hl,(cam_x)                   ; and the screen is at her room (the
-        ld de,(area_hdr+AH_MINCAM)      ; area's left end)
-        or a
-        sbc hl,de
-        ret nz
-        ld a,SND_BOSS                   ; awake
-        call music_restart
-        ld hl,(cam_x)                   ; the screen locks
-        ld (cam_min),hl
-        ld (area_hdr+AH_MAXCAM),hl
-        ld a,1
-        ld (cam_lock),a
-        ld l,(ix+1)                     ; the statue's tiles: 4 x 3 from
-        ld h,(ix+2)                     ; box x + 8, y + 9
-        ld de,8
-        add hl,de
-        call hl_shr3
-        ld (med_col),hl
-        ld a,(ix+3)
-        add a,9
-        rrca
-        rrca
-        rrca
-        and 31
-        ld (med_row),a
-        ld a,1
-        ld (med_erase),a
-        ld a,(ix+3)
-        ld (ix+10),a
-        call boss_simon_dx              ; first towards Simon
-        ld (ix+5),1
-        bit 7,h
-        jr z,.dir
-        ld (ix+5),-1
-.dir:
-        ld (ix+9),1
-        ld (ix+4),0
-        call medusa_next_pause
-        call snake_drop
-        jp boss_update.hits
-
-.awake:
-        cp 2
-        jr z,.stopped
-        ld hl,med_t                     ; flying
-        dec (hl)
-        jr nz,.fly
-        ld (ix+9),2
-        ld (hl),MEDUSA_PAUSE
-        jr .wave
-.fly:
-        ld a,(ix+4)                     ; x: 7 px every 8 frames
-        and 7
-        cp 7
-        jr z,.edges
-        ld a,(ix+5)
-        ld e,a
-        rla
-        sbc a,a
-        ld d,a
-        ld l,(ix+1)
-        ld h,(ix+2)
-        add hl,de
-        ld (ix+1),l
-        ld (ix+2),h
-.edges:
-        ld l,(ix+1)                     ; turn at the room's edges
-        ld h,(ix+2)
-        ld de,24
-        add hl,de
-        ld de,(cam_x)
-        or a
-        sbc hl,de                       ; HL = her centre on the screen
-        ld a,h
-        or a
-        jr nz,.go_left
-        ld a,l
-        cp MEDUSA_LEFT
-        jr nc,.not_left
-        ld (ix+5),1
-        jr .wave
-.not_left:
-        cp MEDUSA_RIGHT
-        jr c,.wave
-.go_left:
-        ld (ix+5),-1
-        jr .wave
-
-.stopped:
-        ld hl,med_t
-        dec (hl)
-        ld a,(hl)
-        cp MEDUSA_PAUSE/2
-        call z,snake_drop
-        ld a,(med_t)
-        or a
-        jr nz,.wave
-        ld (ix+9),1
-        call medusa_next_pause
-
-.wave:
-        ld a,(ix+4)                     ; follow Simon's height, 1 px every
-        and 7                           ; 8 frames
-        jr nz,.no_follow
-        ld a,(py)
-        sub 4
-        cp (ix+10)
-        jr z,.no_follow
-        jr c,.up
-        inc (ix+10)
-        jr .no_follow
-.up:
-        dec (ix+10)
-.no_follow:
-        ld a,(ix+4)                     ; y: the wave's top + bat wave
-.mod96:
-        sub 96
-        jr nc,.mod96
-        add a,96
-        ld e,a
-        ld d,0
-        ld hl,bat_wave
-        add hl,de
-        ld a,(ix+10)
-        add a,(hl)
-        ld (ix+3),a
-        jp boss_update.hits
-
-medusa_next_pause:
-        ld a,(frame_count)
-        and 127
-        add a,150
-        ld (med_t),a
-        ret
-
-; a snake drops from Medusa (IX), at most SNAKE_MAX about
-snake_drop:
-        push ix
-        ld l,(ix+1)
-        ld h,(ix+2)
-        ld de,16
-        add hl,de
-        ld b,(ix+3)
-        push hl
-        push bc
-        ld ix,obj_table
-        ld de,OBJ_SIZE
-        ld bc,OBJ_MAX*256
-.count:
-        ld a,(ix+0)
-        cp OBJ_SNAKE
-        jr nz,.not_snake
-        inc c
-.not_snake:
-        add ix,de
-        djnz .count
-        ld a,c
-        pop bc
-        pop hl
-        cp SNAKE_MAX
-        jr nc,.done
-        call obj_free_slot
-        jr c,.done
-        ld (ix+1),l
-        ld (ix+2),h
-        ld a,b
-        add a,8
-        ld (ix+3),a
-        ld (ix+0),OBJ_SNAKE
-        ld (ix+4),0
-        ld (ix+5),-1
-        ld (ix+6),OBJF_SNAKE
-        ld (ix+7),KIND_BAT              ; 16x16 box
-        ld (ix+8),0xFF
-        ld (ix+9),0
-        ld (ix+10),0
-        ld (ix+11),0
-.done:
-        pop ix
-        ret
-
-; ---------------------------------------------------------------------------
-; Snake (Medusa's): falls to the floor, then slides at Simon 3 px every 2
-; frames. One whip hit; touching Simon hurts him.
-;   +9 state (0 falling, 1 sliding)  +10 fall speed / x fraction  +11 fraction
-; ---------------------------------------------------------------------------
-snake_update:
-        inc (ix+4)
-        ld a,(ix+9)
-        or a
-        jr nz,.slide
-        ld a,(ix+10)                    ; falling: vy += 2/16, y += vy / 16
-        add a,2
-        cp 64
-        jr c,.vy
-        ld a,64
-.vy:
-        ld (ix+10),a
-        add a,(ix+11)
-        ld c,a
-        rrca
-        rrca
-        rrca
-        rrca
-        and 15
-        add a,(ix+3)
-        ld (ix+3),a
-        ld a,c
-        and 15
-        ld (ix+11),a
-        ld a,(ix+3)
-        cp MT_ROWS*16
-        jp nc,.gone
-        call snake_ground
-        jr nc,.frame
-        ld a,(ix+3)                     ; on the floor: slide at Simon
-        add a,16
-        and 0xF8
-        sub 16
-        ld (ix+3),a
-        ld (ix+9),1
-        ld (ix+10),0
-        call simon_dx
-        ld de,8                         ; (simon_dx is for a 32-wide box)
-        add hl,de
-        ld (ix+5),1
-        bit 7,h
-        jr z,.frame
-        ld (ix+5),-1
-        jr .frame
-.slide:
-        ld a,(ix+10)                    ; 1 + 1/2 px per frame
-        add a,0x80
-        ld (ix+10),a
-        ld a,1
-        adc a,0
-        bit 7,(ix+5)
-        jr z,.dx
-        neg
-.dx:
-        ld e,a
-        rla
-        sbc a,a
-        ld d,a
-        ld l,(ix+1)
-        ld h,(ix+2)
-        add hl,de
-        ld (ix+1),l
-        ld (ix+2),h
-.frame:
-        ld a,OBJF_SNAKE
-        bit 7,(ix+5)
-        jr nz,.left
-        inc a
-.left:
-        ld (ix+6),a
-        jp bat_update.checks
-.gone:
-        ld (ix+0),OBJ_NONE
-        ret
-
-; Carry if there is floor under the snake at IX (its middle, feet at y+16)
-snake_ground:
-        ld l,(ix+1)
-        ld h,(ix+2)
-        ld de,8
-        add hl,de
-        ld a,(ix+3)
-        add a,16
-        ld e,a
-        ld d,0
-        jp solid_at
-
-; VBLANK: Medusa woke: her statue's 4 x 3 tiles go blank
-medusa_vram:
-        ld a,(med_erase)
-        or a
-        ret z
-        xor a
-        ld (med_erase),a
-        ld a,(med_row)
-        ld l,a
-        ld h,0
-        add hl,hl
-        add hl,hl
-        add hl,hl
-        add hl,hl
-        add hl,hl
-        ld de,VRAM_PNT+HUD_ROWS*32
-        add hl,de
-        ld a,(med_col)
-        and 31
-        ld e,a
-        ld d,0
-        add hl,de
-        ld c,3
-.row:
-        push hl
-        call vram_set_write
-        ld a,(area_hdr+AH_BLANK)
-        ld b,4
-.t:
-        out (VDP_DATA),a
-        djnz .t
-        pop hl
-        ld de,32
-        add hl,de
-        dec c
-        jr nz,.row
-        ret
+; (Block 2's and block 3's enemies, Medusa: src/enemies2.asm, run from RAM)
 
 ; ---------------------------------------------------------------------------
 ; Fishman (measured in the NES stage 2 waterway). While fewer than FISH_MAX
@@ -2621,6 +1931,11 @@ fireball_update:
         ld a,(ix+10)
         or a
         jr z,.fish
+        cp 2
+        jr nz,.boss_ball
+        ld e,2                          ; bone pillar: 2 px per frame
+        jr .dx
+.boss_ball:
         ld a,(ix+4)                     ; boss: 4 px every 3 frames
 .mod3:
         sub 3
@@ -3548,8 +2863,11 @@ objects_draw:
         ld a,(ix+0)
         or a
         jp z,.next_obj
+        cp OBJ_GHOST                    ; (a ghost not out yet: nothing)
+        jr z,.hidden
         cp OBJ_MEDUSA                   ; asleep, Medusa is the statue in the
         jr nz,.drawn                    ; map: no sprites
+.hidden:
         ld a,(ix+9)
         or a
         jp z,.next_obj

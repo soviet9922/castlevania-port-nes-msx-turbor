@@ -35,7 +35,8 @@
 - [x] Stage 6's ceiling crushers
 - [x] Medusa (stage 6 boss) and her snakes
 - [x] Block 3's maps (stages 7-9): graphics, stairs, candles, doors, music
-- [ ] Block 3's enemies and boss; blocks 4-6; the castle map between blocks
+- [x] Block 3's enemies: fleamen, ghosts, skeletons, bone pillars, ravens
+- [ ] Block 3's boss (the mummies); blocks 4-6; the castle map between blocks
 - [ ] Palette selection table, stages 2 and up
 
 ## Milestone 2: Simon (in progress)

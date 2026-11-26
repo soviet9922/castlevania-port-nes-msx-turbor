@@ -214,7 +214,13 @@ def tcl_script(syms, result_file):
     after time 74.7 {{ # wait on the floor without whipping: the boss must come down
                        set ::boss_hunt 0; set ::boss_floor 1
                        poke {px_a} [expr {{700 & 255}}]; poke {px_a + 1} [expr {{700 >> 8}}]
-                       poke {py} 128; poke {py + 1} 0 }}
+                       poke {py} 128; poke {py + 1} 0
+                       # (hovering, 30 frames before its swoop: one swoop always
+                       # falls in this window, whatever the frame timing)
+                       for {{set i 0}} {{$i < 8}} {{incr i}} {{
+                           set b [expr {{{objt} + $i*{obj_size}}}]
+                           if {{[peek $b] == 10}} {{ poke [expr {{$b + 9}}] 2; poke [expr {{$b + 4}}] [expr {{{syms["BOSS_HOVER"]} - 30}}] }}
+                       }} }}
     after time 74.75 {{ {dump('27b_floor_start')} }}
     after time 78.8 {{ # holy water's fire on the boss: held in it, and hurt again and again
                        set ::boss_hunt 0
@@ -411,9 +417,19 @@ def tcl_script(syms, result_file):
     after time 143.9 {{ keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
     after time 146 {{ set f [open "{result_file}" a]; puts $f "medusa_dead [peek {syms["boss_hp"]}] [count_type 11]"; close $f }}
     # block 3: stage 7 starts at its right end, facing left (NES: x 720, camera 512)
-    after time 146.1 {{ if {{{areas} > 11}} {{ poke {syms["area_hdr"] + 44} 11; poke {syms["clear_t"]} 1; poke {syms["clear_phase"]} 4 }} }}
+    after time 146.1 {{ poke {eoff} 0; if {{{areas} > 11}} {{ poke {syms["area_hdr"] + 44} 11; poke {syms["clear_t"]} 1; poke {syms["clear_phase"]} 4 }} }}
     after time 146.7 {{ {dump('50_stage7')} }}
-    after time 146.9 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}] $::vbl_worst_fc"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
+    # block 3's enemies: stage 7's ghost appears and follows Simon; a bone
+    # pillar in stage 9 fires at him
+    after time 148 {{ set g [find_type 25]
+                     set f [open "{result_file}" a]
+                     puts $f "b3ghost [expr {{$g >= 0 ? [peek [expr {{$g + 9}}]] : -1}}] [expr {{$g >= 0 ? [peek [expr {{$g + 1}}]] + 256*[peek [expr {{$g + 2}}]] : -1}}]"
+                     close $f
+                     poke {syms["area_hdr"] + 44} 15; poke {syms["clear_t"]} 1; poke {syms["clear_phase"]} 4 }}
+    after time 148.6 {{ set x 330; poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
+                       poke {py} 48; poke {py + 1} 0; poke {syms["invuln_t"]} 250; set ::fb_seen 0; fb_watch 300 }}
+    after time 153.8 {{ set f [open "{result_file}" a]; puts $f "b3pillar [count_type 23] $::fb_seen"; close $f }}
+    after time 154 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}] $::vbl_worst_fc"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
 """ if areas > 1 else f"""
     after time 9 {{ snd_report; set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
@@ -695,6 +711,11 @@ proc medusa_pin {{n}} {{
     }}
     after frame "medusa_pin [expr {{$n - 1}}]"
 }}
+proc fb_watch {{n}} {{
+    if {{$n <= 0}} return
+    if {{[count_type 9] > 0}} {{ set ::fb_seen 1 }}
+    after frame "fb_watch [expr {{$n - 1}}]"
+}}
 proc crush_watch {{n}} {{
     if {{$n <= 0}} return
     if {{[peek {syms["dying_t"]}] > 0}} {{ set ::crushed 1; return }}
@@ -781,7 +802,7 @@ proc wait_game {{}} {{
     }}
 }}
 after time 0.1 wait_game
-after time 180 {{ exit }}
+after time 190 {{ exit }}
 """
 
 
@@ -945,7 +966,7 @@ def run():
                 fish_seen = int(kv[0])
                 continue
             if tag in ("medusa", "s4enemies", "hbat", "knight1", "knight2", "crush",
-                       "medusa_wake", "medusa_dead"):
+                       "medusa_wake", "medusa_dead", "b3ghost", "b3pillar"):
                 block2_enemies[tag] = kv
                 continue
             if tag == "bat":
@@ -1188,6 +1209,11 @@ def run():
             snaps["50_stage7"]["cur_area"] == 11 and snaps["50_stage7"]["px"] == 712
             and snaps["50_stage7"]["cam_x"] == 512 and snaps["50_stage7"]["facing"] == 1)]
           if n_areas > 11 and "50_stage7" in snaps else []),
+        *([("stage 7's ghost appears when Simon comes near and floats at him",
+            block2_enemies["b3ghost"][0] == "1" and int(block2_enemies["b3ghost"][1]) != 664),
+           ("stage 9's bone pillars stand and fire at Simon",
+            int(block2_enemies["b3pillar"][0]) >= 1 and block2_enemies["b3pillar"][1] == "1")]
+          if n_areas > 11 and "b3pillar" in block2_enemies else []),
         *([("the chain whip has its own poses, the same reach as the leather whip",
             any(16 <= int(p) < 24 for p in weapons["chain"]["poses"].split(","))
             and int(weapons["chain"]["reach"]) == whip_reach),

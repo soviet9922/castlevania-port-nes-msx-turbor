@@ -155,5 +155,10 @@ med_t           equ crush_drawn+CRUSH_MAX ; 1  Medusa: frames to her next pause 
 med_erase       equ med_t+1             ; 1  VBLANK: erase her statue
 med_col         equ med_erase+1         ; 2  the statue's first tile column
 med_row         equ med_col+2           ; 1  ... and playfield row
-RAM_END         equ med_row+1
+obj_hits        equ med_row+1           ; OBJ_MAX  block 3's tough enemies: hits taken
+                                        ;    (bits 5-7) and frames of flash (0-4)
+RAM_END         equ obj_hits+8
         ASSERT RAM_END < 0xF380
+        ASSERT RAM_END <= RAMCODE
+RAMCODE         equ 0xD000              ; code copied from ROM (src/ramcode.asm)
+RAMCODE_TOP     equ 0xEC00              ; (the stack is above, from about 0xF370 down)

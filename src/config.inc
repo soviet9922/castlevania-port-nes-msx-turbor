@@ -196,6 +196,23 @@ MEDUSA_LEFT     equ 40                  ; she turns at these screen x (centre)
 MEDUSA_RIGHT    equ 235
 MEDUSA_PAUSE    equ 64                  ; she stops this long and drops a snake
 SNAKE_MAX       equ 2
+; Block 3's enemies (recorded on the NES in stages 7-9; hits and points of the
+; ghost, the pillar and the skeleton are estimates)
+WAKE_DX         equ 96                  ; fleaman, ghost, raven wake this close
+FLEA_VY0        equ -53                 ; hop: 1/16 px per frame up, about 44 px high
+FLEA_GRAVITY    equ 2
+FLEA_REST       equ 8                   ; frames on the floor between hops
+GHOST_HP        equ 3
+PILLAR_HP       equ 4
+PILLAR_EVERY    equ 245                 ; two fireballs, 40 frames apart, this often
+SKEL_THROW      equ 112                 ; frames between bones
+BONE_VY0        equ -70                 ; 1/16 px per frame, gravity 2
+RAVEN_HOVER     equ 32
+SCORE_FLEA      equ 0x03
+SCORE_GHOST     equ 0x03
+SCORE_SKEL      equ 0x03
+SCORE_PILLAR    equ 0x04
+SCORE_RAVEN     equ 0x02
 FISH_MAX        equ 2                   ; fishmen about at once
 FISH_DELAY      equ 32                  ; frames before the next one jumps out
 FISH_AWAY       equ 48                  ; not right under Simon

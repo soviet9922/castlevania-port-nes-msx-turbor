@@ -367,8 +367,25 @@ stage, and block 3 starts.
 
 Block 3 (stages 7-9) uses the same machinery: stage 7 starts at its right end facing
 left, and its doors are on the right, followed in the ROM by the next stage's first
-columns as in block 1, so its areas need no x offset. Its enemies and its boss are not
-converted yet; Medusa heads already come from their spawners.
+columns as in block 1, so its areas need no x offset. Its enemies (fleamen, ghosts,
+skeletons and their bones, bone pillars and their fireballs, ravens) are placed in the
+candle list; the skeleton uses the zombie's frames, the pillar's fireball the fishman's
+(at 2 px a frame). The ghost and the pillar take several hits: `obj_hits` keeps hits
+taken and a short flash per object slot. Its boss is not converted yet.
+
+### Code in RAM
+
+Bank 0, the code page, is full. The enemies of blocks 2 and 3 and Medusa
+(`src/enemies2.asm`) are stored in Simon's bank and copied at start-up to `RAMCODE`
+(0xD000), where they run (`src/ramcode.asm`, sjasmplus `DISP`). They call the engine in
+bank 0 and read the current area's bank at 0x8000 like the rest of the object code.
+
+### Late frames
+
+`wait_frame` returns right after a VBLANK interrupt. A frame whose logic ran past the
+next VBLANK goes on at once only while the VDP is still in the vertical retrace (S#2
+bit 6); otherwise it waits for the next one, rather than writing to video memory while
+the screen is drawn and staying out of step with the interrupts from then on.
 
 `load_area` turns the display off, loads the palette, tiles and object
 patterns, resets objects and the player, redraws the screen and turns

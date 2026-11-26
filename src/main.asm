@@ -43,6 +43,15 @@ init:
         ld (hl),0
         ldir
 
+        ld a,PLAYER_BANK                ; the RAM code (src/ramcode.asm)
+        ld (ASCII16_PAGE2),a
+        ld hl,ramcode_src
+        ld de,RAMCODE
+        ld bc,RAMCODE_LEN
+        ldir
+        ld a,1
+        ld (ASCII16_PAGE2),a
+
         call vdp_init
         call load_graphics
         call install_irq
@@ -116,19 +125,40 @@ vblank_done:                            ; (tests measure VBLANK work up to here)
         call write_player_sprites       ; into the hidden sprite page
         jp main_loop
 
-; Wait for the next VBLANK. The flag is tested with interrupts off and EI
-; comes right before HALT (interrupts are taken only after the instruction
-; that follows EI): a VBLANK interrupt between the test and the HALT would
-; otherwise leave HALT waiting for the next interrupt, the line interrupt
-; about 5 ms later, and the VBLANK work would miss the vertical blank.
+; Wait for the next VBLANK, so that the VBLANK work that follows runs in the
+; vertical blank. A frame whose logic ran late (the flag is already set) goes
+; on at once if the VDP is still in the vertical retrace (S#2 bit 6), and
+; otherwise waits for the next VBLANK rather than doing its VRAM work while
+; the screen is being drawn (and staying out of step from then on). The flag
+; is tested with interrupts off, and EI comes right before HALT (interrupts
+; are taken only after the instruction that follows EI), so no VBLANK can
+; slip in between the test and the HALT.
 wait_frame:
         di
         ld a,(frame_ready)
         or a
-        jr nz,.go
+        jr z,.wait
+        ld a,2                          ; late: still in the vertical retrace?
+        out (VDP_CTRL),a
+        ld a,0x80|15
+        out (VDP_CTRL),a
+        in a,(VDP_CTRL)                 ; S#2
+        ld b,a
+        xor a                           ; back to S#0 for the BIOS
+        out (VDP_CTRL),a
+        ld a,0x80|15
+        out (VDP_CTRL),a
+        bit 6,b
+        jr nz,.go                       ; VR: go on now
+        xor a                           ; no: that one is gone, the next
+        ld (frame_ready),a
+.wait:
         ei
         halt
-        jr wait_frame
+        di
+        ld a,(frame_ready)
+        or a
+        jr z,.wait                      ; (a line interrupt: keep waiting)
 .go:
         xor a
         ld (frame_ready),a

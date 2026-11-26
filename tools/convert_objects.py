@@ -45,7 +45,9 @@ OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
               "holy_item", "watch_item", "flame4", "flame5", "axe_item", "boss_sleep",
               "mhead1_l", "mhead2_l", "mhead1_r", "mhead2_r",
               "hbat_hang", "hbat1_l", "hbat2_l", "hbat3_l", "hbat1_r", "hbat2_r", "hbat3_r",
-              "medusa1", "medusa2", "snake_l", "snake_r"]
+              "medusa1", "medusa2", "snake_l", "snake_r",
+              "flea_l", "flea_r", "ghost_l", "ghost_r", "bone", "pillar",
+              "raven_perch", "raven1_l", "raven2_l", "raven3_l", "raven1_r", "raven2_r", "raven3_r"]
 
 # Black panther: 32x16, palette 3, art faces left (recorded in the hall).
 # Run cycle run1 -> run2 -> run3, 7 frames each; the leap shows run2.
@@ -60,6 +62,10 @@ KIND_BRAZIER, KIND_CANDLE, KIND_PANTHER = 0, 1, 2
 KIND_BOSS = 5
 KIND_KNIGHT, KIND_HBAT = 6, 7   # block 2's placed enemies (16x32, 16x16)
 KIND_MEDUSA = 8                 # the stage 6 boss (box as the stage 3 boss's)
+# block 3's placed enemies (recorded in stages 7-9)
+KIND_FLEA, KIND_SKEL, KIND_PILLAR, KIND_RAVEN, KIND_GHOST = 9, 10, 11, 12, 13
+ENEMY_FLEA, ENEMY_SKEL, ENEMY_PILLAR, ENEMY_RAVEN = 0x4C, 0x50, 0x4E, 0x4F
+ENEMY_GHOST = 0x0D              # (and $8D) outside stage 6, where they are crushers
 ENEMY_MEDUSA_BOSS = 0x5B        # its enemy group record (object $1B)
 ENEMY_BOSS = 0x59               # enemy group record type: the stage 3 boss
 ENEMY_KNIGHT = 0x48             # block 2: a spear knight (object $08)
@@ -173,6 +179,22 @@ FRAME_SPRITES["medusa2"] = ([(t, 8 + 8 * i, dy, 2, 0) for dy, ts in ((0, (0xD8, 
                                for i, t in enumerate(ts)])
 FRAME_SPRITES["snake_l"] = [(0xF0, 0, 0, 2, 0), (0xF2, 8, 0, 2, 0)]
 FRAME_SPRITES["snake_r"] = [(0xF2, 0, 0, 2, 1), (0xF0, 8, 0, 2, 1)]
+# block 3 (recorded in stages 7-9, CHR sets 3 and 5): fleaman 16x16 palette 3,
+# ghost 16x16 palette 1, the skeleton's bone 8x16 palette 1, the bone pillar
+# (two skulls, 16x32, palette 1), the raven 16x16 palette 3 (perched, then three
+# wing pictures); art facing left. The skeleton uses the zombie's frames (block
+# 3's graphics have it there), the pillar's fireball the fishman's.
+FRAME_SPRITES["flea_l"] = [(0x7C, 0, 0, 3, 0), (0x7E, 8, 0, 3, 0)]
+FRAME_SPRITES["flea_r"] = [(0x7E, 0, 0, 3, 1), (0x7C, 8, 0, 3, 1)]
+FRAME_SPRITES["ghost_l"] = [(0xB0, 0, 0, 1, 0), (0xB2, 8, 0, 1, 0)]
+FRAME_SPRITES["ghost_r"] = [(0xB2, 0, 0, 1, 1), (0xB0, 8, 0, 1, 1)]
+FRAME_SPRITES["bone"] = [(0x92, 4, 0, 1, 0)]
+FRAME_SPRITES["pillar"] = [(0xE0, 0, 0, 1, 0), (0xE2, 8, 0, 1, 0),
+                           (0xE2, 0, 16, 1, 1), (0xE0, 8, 16, 1, 1)]
+FRAME_SPRITES["raven_perch"] = [(0xAC, 0, 0, 3, 0), (0xAE, 8, 0, 3, 0)]
+for _n, _t in (("raven1", 0xA0), ("raven2", 0xA4), ("raven3", 0xA8)):
+    FRAME_SPRITES[_n + "_l"] = [(_t, 0, 0, 3, 0), (_t + 2, 8, 0, 3, 0)]
+    FRAME_SPRITES[_n + "_r"] = [(_t + 2, 0, 0, 3, 1), (_t, 8, 0, 3, 1)]
 # (the spear knight uses the zombie's frames: block 2's graphics have the
 # knight in the zombie's tiles, 80-8A, palette 1)
 
@@ -235,6 +257,19 @@ def candles(rom, stage, section, level_px):
             cx, cy = (chunk - 1) * 64 + rom.fixed(p + 1) - 1, rom.fixed(p + 2)
             out.append((cx - 24, cy - 56, ITEM_NONE, KIND_BOSS))
             continue
+        block3 = {ENEMY_FLEA: KIND_FLEA, ENEMY_SKEL: KIND_SKEL, ENEMY_PILLAR: KIND_PILLAR,
+                  ENEMY_RAVEN: KIND_RAVEN}
+        if stage != 6 and kind & 0x7F == ENEMY_GHOST:
+            block3[kind] = KIND_GHOST
+        if kind in block3:
+            # 16x32 (skeleton, pillar): box top = NES y - 64, as the knight;
+            # 16x16 (fleaman, raven, ghost): its sprite top = NES y - 7: - 57
+            k = block3[kind]
+            cx, cy = (chunk - 1) * 64 + rom.fixed(p + 1), rom.fixed(p + 2)
+            if 8 <= cx < level_px - 8:
+                tall = k in (KIND_SKEL, KIND_PILLAR)
+                out.append((cx - 8, cy - (64 if tall else 57), ITEM_NONE, k))
+            continue
         if kind == ENEMY_MEDUSA_BOSS:
             # asleep she is the statue in the map; her 48x32 box: sprite top
             # = NES y - 15 (as the engine's y: - 65), centred on the record x
@@ -276,7 +311,9 @@ FOLDS = [("panther_run3_l", "panther_run1_l"), ("panther_run3_r", "panther_run1_
          ("burst4", "burst3"), ("burst2", "burst1"),
          ("fish_walk2_l", "fish_walk1_l"), ("fish_walk2_r", "fish_walk1_r"),
          ("zombie_l2", "zombie_l1"), ("zombie_r2", "zombie_r1"),
-         ("flame3", "flame1"), ("flame2", "flame1"), ("flame4", "flame1"), ("axe2", "axe1")]
+         ("flame3", "flame1"), ("flame2", "flame1"), ("flame4", "flame1"), ("axe2", "axe1"),
+         ("raven3_l", "raven1_l"), ("raven3_r", "raven1_r"),
+         ("mhead2_l", "mhead1_l"), ("mhead2_r", "mhead1_r")]
 
 
 SUB_FRAMES = {ITEM_DAGGER: {"dagger_fly_r", "dagger_fly_l"},
@@ -297,6 +334,16 @@ def needed_frames(candle_list, spawners, carried=()):
             need |= {"boss_sleep", "boss_open", "boss_up", "orb", "fireball"}
         elif kind == KIND_MEDUSA:
             need |= {"medusa1", "medusa2", "snake_l", "snake_r", "orb"}
+        elif kind == KIND_FLEA:
+            need |= {"flea_l", "flea_r"}
+        elif kind == KIND_GHOST:
+            need |= {"ghost_l", "ghost_r"}
+        elif kind == KIND_SKEL:
+            need |= {n for n in OBJ_FRAMES if n.startswith("zombie")} | {"bone"}
+        elif kind == KIND_PILLAR:
+            need |= {"pillar", "fireball"}
+        elif kind == KIND_RAVEN:
+            need |= {n for n in OBJ_FRAMES if n.startswith("raven")}
         elif kind == KIND_KNIGHT:
             need |= {n for n in OBJ_FRAMES if n.startswith("zombie")}
         elif kind == KIND_HBAT:

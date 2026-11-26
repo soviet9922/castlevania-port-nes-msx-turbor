@@ -358,8 +358,24 @@ A savestate at the start of stage 7 was made by forcing the stage-clear mode (`$
   158. Both doors are followed in the ROM by the next stage's first columns, as in block 1.
 - Stage 9 is a bridge to a tower room at the right end, where the boss records (`$5A`,
   two of them) are.
-- Enemy records: `$4C`, `$4E`, `$4F`, `$50`, `$0D`/`$8D`, Medusa heads (`$05`, `$06`).
-  Not identified yet.
+- Enemies (savestates at the starts of stages 7, 8 and 9; sprites from CHR sets 3+5):
+  - `$4C` **fleaman** (object `$0C`, tiles `7C 7E`, palette 3): waits until Simon is
+    about 90 px away, then hops at him: arcs about 45 px high, about 1 px across a frame
+    (the first, off its perch, flatter), resting a few frames between hops.
+  - `$8D`/`$0D` outside stage 6 (bank 6 `$8588`): a **ghost** (object `$0D`, tiles
+    `B0 B2`, palette 1) appears at the record's place when Simon is about 96 px away
+    and floats at him, about 3 px every 4 frames on both axes. One per record.
+  - `$50` **skeleton** (object `$10`, the zombie's tiles `80`-`8A`, palette 1): walks,
+    jumps about (56 px), and throws bones (object `$24`, tile `92`) up and towards Simon:
+    3/4 px across a frame, about 77 px up, under gravity.
+  - `$4E` **bone pillar** (object `$0E`, two skulls `E0 E2` and mirrored, palette 1;
+    stage 6's two `$4E` records too): stands, and every 245 frames fires two fireballs
+    40 frames apart (object `$23`, tile `68`), 2 px a frame at its height, towards Simon.
+  - `$4F` **raven** (object `$0F`, perched `AC AE`, flying `A0 A2` / `A4 A6` / `A8 AA`,
+    palette 3): perches until Simon is about 90 px away, swoops down (3/4 px across and
+    down a frame) to his head's height, hovers about 30 frames, then chases him across,
+    speeding up and overshooting.
+  - Not measured: the pillar's and the ghost's hit points and points, the skeleton's.
 
 ## Exit sequences
 
