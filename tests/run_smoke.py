@@ -361,7 +361,35 @@ def tcl_script(syms, result_file):
     after time 124.6 {{ keymatrixup 8 0x10 }}
     after time 127.6 {{ {dump('43_door_left')} }}
     after time 132.6 {{ {dump('44_stage5')} }}
-    after time 132.8 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}] $::vbl_worst_fc"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
+    # block 2's enemies: Medusa heads in stage 5, the hanging bat and a knight in stage 4
+    after time 132.7 {{ poke {eoff} 0 }}
+    after time 134.2 {{ set f [open "{result_file}" a]; puts $f "medusa [count_type 16]"; close $f
+                       poke {syms["area_hdr"] + 44} 5; poke {syms["clear_t"]} 1; poke {syms["clear_phase"]} 4 }}
+    after time 134.8 {{ set ::hb [find_type 17]
+                       set f [open "{result_file}" a]
+                       puts $f "s4enemies [count_type 15] [count_type 17] [expr {{$::hb >= 0 ? [peek [expr {{$::hb + 6}}]] : -1}}]"
+                       close $f
+                       # onto the bat's ledge, near it: it wakes and flies at him
+                       set x 600; poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
+                       poke {py} 32; poke {py + 1} 0; poke {fa} 1 }}
+    after time 136.4 {{ set f [open "{result_file}" a]; puts $f "hbat [count_type 17] [peek {syms["hp"]}]"; close $f
+                       # 40 px left of the knight, facing it, whip twice
+                       set k [find_type 15]
+                       set x [expr {{[peek [expr {{$k+1}}]] + 256*[peek [expr {{$k+2}}]] - 40}}]
+                       poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
+                       poke {py} 32; poke {py + 1} 0; poke {fa} 0; poke {syms["invuln_t"]} 250
+                       set ::score0 [format %02x%02x [peek {syms["score"] + 2}] [peek {syms["score"] + 1}]]
+                       keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
+    after time 136.9 {{ set f [open "{result_file}" a]; puts $f "knight1 [count_type 15]"; close $f }}
+    after time 137.2 {{ set k [find_type 15]
+                       if {{$k >= 0}} {{
+                           set x [expr {{[peek [expr {{$k+1}}]] + 256*[peek [expr {{$k+2}}]] - 40}}]
+                           poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]; poke {fa} 0 }}
+                       keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
+    after time 138 {{ set f [open "{result_file}" a]
+                     puts $f "knight2 [count_type 15] $::score0 [format %02x%02x [peek {syms["score"] + 2}] [peek {syms["score"] + 1}]]"
+                     close $f }}
+    after time 138.2 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}] $::vbl_worst_fc"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
 """ if areas > 1 else f"""
     after time 9 {{ snd_report; set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
@@ -633,6 +661,10 @@ proc seq_watch {{}} {{
     }}
 }}
 debug set_watchpoint write_mem {fc} {{}} seq_watch
+proc find_type {{t}} {{
+    for {{set i 0}} {{$i < 8}} {{incr i}} {{ if {{[peek [expr {{{objt} + $i*{obj_size}}}]] == $t}} {{ return [expr {{{objt} + $i*{obj_size}}}] }} }}
+    return -1
+}}
 proc count_type {{t}} {{
     set n 0
     for {{set i 0}} {{$i < 8}} {{incr i}} {{ if {{[peek [expr {{{objt} + $i*{obj_size}}}]] == $t}} {{ incr n }} }}
@@ -710,7 +742,7 @@ proc wait_game {{}} {{
     }}
 }}
 after time 0.1 wait_game
-after time 160 {{ exit }}
+after time 170 {{ exit }}
 """
 
 
@@ -816,6 +848,7 @@ def run():
     stun = None
     whip_reach = 43                     # WHIP_HIT_X2 in src/config.inc (leather whip)
     orb_seen = clear_t = None
+    block2_enemies = {}
     panther_dead = 0
     stair = None
     with open(result_file) as f:
@@ -871,6 +904,9 @@ def run():
                 continue
             if tag == "fish":
                 fish_seen = int(kv[0])
+                continue
+            if tag in ("medusa", "s4enemies", "hbat", "knight1", "knight2"):
+                block2_enemies[tag] = kv
                 continue
             if tag == "bat":
                 bat_seen = int(kv[0])
@@ -1089,6 +1125,15 @@ def run():
             snaps["44_stage5"]["cur_area"] == 7 and snaps["44_stage5"]["px"] == 968
             and snaps["44_stage5"]["cam_x"] == 768 and snaps["44_stage5"]["facing"] == 1)]
           if block2 and "44_stage5" in snaps else []),
+        *([("Medusa heads fly at Simon in stage 5", int(block2_enemies["medusa"][0]) >= 1),
+           ("stage 4 has its spear knight and its bat, hanging",
+            block2_enemies["s4enemies"][:3] == ["1", "1", "60"]),
+           ("the bat flies at Simon when he comes near it and hurts him",
+            block2_enemies["hbat"][0] == "0" and int(block2_enemies["hbat"][1]) < 64),
+           ("a spear knight takes two whip hits, then gives 400 points",
+            block2_enemies["knight1"][0] == "1" and block2_enemies["knight2"][0] == "0"
+            and int(block2_enemies["knight2"][2]) - int(block2_enemies["knight2"][1]) == 4)]
+          if block2 and "knight2" in block2_enemies else []),
         *([("the chain whip has its own poses, the same reach as the leather whip",
             any(16 <= int(p) < 24 for p in weapons["chain"]["poses"].split(","))
             and int(weapons["chain"]["reach"]) == whip_reach),

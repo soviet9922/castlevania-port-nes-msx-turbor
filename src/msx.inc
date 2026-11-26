@@ -37,3 +37,4 @@ ASCII16_PAGE2   equ 0x77FF      ; selects the bank seen at 0x8000-0xBFFF (0x7000
 TRIG_SPACE      equ 0
 TRIG_JOY1_A     equ 1
 TRIG_JOY1_B     equ 3
+CLIKSW          equ 0xF3DB              ; key click on/off (BIOS work area)

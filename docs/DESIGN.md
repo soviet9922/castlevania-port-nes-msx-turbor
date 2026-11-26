@@ -338,7 +338,16 @@ scrolls left to `AH_DOOR_CAM`, the door opens to the left (the converter mirrors
 NES door picture), Simon walks left into the next stage's columns, and the next stage
 loads at its right end with Simon facing left (`AH_FACE`), as on the NES. The door's
 height varies (`AH_DOOR_ROW`), and each area names its music (`AH_MUSIC`: block 2
-has its own). Block 2's enemies and its boss are not converted yet.
+has its own).
+
+Block 2's enemies: Medusa heads come from their spawners like the stage 2 bats (every
+64 frames, up to three, at the screen edge Simon faces) and fly in a cosine wave
+(`mhead_wave`). Spear knights and hanging bats are placed enemies in the candle list,
+like the panthers: the knight uses the zombie's frames (block 2's graphics have the
+knight in those tiles), paces its floor, turns to face Simon now and then and at the
+end of its floor, and takes two whip hits; the hanging bat flies at Simon when he comes
+near and level with it, along the recorded drop. Stage 6's ceiling crushers and
+Medusa (the boss) are not converted yet.
 
 `load_area` turns the display off, loads the palette, tiles and object
 patterns, resets objects and the player, redraws the screen and turns

@@ -147,5 +147,6 @@ mus_state       equ mus_id+1            ; SS_SIZE  music stream (src/sound.asm)
 sfx_state       equ mus_state+20        ; SS_SIZE  sound effect stream
 snd_frame       equ sfx_state+20        ; 2  frame_count at the last sound step
 psg_buf         equ snd_frame+2         ; 11 PSG registers being written
-RAM_END         equ psg_buf+11
+medusa_t        equ psg_buf+11          ; 1  frames to the next Medusa head check
+RAM_END         equ medusa_t+1
         ASSERT RAM_END < 0xF380

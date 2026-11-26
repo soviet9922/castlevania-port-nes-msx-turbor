@@ -149,6 +149,8 @@ SCORE_PANTHER   equ 0x02
 SCORE_BAT       equ 0x02
 SCORE_FISH      equ 0x03
 SCORE_BOSS      equ 0x30
+SCORE_KNIGHT    equ 0x04                ; block 2, measured on the NES
+SCORE_MEDUSA    equ 0x03
 
 ; Health and getting hit (measured in the NES entrance hall)
 HP_MAX          equ 64                  ; 16 bar segments of 4 on the NES, 8 HUD tiles here
@@ -173,6 +175,15 @@ CLEAR_HEART_WAIT equ 56                ; then the timer (1 a frame, 10 points ea
 CLEAR_HEART_STEP equ 8                 ; a pause, the hearts (one per 8 frames, 100 each)
 CLEAR_OUTRO     equ 115                 ; and a pause before the next block
 ENEMY_FISH      equ 0x03
+ENEMY_MEDUSA    equ 0x06                ; block 2: Medusa heads
+; Block 2's enemies (measured on the NES in stages 4 and 5)
+MEDUSA_EVERY    equ 64                  ; frames between Medusa heads ($0184)
+MEDUSA_MAX      equ 3                   ; at most this many (NES slots 9-11)
+KNIGHT_HP       equ 2                   ; leather whip hits to kill a spear knight
+KNIGHT_TURN     equ 192                 ; it faces Simon every 192-255 frames
+KNIGHT_FLASH    equ 16                  ; frames it can't be hit again
+HBAT_WAKE       equ 96                  ; a hanging bat flies at Simon this close
+HBAT_WAKE_DY    equ 48                  ; ... and this near its height
 FISH_MAX        equ 2                   ; fishmen about at once
 FISH_DELAY      equ 32                  ; frames before the next one jumps out
 FISH_AWAY       equ 48                  ; not right under Simon

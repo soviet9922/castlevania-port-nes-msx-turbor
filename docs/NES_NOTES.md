@@ -298,10 +298,31 @@ boss and the tally), and by reading the tables below.
   section 0, top (93, 176) in section 1; stage 6: foot (656, 64), top (717, 160)).
 - **Doors:** a 1x6-tile column of solid tiles (`$62`-`$67`) at map column 1: stage 4
   section 1 at nametable rows 8-13, stage 5 section 1 at rows 12-17.
-- **Enemy records** (enemy groups, as in block 1): `$47` (object `$07`, hangs still at
-  first), `$48` (object `$08`, purple and white, paces its platform at about 1/2 px
-  per frame), `$05`, `$06`, `$4E`, `$0D`, `$8D`, and `$5B` in stage 6 section 1 (the
-  boss room). Not identified yet.
+- **Enemy records** (enemy groups, as in block 1): the spawner code (`$F382`) runs
+  the handler at `$F3E9 + 2*(type & $3F)` (`JSR $CA6D` jump table). Types with bit 6
+  set are single placed enemies whose object id is the type's low bits (`$51` panther,
+  `$59` stage 3 boss, `$47`, `$48`, `$4E`, `$5B` Medusa); the others are spawners.
+  - `$06` **Medusa heads** (bank 6 `$8435`): every 64 frames (`$0184`), up to three at
+    a time (object slots 9-11), not while Simon is on the stairs. A head (object `$06`,
+    tiles `E8 EA` / `EC EE`, 8 frames each, sprite palette 2, art facing left) starts at
+    the screen edge Simon faces (x `$F8` or `$08`), 32 px above his y, and flies at him
+    5 px every 4 frames in a wave around his y (`$04DC`): 34 px up and down, a period
+    of about 100 frames, starting at the top. A whip hit kills it (300 points);
+    touching Simon takes 8 health.
+  - `$05`: Medusa heads too, but only when `$2B` is set (bank 6 `$8431`): the second
+    quest. Nothing appears from it in the first.
+  - `$48` **spear knight** (object `$08`, the zombie's tiles `80`-`8A` in block 2's
+    graphics, palette 1): paces its floor at 1/2 px per frame and turns to face Simon
+    every 200-260 frames. Two leather-whip hits kill it (400 points); touching it takes
+    8 health.
+  - `$47` **hanging bat** (object `$07`): hangs under the ceiling (tile `9C` and its
+    mirror, palette 1) until Simon is about 96 px away and near its height (it didn't
+    wake with Simon on the floor below it, 128 px lower). Then it flies at him 3 px
+    every 2 frames, dropping about 30 px over 34 frames, with the bat's wings (`94 96`
+    etc., palette 1), and dies when it touches him.
+  - `$0D`, `$8D` and `$4E` (stage 6): the ceiling spikes in section 0 crush Simon
+    (`$046C` = 8, death whatever his health); not decoded yet.
+  - `$5B`: Medusa, the boss (bank 6 `$8425`, object `$1B`).
 
 ## Exit sequences
 

@@ -42,7 +42,9 @@ OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
               "fish_walk1_r", "fish_walk2_r", "fish_shoot_r", "fireball",
               "boss_open", "boss_up", "orb", "dagger_fly_r", "dagger_fly_l",
               "axe1", "axe2", "axe3", "axe4", "bottle", "flame1", "flame2", "flame3",
-              "holy_item", "watch_item", "flame4", "flame5", "axe_item", "boss_sleep"]
+              "holy_item", "watch_item", "flame4", "flame5", "axe_item", "boss_sleep",
+              "mhead1_l", "mhead2_l", "mhead1_r", "mhead2_r",
+              "hbat_hang", "hbat1_l", "hbat2_l", "hbat3_l", "hbat1_r", "hbat2_r", "hbat3_r"]
 
 # Black panther: 32x16, palette 3, art faces left (recorded in the hall).
 # Run cycle run1 -> run2 -> run3, 7 frames each; the leap shows run2.
@@ -55,7 +57,10 @@ PANTHER_LEFT = {
 
 KIND_BRAZIER, KIND_CANDLE, KIND_PANTHER = 0, 1, 2
 KIND_BOSS = 5
+KIND_KNIGHT, KIND_HBAT = 6, 7   # block 2's placed enemies (16x32, 16x16)
 ENEMY_BOSS = 0x59               # enemy group record type: the stage 3 boss
+ENEMY_KNIGHT = 0x48             # block 2: a spear knight (object $08)
+ENEMY_HBAT = 0x47               # block 2: a bat hanging until Simon comes (object $07)
 ITEM_NONE = 0xFF
 ENEMY_PANTHER = 0x51            # enemy group record type: a waiting black panther
 ITEM_WHIPUP, ITEM_HEART, ITEM_DAGGER, ITEM_SMALLHEART = 0, 1, 2, 3
@@ -140,10 +145,27 @@ FRAME_SPRITES["flame5"] = [(0x99, 0, 8, 3, 0), (0x99, 8, 8, 3, 1)]
 FRAME_SPRITES["holy_item"] = [(0xA1, 0, 0, 2, 0), (0xA3, 8, 0, 2, 0)]
 FRAME_SPRITES["watch_item"] = [(0x89, 0, 0, 2, 0), (0x8B, 8, 0, 2, 0)]
 
+# block 2 (recorded in stages 4-5, sprite palette as block 1's)
+# Medusa head: 16x16, palette 2, art faces left, two frames
+FRAME_SPRITES["mhead1_l"] = [(0xE8, 0, 0, 2, 0), (0xEA, 8, 0, 2, 0)]
+FRAME_SPRITES["mhead2_l"] = [(0xEC, 0, 0, 2, 0), (0xEE, 8, 0, 2, 0)]
+FRAME_SPRITES["mhead1_r"] = [(0xEA, 0, 0, 2, 1), (0xE8, 8, 0, 2, 1)]
+FRAME_SPRITES["mhead2_r"] = [(0xEE, 0, 0, 2, 1), (0xEC, 8, 0, 2, 1)]
+# the hanging bat: tile 9C and its mirror while it hangs, then the bat's wings
+# (as the stage 2 bat) in palette 1
+FRAME_SPRITES["hbat_hang"] = [(0x9C, 0, 0, 1, 0), (0x9C, 8, 0, 1, 1)]
+for _n, _t in (("hbat1", 0x90), ("hbat2", 0x94), ("hbat3", 0x98)):
+    FRAME_SPRITES[_n + "_l"] = [(_t, 0, 0, 1, 0), (_t + 2, 8, 0, 1, 0)]
+    FRAME_SPRITES[_n + "_r"] = [(_t + 2, 0, 0, 1, 1), (_t, 8, 0, 1, 1)]
+# (the spear knight uses the zombie's frames: block 2's graphics have the
+# knight in the zombie's tiles, 80-8A, palette 1)
+
 ENEMY_ZOMBIE = 0x01             # spawner types in the enemy group records
 ENEMY_BAT = 0x02
 ENEMY_FISH = 0x03
-SPAWNER_TYPES = (ENEMY_ZOMBIE, ENEMY_BAT, ENEMY_FISH)
+ENEMY_MEDUSA = 0x06             # Medusa heads (type $05 spawns them only in the
+                                # second quest: $2B, bank 6 $8431)
+SPAWNER_TYPES = (ENEMY_ZOMBIE, ENEMY_BAT, ENEMY_FISH, ENEMY_MEDUSA)
 
 
 def candles(rom, stage, section, level_px):
@@ -197,6 +219,16 @@ def candles(rom, stage, section, level_px):
             cx, cy = (chunk - 1) * 64 + rom.fixed(p + 1) - 1, rom.fixed(p + 2)
             out.append((cx - 24, cy - 56, ITEM_NONE, KIND_BOSS))
             continue
+        if kind in (ENEMY_KNIGHT, ENEMY_HBAT):
+            # knight: 16x32 box on the floor at record y (feet, as Simon's y);
+            # bat: 16x16 box, its centre line at record y
+            cx, cy = (chunk - 1) * 64 + rom.fixed(p + 1), rom.fixed(p + 2)
+            if 8 <= cx < level_px - 8:
+                if kind == ENEMY_KNIGHT:
+                    out.append((cx - 8, cy - 64, ITEM_NONE, KIND_KNIGHT))
+                else:
+                    out.append((cx - 8, cy - 56, ITEM_NONE, KIND_HBAT))
+            continue
         if kind != ENEMY_PANTHER:
             continue
         cx, cy = (chunk - 1) * 64 + rom.fixed(p + 1) - 1, rom.fixed(p + 2)
@@ -241,6 +273,10 @@ def needed_frames(candle_list, spawners, carried=()):
             need |= {"candle1", "candle2"}
         elif kind == KIND_BOSS:
             need |= {"boss_sleep", "boss_open", "boss_up", "orb", "fireball"}
+        elif kind == KIND_KNIGHT:
+            need |= {n for n in OBJ_FRAMES if n.startswith("zombie")}
+        elif kind == KIND_HBAT:
+            need |= {n for n in OBJ_FRAMES if n.startswith("hbat")}
         else:
             need |= {n for n in OBJ_FRAMES if n.startswith("panther")}
         if item in ITEM_FRAMES:
@@ -254,6 +290,8 @@ def needed_frames(candle_list, spawners, carried=()):
         need |= {n for n in OBJ_FRAMES if n.startswith("bat")}
     if ENEMY_FISH in kinds:
         need |= {n for n in OBJ_FRAMES if n.startswith("fish")} | {"fireball"}
+    if ENEMY_MEDUSA in kinds:
+        need |= {n for n in OBJ_FRAMES if n.startswith("mhead")}
     return need
 
 

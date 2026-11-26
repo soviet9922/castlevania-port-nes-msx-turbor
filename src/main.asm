@@ -28,6 +28,8 @@
 
 init:
         di
+        xor a                           ; no BIOS key click on key presses
+        ld (CLIKSW),a
         call select_cpu
         call enable_page2
         ld a,1
@@ -112,15 +114,23 @@ vblank_done:                            ; (tests measure VBLANK work up to here)
         call write_player_sprites       ; into the hidden sprite page
         jp main_loop
 
+; Wait for the next VBLANK. The flag is tested with interrupts off and EI
+; comes right before HALT (interrupts are taken only after the instruction
+; that follows EI): a VBLANK interrupt between the test and the HALT would
+; otherwise leave HALT waiting for the next interrupt, the line interrupt
+; about 5 ms later, and the VBLANK work would miss the vertical blank.
 wait_frame:
+        di
         ld a,(frame_ready)
         or a
         jr nz,.go
+        ei
         halt
         jr wait_frame
 .go:
         xor a
         ld (frame_ready),a
+        ei
         ret
 
 ; ---------------------------------------------------------------------------
