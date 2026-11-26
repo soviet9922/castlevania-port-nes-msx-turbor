@@ -131,6 +131,9 @@ load_band:
 
 ; Walking into the area's exit (the castle gate) enters the next area.
 check_area_exit:
+        ld a,(area_hdr+AH_EXIT_KIND)    ; kind 3: a point on the stairs (stage
+        cp 3                            ; 10's end, NES $FC19)
+        jr z,.anywhere
         ld a,(on_ground)                ; only standing on the ground: not in
         or a                            ; a jump, on stairs or knocked back
         ret z                           ; (a sequence walks him along the floor)
@@ -140,6 +143,7 @@ check_area_exit:
         ld hl,jump_idx
         or (hl)
         ret nz
+.anywhere:
         ld hl,(area_hdr+AH_EXITX)
         ld a,h
         and l
@@ -173,6 +177,8 @@ check_area_exit:
 .go:
         ld a,(area_hdr+AH_EXIT_KIND)    ; the castle gate and the doors play
         or a                            ; a short sequence first
+        jr z,.now
+        cp 3
         jr z,.now
         ld (seq_kind),a
         xor a

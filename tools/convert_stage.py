@@ -37,9 +37,12 @@ SOLID_TILES = range(0x60, 0x6C)
 # Each block has its own 4x4 tile-block table (word per stage at $FA01) and
 # graphics (cv_rom.BLOCK_CHR_SETS) and background palette.
 MAP_BANK, BLOCKS = 4, 0x830A
-BLOCK_TABLES = {1: 0x830A, 2: 0x8B25, 3: 0x9156}
-BLOCK_PALETTES = {1: "1-courtyard", 2: "2-castle", 3: "3-castle"}
-BLOCK_MUSIC = {1: "STAGE", 2: "STAGE2", 3: "STAGE3"}   # NES $2A, $2D, $30 (table at $FB56)
+BLOCK_TABLES = {1: 0x830A, 2: 0x8B25, 3: 0x9156, 4: 0x975B, 5: 0x9ED1, 6: 0xA537, 7: 0xA9F4}
+BLOCK_PALETTES = {1: "1-courtyard", 2: "2-castle", 3: "3-castle", 4: "4-castle",
+                  5: "5-castle", 6: "6-castle", 7: "7-dracula"}
+# NES $2A, $2D, $30 (table at $FB56 by stage); stage 10 has its own ($39),
+# 11-12 play block 2's ($2D): an area's "music" overrides
+BLOCK_MUSIC = {1: "STAGE", 2: "STAGE2", 3: "STAGE3", 4: "STAGE2"}
 
 # Block 2 runs right to left: its doors are at the left end of a section, and
 # the 8 map columns before a section's world column 0 are the last 8 columns of
@@ -245,6 +248,42 @@ AREAS = [
         "stage": 9, "section": 0,       # tower room of the boss
         "start_x": 40,                  # NES $CA0C: x 48 (centre), y 112
         "start_y": 112 - 64,
+        "exit_x": None,
+        "next_area": 16,                # after the mummies and the stage clear
+    },
+    # block 4 (stages 10-12; bank 4 maps, tile blocks $975B, palette $CE61,
+    # graphics sets 3 and 6): left to right
+    {
+        "name": "10-cave",
+        "block": 4,
+        "map": (0x945B, 0x957B),        # stage 10 (1536 px): the cave and its
+        "stage": 10, "section": 0,      # waterway
+        "start_x": 80 - 8,              # NES $CA0C: x 80, y 144
+        "start_y": 144 - 64,
+        "music": "STAGE4",              # (NES $39)
+        # the NES's exit point ($FC19): screen x $D0, y $40 at the end of the
+        # camera, halfway up the last staircase: stage 11 starts
+        "exit_x": 1280 + 0xD0 - 8, "exit_y": 0x40 - 64, "exit_kind": 3,
+        "next_area": 17,
+    },
+    {
+        "name": "11-ruins",
+        "block": 4,
+        "map": (0x957B, 0x969B),        # stage 11 (1536 px): outside
+        "stage": 11, "section": 0,
+        "start_x": 48 - 8,              # NES: x 48, y 176
+        "start_y": 176 - 64,
+        "exit_x": 1280 + 0xF2 - 8,      # NES $FC19: the right edge, y $B0
+        "exit_y": 0xB0 - 64,
+        "next_area": 18,
+    },
+    {
+        "name": "12-corridor",
+        "block": 4,
+        "map": (0x969B, 0x975B),        # stage 12 (1024 px): the corridor, and
+        "stage": 12, "section": 0,      # Frankenstein's room at its end
+        "start_x": 48 - 8,              # NES: x 48, y 176
+        "start_y": 176 - 64,
         "exit_x": None,
     },
 ]
@@ -463,7 +502,7 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
                   exit_kind=area.get("exit_kind", 0), door_col=area.get("door_col", 0),
                   door_cam=area.get("door_cam", 0), door_vcol=door_vcol,
                   walk_end=walk_end, cam_end=cam_end,
-                  min_cam=area.get("min_cam", x_off), music=BLOCK_MUSIC[block],
+                  min_cam=area.get("min_cam", x_off), music=area.get("music", BLOCK_MUSIC[block]),
                   start_face=area.get("start_face", 0), exit_left=int(exit_left),
                   door_row=area.get("door_row", DOOR_ROW), crush_vcol=crush_vcol,
                   max_cam=area.get("max_cam", width - 256),     # (not the door's columns)

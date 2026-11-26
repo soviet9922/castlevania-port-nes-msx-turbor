@@ -131,7 +131,18 @@ restart_section_vars:
 ; The timer for the current area's stage, from the NES's table at $C9F6:
 ; a death or a new block restarts it there (between stages it carries on).
 set_stage_time:
-        ld a,(area_hdr+AH_STAGE)        ; BCD 1-9
+        ld a,(area_hdr+AH_STAGE)        ; BCD 1-18 -> 1-18
+        ld c,a
+        and 0xF0
+        rrca
+        ld b,a                          ; tens * 8
+        rrca
+        rrca                            ; tens * 2
+        add a,b
+        ld b,a                          ; tens * 10
+        ld a,c
+        and 15
+        add a,b
         add a,a
         ld e,a
         ld d,0
@@ -147,6 +158,7 @@ set_stage_time:
         ret
 stage_times:                            ; BCD, stage 0 (not used) to 9
         dw 0x0300, 0x0300, 0x0200, 0x0100, 0x0400, 0x0300, 0x0200, 0x0500, 0x0400, 0x0300
+        dw 0x0400, 0x0300, 0x0200, 0x0500, 0x0400, 0x0300, 0x0700, 0x0600, 0x0500
 
 ; ---------------------------------------------------------------------------
 ; Stage clear (NES game mode $0C, measured after the stage 3 boss): the
@@ -342,10 +354,13 @@ simon_hurt:
         or a
         ret nz
         ld a,(area_hdr+AH_STAGE)        ; NES $E74A: 8 in stages 1-6,
-        cp 7                            ; 12 from stage 7
+        cp 7                            ; 12 in 7-11, 16 from 12 (BCD)
         ld c,ZOMBIE_DAMAGE
         jr c,.dmg
+        cp 0x12
         ld c,DAMAGE_LATE
+        jr c,.dmg
+        ld c,DAMAGE_LAST
 .dmg:
         ld a,(hp)
         sub c

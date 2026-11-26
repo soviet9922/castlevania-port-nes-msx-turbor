@@ -162,6 +162,7 @@ SCORE_SNAKE     equ 0x01                ; snake, bandage, bone, fireball: 100
 HP_MAX          equ 64                  ; 16 bar segments of 4 on the NES, 8 HUD tiles here
 ZOMBIE_DAMAGE   equ 8
 DAMAGE_LATE     equ 12                  ; an enemy's touch from stage 7 (NES $E74A)
+DAMAGE_LAST     equ 16                  ; ... from stage 12
 ENEMY_ZOMBIE    equ 0x01                ; spawner types (NES enemy records)
 ENEMY_BAT       equ 0x02
 BAT_EVERY       equ 384                 ; frames from a bat to the next (NES $C0 ticks)

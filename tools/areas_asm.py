@@ -69,7 +69,7 @@ def write(gen_dir, areas):
             f"        db {a.get('next_area', 0)}, 0x{a['blank']:02X}",
             f"        dw {p}stairs, {p}enemies",
             f"        db {a.get('exit_y', 0xFF)}, {a.get('below', 0xFF)}, {a.get('above', 0xFF)}, "
-            f"{a.get('respawn', i)}, 0x{a.get('stage_no', 1):02X}, {a.get('exit_kind', 0)}",
+            f"{a.get('respawn', i)}, 0x{a.get('stage_no', 1):02d}, {a.get('exit_kind', 0)}",
             f"        dw {a.get('door_col', 0)}, {a.get('door_cam', 0)}, {a.get('door_vcol', 0)}, "
             f"{a.get('walk_end', 0)}, {a.get('cam_end', 0)}",
             "        dw " + ", ".join(f"{p}sub{n}_spt" if n in a.get("subs", []) else "0" for n in (1, 2, 3)),

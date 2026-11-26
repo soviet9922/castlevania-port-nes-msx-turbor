@@ -194,7 +194,7 @@ dbg_change:
         ld a,(dbg_stage)
         add a,c
         ret z                           ; below 1
-        cp 10
+        cp 19
         ret nc
         ld e,a                          ; only stages this ROM has
         dec e
@@ -329,7 +329,20 @@ dbg_draw:
         jr .next
 .v_stage:
         ld a,(dbg_stage)
-        add a,'0'
+        ld b,'0'-1
+.tens:
+        inc b
+        sub 10
+        jr nc,.tens
+        add a,10+'0'
+        ld c,a
+        ld a,b
+        cp '0'
+        jr nz,.two
+        ld a,' '
+.two:
+        out (VDP_DATA),a
+        ld a,c
         out (VDP_DATA),a
         jr .next
 .v_hp:
@@ -414,9 +427,10 @@ debug_tick:
         ld (time_t),a
         ret
 
-; the first area of stages 1-9
+; the first area of stages 1-18 (255: not in the port yet)
 dbg_stage_area:
-        db 0, 2, 4, 5, 7, 9, 11, 13, 15
+        db 0, 2, 4, 5, 7, 9, 11, 13, 15, 16, 17, 18
+        db 255, 255, 255, 255, 255, 255
 
 dbg_title:      db "CASTLEVANIA MSX  DEBUG MENU", 0
 dbg_help1:      db "UP DOWN CHOOSE, LEFT RIGHT SET", 0
