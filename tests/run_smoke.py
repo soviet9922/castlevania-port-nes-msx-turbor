@@ -389,7 +389,13 @@ def tcl_script(syms, result_file):
     after time 138 {{ set f [open "{result_file}" a]
                      puts $f "knight2 [count_type 15] $::score0 [format %02x%02x [peek {syms["score"] + 2}] [peek {syms["score"] + 1}]]"
                      close $f }}
-    after time 138.2 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}] $::vbl_worst_fc"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
+    # stage 6's ceiling crushers: under one, Simon is crushed within its cycle
+    after time 138.1 {{ poke {eoff} 3; poke {syms["area_hdr"] + 44} 9; poke {syms["clear_t"]} 1; poke {syms["clear_phase"]} 4 }}
+    after time 138.7 {{ set ::lives0 [peek {syms["lives"]}]
+                       set x 680; poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
+                       poke {py} 96; poke {py + 1} 0; set ::crushed 0; crush_watch 200 }}
+    after time 142 {{ set f [open "{result_file}" a]; puts $f "crush [peek {cur}] $::crushed"; close $f }}
+    after time 142.2 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}] $::vbl_worst_fc"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
 """ if areas > 1 else f"""
     after time 9 {{ snd_report; set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
@@ -661,6 +667,11 @@ proc seq_watch {{}} {{
     }}
 }}
 debug set_watchpoint write_mem {fc} {{}} seq_watch
+proc crush_watch {{n}} {{
+    if {{$n <= 0}} return
+    if {{[peek {syms["dying_t"]}] > 0}} {{ set ::crushed 1; return }}
+    after frame "crush_watch [expr {{$n - 1}}]"
+}}
 proc find_type {{t}} {{
     for {{set i 0}} {{$i < 8}} {{incr i}} {{ if {{[peek [expr {{{objt} + $i*{obj_size}}}]] == $t}} {{ return [expr {{{objt} + $i*{obj_size}}}] }} }}
     return -1
@@ -742,7 +753,7 @@ proc wait_game {{}} {{
     }}
 }}
 after time 0.1 wait_game
-after time 170 {{ exit }}
+after time 175 {{ exit }}
 """
 
 
@@ -905,7 +916,7 @@ def run():
             if tag == "fish":
                 fish_seen = int(kv[0])
                 continue
-            if tag in ("medusa", "s4enemies", "hbat", "knight1", "knight2"):
+            if tag in ("medusa", "s4enemies", "hbat", "knight1", "knight2", "crush"):
                 block2_enemies[tag] = kv
                 continue
             if tag == "bat":
@@ -1134,6 +1145,9 @@ def run():
             block2_enemies["knight1"][0] == "1" and block2_enemies["knight2"][0] == "0"
             and int(block2_enemies["knight2"][2]) - int(block2_enemies["knight2"][1]) == 4)]
           if block2 and "knight2" in block2_enemies else []),
+        *([("stage 6's ceiling crushers crush Simon standing under one",
+            block2_enemies["crush"] == ["9", "1"])]
+          if block2 and "crush" in block2_enemies else []),
         *([("the chain whip has its own poses, the same reach as the leather whip",
             any(16 <= int(p) < 24 for p in weapons["chain"]["poses"].split(","))
             and int(weapons["chain"]["reach"]) == whip_reach),

@@ -63,6 +63,7 @@ load_area:
         ld (dagger_on),a
         ld (holy_fire),a
         call objects_reset
+        call crushers_reset
         ld a,(keep_player)
         or a
         jr nz,.keep
@@ -657,4 +658,387 @@ section_link:
 .lost:
         xor a                           ; no staircase here (bad data): drop him
         ld (stair_state),a
+        ret
+
+; ---------------------------------------------------------------------------
+; Ceiling crushers (stage 6, recorded on the NES): background tiles. Each one
+; steps through its cycle (AH_CRUSHERS: spike row and frames per step: down a
+; row every 4 frames, up a row every 16); its 4 tile columns are copied from
+; the area's hidden columns (AH_CRUSH_VCOL, 4 per spike row) into the name
+; table, one crusher per VBLANK. Spikes that reach Simon kill him at once.
+; ---------------------------------------------------------------------------
+
+; IX -> crusher record (x lo, x hi, phase, steps, (row, frames)...); A = index
+; -> HL = its state (step, frames left)
+crush_state_of:
+        add a,a
+        ld e,a
+        ld d,0
+        ld hl,crush_state
+        add hl,de
+        ret
+
+; HL = the record after the one at IX
+crush_skip:
+        push ix
+        pop hl
+        ld e,(ix+3)
+        ld d,0
+        inc hl
+        inc hl
+        inc hl
+        inc hl
+        add hl,de
+        add hl,de
+        ret
+
+; one frame of the crusher at IX, state at HL
+crush_step:
+        dec (hl)                        ; (frames left are at HL+1: see below)
+        ret
+
+crushers_reset:
+        xor a
+        ld (crush_next),a
+        call crushers_redraw
+        ld ix,(area_hdr+AH_CRUSHERS)
+        ld a,(ix+0)
+        or a
+        ret z
+        ld b,a
+        inc ix
+        ld c,0
+.lp:
+        push bc
+        ld a,c
+        call crush_state_of
+        ld (hl),0                       ; step 0, its frames
+        inc hl
+        ld a,(ix+5)
+        ld (hl),a
+        ld b,(ix+2)                     ; then run the phase
+        inc b
+        jr .run
+.adv:
+        push bc
+        push hl
+        call crush_tick_one
+        pop hl
+        pop bc
+.run:
+        djnz .adv
+        call crush_skip
+        push hl
+        pop ix
+        pop bc
+        inc c
+        djnz .lp
+        ret
+
+; advance the crusher at IX (its frames-left byte at HL, step at HL-1)
+crush_tick_one:
+        dec (hl)
+        ret nz
+        dec hl
+        ld a,(hl)
+        inc a
+        cp (ix+3)
+        jr c,.ok
+        xor a
+.ok:
+        ld (hl),a
+        inc hl
+        add a,a
+        ld e,a
+        ld d,0
+        push ix
+        add ix,de
+        ld a,(ix+5)                     ; this step's frames
+        pop ix
+        ld (hl),a
+        ret
+
+; IX = crusher, A = its index -> A = spike row (0 = highest)
+crush_row:
+        call crush_state_of
+        ld a,(hl)
+        add a,a
+        ld e,a
+        ld d,0
+        push ix
+        add ix,de
+        ld a,(ix+4)
+        pop ix
+        ret
+
+crushers_tick:
+        ld ix,(area_hdr+AH_CRUSHERS)
+        ld a,(ix+0)
+        or a
+        ret z
+        ld b,a
+        inc ix
+        ld c,0
+.lp:
+        push bc
+        ld a,c
+        call crush_state_of
+        inc hl
+        call crush_tick_one
+        pop bc
+        push bc
+        ld a,c
+        call crush_row                  ; spikes on Simon?
+        add a,CRUSH_FIRST_ROW+1
+        add a,a
+        add a,a
+        add a,a                         ; A = spikes' bottom y
+        sub 2
+        ld d,a
+        ld a,(py+1)
+        or a
+        jr nz,.next                     ; above the playfield
+        ld a,(py)
+        cp d
+        jr nc,.next                     ; below the spikes
+        ld l,(ix+0)                     ; crusher x+0..x+31 vs Simon px+3..px+12
+        ld h,(ix+1)
+        ld de,31
+        add hl,de
+        ld de,(px)
+        inc de
+        inc de
+        inc de
+        or a
+        sbc hl,de
+        jr c,.next
+        ld hl,(px)
+        ld de,12
+        add hl,de
+        ld e,(ix+0)
+        ld d,(ix+1)
+        or a
+        sbc hl,de
+        jr c,.next
+        ld a,(dying_t)
+        or a
+        jr nz,.next
+        ld a,1                          ; crushed: dead whatever his health
+        ld (player_dead),a
+.next:
+        call crush_skip
+        push hl
+        pop ix
+        pop bc
+        inc c
+        djnz .lp
+        ret
+
+; all crushers drawn again (the map's columns show them at rest)
+crushers_redraw:
+        ld hl,crush_drawn
+        ld b,CRUSH_MAX
+.lp:
+        ld (hl),0xFF
+        inc hl
+        djnz .lp
+        ret
+
+; VBLANK: the HUD when it has something to redraw, else a crusher
+hud_or_crusher:
+        ld a,(hud_dirty)
+        ld hl,hud_parts
+        or (hl)
+        jp nz,hud_update
+        ; (fall through)
+
+; VBLANK: copy one crusher's 4 columns (CRUSH_ROWS rows) to the name table
+crusher_vram:
+        ld ix,(area_hdr+AH_CRUSHERS)
+        ld a,(ix+0)
+        or a
+        ret z
+        ld b,a
+        ld a,(crush_next)
+        cp b
+        jr c,.idx
+        xor a
+.idx:
+        ld c,a
+        inc a
+        ld (crush_next),a
+        inc ix
+        ld a,c                          ; find crusher C
+        or a
+        jr z,.found
+.find:
+        push bc
+        call crush_skip
+        push hl
+        pop ix
+        pop bc
+        dec c
+        jr nz,.find
+        ld a,(crush_next)
+        dec a
+.found:
+        ld c,a
+        call crush_row                  ; drawn like that already?
+        ld b,0
+        ld hl,crush_drawn
+        add hl,bc
+        cp (hl)
+        ret z
+        ld (hl),a
+        add a,a                         ; source column: AH_CRUSH_VCOL + 4*row
+        add a,a
+        ld e,a
+        ld d,0
+        ld hl,(area_hdr+AH_CRUSH_VCOL)
+        add hl,de
+        ld (door_src),hl                ; (the door's work variables: no door here)
+        ld l,(ix+0)                     ; destination: the crusher's tile column
+        ld h,(ix+1)
+        call hl_shr3
+        ld (door_dst),hl
+        ld hl,(cam_x)                   ; all 4 columns on the screen, in one
+        call hl_shr3                    ; piece of the name table ring? Then
+        inc hl                          ; a row at a time
+        ex de,hl
+        ld hl,(door_dst)
+        or a
+        sbc hl,de
+        ld a,h
+        or a
+        jr nz,.slow
+        ld a,l
+        cp 32-3
+        jr nc,.slow
+        ld a,(door_dst)
+        and 31
+        cp 32-3
+        jp c,crush_rows
+.slow:
+        ld b,4
+.col:
+        push bc
+        ld hl,(cam_x)                   ; on the screen? (cam/8 + 1 .. + 32)
+        call hl_shr3
+        inc hl
+        ex de,hl
+        ld hl,(door_dst)
+        or a
+        sbc hl,de
+        ld a,h
+        or a
+        jr nz,.skip
+        ld a,l
+        cp 32
+        jr nc,.skip
+        call crush_column
+.skip:
+        ld hl,(door_src)
+        inc hl
+        ld (door_src),hl
+        ld hl,(door_dst)
+        inc hl
+        ld (door_dst),hl
+        pop bc
+        djnz .col
+        ret
+
+; one column: map column door_src rows CRUSH_FIRST_ROW.. -> screen column door_dst
+crush_column:
+        ld hl,(door_src)                ; AH_TILES + col * PF_ROWS + first row
+        ld d,h
+        ld e,l
+        add hl,hl
+        push hl
+        add hl,hl
+        add hl,hl
+        push hl
+        add hl,hl
+        pop bc
+        add hl,bc
+        pop bc
+        or a
+        sbc hl,bc                       ; *22 (PF_ROWS)
+        ld de,(area_hdr+AH_TILES)
+        add hl,de
+        ld de,CRUSH_FIRST_ROW
+        add hl,de
+        ex de,hl
+        ld a,(door_dst)
+        and 31
+        ld l,a
+        ld h,0
+        ld bc,VRAM_PNT+(HUD_ROWS+CRUSH_FIRST_ROW)*32
+        add hl,bc
+        ld b,CRUSH_ROWS
+.lp:
+        push bc
+        push hl
+        call vram_set_write
+        ld a,(de)
+        out (VDP_DATA),a
+        inc de
+        pop hl
+        ld bc,32
+        add hl,bc
+        pop bc
+        djnz .lp
+        ret
+
+; the crusher's 4 columns, row by row (all on the screen, no ring wrap):
+; map columns door_src.. rows CRUSH_FIRST_ROW.. -> screen columns door_dst..
+crush_rows:
+        ld hl,(door_src)                ; AH_TILES + col * PF_ROWS + first row
+        add hl,hl
+        push hl
+        add hl,hl
+        add hl,hl
+        push hl
+        add hl,hl
+        pop bc
+        add hl,bc
+        pop bc
+        or a
+        sbc hl,bc                       ; *22 (PF_ROWS)
+        ld de,(area_hdr+AH_TILES)
+        add hl,de
+        ld de,CRUSH_FIRST_ROW
+        add hl,de
+        ex de,hl                        ; DE = first map tile
+        ld a,(door_dst)
+        and 31
+        ld l,a
+        ld h,0
+        ld bc,VRAM_PNT+(HUD_ROWS+CRUSH_FIRST_ROW)*32
+        add hl,bc
+        ld b,CRUSH_ROWS
+.row:
+        push bc
+        push hl
+        push de
+        call vram_set_write
+        ex de,hl
+        ld bc,PF_ROWS
+        ld a,(hl)
+        out (VDP_DATA),a
+        add hl,bc
+        ld a,(hl)
+        out (VDP_DATA),a
+        add hl,bc
+        ld a,(hl)
+        out (VDP_DATA),a
+        add hl,bc
+        ld a,(hl)
+        out (VDP_DATA),a
+        pop de
+        inc de
+        pop hl
+        ld bc,32
+        add hl,bc
+        pop bc
+        djnz .row
         ret

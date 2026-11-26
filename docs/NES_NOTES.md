@@ -320,8 +320,14 @@ boss and the tally), and by reading the tables below.
     wake with Simon on the floor below it, 128 px lower). Then it flies at him 3 px
     every 2 frames, dropping about 30 px over 34 frames, with the bat's wings (`94 96`
     etc., palette 1), and dies when it touches him.
-  - `$0D`, `$8D` and `$4E` (stage 6): the ceiling spikes in section 0 crush Simon
-    (`$046C` = 8, death whatever his health); not decoded yet.
+  - **Ceiling crushers** (stage 6 section 0, NES x 352, 416 and 480, 32 px wide):
+    background tiles the game rewrites, recorded from the nametables. At rest (the map)
+    the chain is at nametable row 14 and the spikes (`18 18 18 18`) at row 15 under a
+    mount at rows 12-13. The spikes drop a row every 4 frames to their lowest row (18
+    for the one at 416, 21 for the one at 480), and rise a row every 16 frames back to
+    row 14; the chain (`00 1A 1B 00`) fills the rows above them. Spikes that reach
+    Simon crush him (`$046C` = 8): he dies whatever his health. The records `$0D` and
+    `$8D` are at two of them; `$4E` (two, left of them) is not identified yet.
   - `$5B`: Medusa, the boss (bank 6 `$8425`, object `$1B`).
 
 ## Exit sequences

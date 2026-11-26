@@ -165,6 +165,9 @@ AREAS = [
         "block": 2,
         "map": (0x8A05 - 48, 0x8A95),   # stage 6, section 0 (768 px)
         "stage": 6, "section": 0,
+        # three ceiling crushers (recorded): NES x, the lowest row their spikes
+        # reach (nametable row), frames into their cycle at the start
+        "crushers": [(352, 18, 40), (416, 18, 0), (480, 21, 20)],
         "x_off": BLOCK2_X_OFF,
         "start_x": 712 + BLOCK2_X_OFF,  # NES $CA0C: world x 720 (centre), y 128,
         "start_y": 128 - 64,            # facing left
@@ -353,6 +356,11 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
         door_vcol = len(pixels[0]) // 8
         add_door_columns(rom, pixels, solid, area["door_col"], slot_for_nes, nes_to_slot[pal[0]],
                          left=exit_left, door_row=area.get("door_row", DOOR_ROW))
+    crush_vcol, crushers = 0, []
+    if area.get("crushers"):
+        crush_vcol = len(pixels[0]) // 8
+        crushers = add_crusher_columns(pixels, solid, area["crushers"][0][0] + x_off)
+        crushers = [(nx + x_off, bottom, phase) for nx, bottom, phase in area["crushers"]]
     play_px = nes_width(area)               # objects only from the area itself
     cl = [(x + x_off, y, it, k) for x, y, it, k in
           convert_objects.candles(rom, area["stage"], area["section"], play_px)]
@@ -373,6 +381,7 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
     with open(os.path.join(out_dir, "stairs.bin"), "wb") as f:
         f.write(data)
 
+    write_crushers(out_dir, crushers)
     params = msx_area.write_area(out_dir, pixels, msx_pal, solid, sx, sy, area["name"])
     nxt = AREAS[area.get("next_area", 0)]
     if area.get("exit_kind") == 2 and exit_left:
@@ -395,7 +404,7 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
                   walk_end=walk_end, cam_end=cam_end,
                   min_cam=area.get("min_cam", x_off), music=BLOCK_MUSIC[block],
                   start_face=area.get("start_face", 0), exit_left=int(exit_left),
-                  door_row=area.get("door_row", DOOR_ROW),
+                  door_row=area.get("door_row", DOOR_ROW), crush_vcol=crush_vcol,
                   max_cam=area.get("max_cam", width - 256),     # (not the door's columns)
                   next_area=area.get("next_area", 0))
 
@@ -489,6 +498,57 @@ def add_door_columns(rom, pixels, solid, door_col, slot_for_nes, backdrop, left=
             row += block[y]
     for row in solid:
         row += [0] * 6
+
+
+# Stage 6's ceiling crushers (recorded: background tiles the NES rewrites). In
+# the map one rests with its chain at nametable row 14 and its spikes at row 15.
+# Each cycle: the spikes drop a row every 4 frames to their lowest row, stay 4
+# frames, and go back up a row every 16 frames to row 14.
+CRUSH_TOP = 14                      # highest row of the spikes (nametable row)
+CRUSH_LOW = 21                      # lowest row any of them reaches
+CRUSH_FIRST_ROW = CRUSH_TOP - 6     # first playfield row the engine rewrites
+CRUSH_ROWS = CRUSH_LOW - CRUSH_TOP + 1
+
+
+def add_crusher_columns(pixels, solid, x):
+    """Append 4 tile columns for each height of the spikes (rows CRUSH_TOP to
+    CRUSH_LOW): chain above the spikes, nothing below, cut from the crusher at
+    world x as the map draws it. The engine copies them into the name table."""
+    def row(nt_row, dx):
+        y0 = (nt_row - 6) * 8
+        return [r[x + dx:x + dx + 8] for r in pixels[y0:y0 + 8]]
+    for spikes in range(CRUSH_TOP, CRUSH_LOW + 1):
+        for dx in range(0, 32, 8):
+            col = [r[x + dx:x + dx + 8] for r in pixels]        # the map's own column
+            for nt_row in range(CRUSH_TOP, CRUSH_LOW + 1):
+                src = 14 if nt_row < spikes else 15 if nt_row == spikes else 16
+                y0 = (nt_row - 6) * 8
+                col[y0:y0 + 8] = row(src, dx)
+            for y, r in enumerate(pixels):
+                r += col[y]
+            for r in solid:
+                r.append(0)
+
+
+def crusher_segments(bottom):
+    """(row, frames) steps of one cycle, starting at the top"""
+    segs = [(r, 4) for r in range(CRUSH_TOP + 1, bottom + 1)]
+    segs[-1] = (bottom, 8)              # (reached, then 4 frames still)
+    segs += [(r, 16) for r in range(bottom - 1, CRUSH_TOP - 1, -1)]
+    return segs
+
+
+def write_crushers(out_dir, crushers):
+    """crushers.bin: count, then per crusher x (2 bytes), a phase (frames) and its
+    cycle: steps, then (spike row - CRUSH_TOP, frames) per step"""
+    data = bytearray([len(crushers)])
+    for x, bottom, phase in crushers:
+        segs = crusher_segments(bottom)
+        data += bytes([x & 0xFF, x >> 8, phase, len(segs)])
+        for r, n in segs:
+            data += bytes([r - CRUSH_TOP, n])
+    with open(os.path.join(out_dir, "crushers.bin"), "wb") as f:
+        f.write(data)
 
 
 def write_object_sprites(out_dir, index, objs):

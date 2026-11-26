@@ -346,8 +346,16 @@ Block 2's enemies: Medusa heads come from their spawners like the stage 2 bats (
 like the panthers: the knight uses the zombie's frames (block 2's graphics have the
 knight in those tiles), paces its floor, turns to face Simon now and then and at the
 end of its floor, and takes two whip hits; the hanging bat flies at Simon when he comes
-near and level with it, along the recorded drop. Stage 6's ceiling crushers and
-Medusa (the boss) are not converted yet.
+near and level with it, along the recorded drop.
+
+Stage 6's ceiling crushers are background tiles, as on the NES. The converter draws
+the spikes at each of their heights into hidden map columns (`AH_CRUSH_VCOL`, 4 per
+height) and lists each crusher's x and cycle (`AH_CRUSHERS`). Each frame every crusher
+steps through its cycle, and spikes that reach Simon kill him. In the vertical blank
+one crusher whose height changed is copied into the name table (only when the HUD has
+nothing to redraw and no map column is uploaded, so the vertical blank stays short);
+a new map column shows them at rest, so it marks them all to be drawn again. Medusa
+(the boss) is not converted yet.
 
 `load_area` turns the display off, loads the palette, tiles and object
 patterns, resets objects and the player, redraws the screen and turns

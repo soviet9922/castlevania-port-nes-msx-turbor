@@ -148,5 +148,8 @@ sfx_state       equ mus_state+20        ; SS_SIZE  sound effect stream
 snd_frame       equ sfx_state+20        ; 2  frame_count at the last sound step
 psg_buf         equ snd_frame+2         ; 11 PSG registers being written
 medusa_t        equ psg_buf+11          ; 1  frames to the next Medusa head check
-RAM_END         equ medusa_t+1
+crush_state     equ medusa_t+1          ; 2*CRUSH_MAX  per crusher: cycle step, frames left
+crush_next      equ crush_state+8       ; 1  crusher redrawn in the next VBLANK
+crush_drawn     equ crush_next+1        ; CRUSH_MAX  spike row last drawn (0xFF = redraw)
+RAM_END         equ crush_drawn+CRUSH_MAX
         ASSERT RAM_END < 0xF380

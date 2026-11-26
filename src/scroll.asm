@@ -37,6 +37,11 @@ calc_scroll:
 ; Build col_buf for world tile column DE and mark it for upload.
 ; ---------------------------------------------------------------------------
 prepare_column:
+        push bc                         ; (a new column shows crushers at rest:
+        push hl                         ; draw them again)
+        call crushers_redraw
+        pop hl
+        pop bc
         ld a,e
         and 31
         ld (col_slot),a

@@ -64,7 +64,7 @@ main_loop:
         call flip_sprites
         pop af
         or a
-        call z,hud_update
+        call z,hud_or_crusher           ; (one of them: the VBLANK is short)
         call calc_scroll
         ei
 vblank_done:                            ; (tests measure VBLANK work up to here)
@@ -107,6 +107,7 @@ vblank_done:                            ; (tests measure VBLANK work up to here)
         call check_area_exit
         call objects_spawn
         call enemies_update
+        call crushers_tick
         call objects_update
         call check_death
         call camera_update

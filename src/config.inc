@@ -75,7 +75,12 @@ AH_MUSIC        equ 90                  ; the area's music (SND_ number)
 AH_FACE         equ 91                  ; Simon's facing at the start (1 = left)
 AH_EXIT_LEFT    equ 92                  ; 1 = the exit (door) is at the left end
 AH_DOOR_ROW     equ 93                  ; the door's top playfield row
-AH_SIZE         equ 94
+AH_CRUSHERS     equ 94                  ; ceiling crushers: count, then x, phase, cycle
+AH_CRUSH_VCOL   equ 96                  ; their hidden tile columns (4 per spike row)
+AH_SIZE         equ 98
+CRUSH_FIRST_ROW equ 8                   ; playfield rows the crushers rewrite (NES
+CRUSH_ROWS      equ 8                   ; nametable rows 14-21)
+CRUSH_MAX       equ 4
 
 ; Exit sequences (measured on the NES)
 GATE_FRAMES     equ 120                 ; walking into the castle gate, 1 px every 3 frames

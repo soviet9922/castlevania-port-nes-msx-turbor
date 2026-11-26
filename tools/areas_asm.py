@@ -27,7 +27,8 @@ The engine maps an area's bank at 0x8000 and copies its header to RAM
   swapping here), +83 their sizes, +87 the swap window's pattern slot
   +88 least camera x, +90 the music (SND_ number), +91 Simon's start facing
   (0 right, 1 left), +92 1 = the exit (door) is at the left end, +93 the
-  door's top playfield row
+  door's top playfield row, +94 ceiling crushers (count, then x, phase and
+  cycle each), +96 the first of their hidden tile columns
 
 Banks: 0 code, 1-6 areas 0-5, 7 Simon's sprites, 8-15 sound, then areas 6 and
 up from bank 16 (the ROM grows to 512 KB). src/area.asm (area_bank) must match.
@@ -82,6 +83,7 @@ def write(gen_dir, areas):
             f"        dw {a.get('min_cam', 0)}",
             f"        db SND_{a.get('music', 'STAGE')}, {a.get('start_face', 0)}, {a.get('exit_left', 0)}, "
             f"{a.get('door_row', 2)}",
+            f"        dw {p}crushers, {a.get('crush_vcol', 0)}",
             f'{p}palette: INCBIN "{d}/palette.bin"',
         ]
         for b in range(3):
@@ -93,6 +95,7 @@ def write(gen_dir, areas):
             f'{p}candles: INCBIN "{d}/candles.bin"',
             f'{p}stairs:  INCBIN "{d}/stairs.bin"',
             f'{p}enemies: INCBIN "{d}/enemies.bin"',
+            f'{p}crushers: INCBIN "{d}/crushers.bin"' if a.get('crush_vcol') else f"{p}crushers: db 0",
             f'{p}obj_spt: INCBIN "{d}/{p}obj_spt.bin"',
             *[line for n in a.get("subs", [])
               for line in (f'{p}sub{n}_spt: INCBIN "{d}/{p}sub{n}_spt.bin"', f"{p}sub{n}_end:")],
