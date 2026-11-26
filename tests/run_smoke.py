@@ -577,7 +577,7 @@ proc panther_test {{}} {{
             set x [expr {{[peek $r] + 256*[peek [expr {{$r+1}}]] + 16 - 8 - 55}}]
             poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
             after time 0.5 [list panther_state $i]
-            after time 0.6 {{ set ::hunting 1 }}
+            after time 0.05 {{ set ::hunting 1 }}
             after time 3.6 {{ set ::hunting 0; {dump('17_panther_whipped')} }}
             return
         }}
