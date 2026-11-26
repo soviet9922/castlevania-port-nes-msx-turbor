@@ -156,10 +156,12 @@ SCORE_FISH      equ 0x03
 SCORE_BOSS      equ 0x30
 SCORE_KNIGHT    equ 0x04                ; block 2, measured on the NES
 SCORE_MEDUSA    equ 0x03
+SCORE_SNAKE     equ 0x01                ; snake, bandage, bone, fireball: 100
 
 ; Health and getting hit (measured in the NES entrance hall)
 HP_MAX          equ 64                  ; 16 bar segments of 4 on the NES, 8 HUD tiles here
 ZOMBIE_DAMAGE   equ 8
+DAMAGE_LATE     equ 12                  ; an enemy's touch from stage 7 (NES $E74A)
 ENEMY_ZOMBIE    equ 0x01                ; spawner types (NES enemy records)
 ENEMY_BAT       equ 0x02
 BAT_DELAY       equ 192                 ; frames before a bat appears (the NES
@@ -182,41 +184,31 @@ CLEAR_OUTRO     equ 115                 ; and a pause before the next block
 ENEMY_FISH      equ 0x03
 ENEMY_MEDUSA    equ 0x06                ; block 2: Medusa heads
 ; Block 2's enemies (measured on the NES in stages 4 and 5)
-MEDUSA_EVERY    equ 64                  ; frames between Medusa heads ($0184)
+MEDUSA_EVERY    equ 128                 ; frames between Medusa heads (NES: $40 ticks of 2)
 MEDUSA_MAX      equ 3                   ; at most this many (NES slots 9-11)
-KNIGHT_HP       equ 2                   ; leather whip hits to kill a spear knight
-KNIGHT_TURN     equ 192                 ; it faces Simon every 192-255 frames
-KNIGHT_FLASH    equ 16                  ; frames it can't be hit again
-HBAT_WAKE       equ 96                  ; a hanging bat flies at Simon this close
-HBAT_WAKE_DY    equ 48                  ; ... and this near its height
+KNIGHT_TURN     equ 192                 ; NES: it turns or faces Simon every 192 frames
 ; Medusa (stage 6 boss, recorded on the NES)
-MEDUSA_WAKE     equ 80                  ; wakes when Simon is this close
-MEDUSA_DAMAGE   equ 3                   ; per whip hit (NES: 64 -> 61 -> 58)
-MEDUSA_LEFT     equ 40                  ; she turns at these screen x (centre)
-MEDUSA_RIGHT    equ 235
-MEDUSA_PAUSE    equ 64                  ; she stops this long and drops a snake
-SNAKE_MAX       equ 2
+MEDUSA_WAKE_T   equ 180                 ; frames from the camera lock to her start (NES $B4)
+MEDUSA_TOP      equ 103                 ; a flight starts once she is above this (NES y $A8)
+MEDUSA_FREEZE   equ 8                   ; frames a hit freezes her
+MEDUSA_PAUSE    equ 60                  ; she hovers still this long between flights
+SNAKE_MAX       equ 4                   ; (NES: as many as free slots 8-13)
 ; Block 3's enemies (recorded on the NES in stages 7-9; hits and points of the
 ; ghost, the pillar and the skeleton are estimates)
-WAKE_DX         equ 96                  ; fleaman, ghost, raven wake this close
-FLEA_VY0        equ -53                 ; hop: 1/16 px per frame up, about 44 px high
+WAKE_DX         equ 96                  ; (the mummies' turn test)
+FLEA_HIGH       equ -56                 ; fleaman hops (1/16 px a frame up): facing Simon near
+FLEA_LONG       equ -16                 ; ... else the long low hop (2 1/4 px across)
 FLEA_GRAVITY    equ 2
 FLEA_REST       equ 8                   ; frames on the floor between hops
-GHOST_HP        equ 3
-PILLAR_HP       equ 4
-PILLAR_EVERY    equ 245                 ; two fireballs, 40 frames apart, this often
-SKEL_THROW      equ 112                 ; frames between bones
-BONE_VY0        equ -70                 ; 1/16 px per frame, gravity 2
-RAVEN_HOVER     equ 32
-SCORE_FLEA      equ 0x03
+PILLAR_HP       equ 192                 ; damage (hit_damage units) that breaks a bone pillar
+SCORE_FLEA      equ 0x05                ; (NES $DF35: 500)
 SCORE_GHOST     equ 0x03
 SCORE_SKEL      equ 0x03
 SCORE_PILLAR    equ 0x04
 SCORE_RAVEN     equ 0x02
 ; The mummies (stage 9 boss, recorded on the NES): two, sharing the HUD's bar
 MUMMY_HP        equ 32                  ; each (the bar shows both: 64)
-MUMMY_DAMAGE    equ 2                   ; a whip hit (NES: 1-3)
-MUMMY_TURN      equ 64                  ; it faces Simon this often
+MUMMY_FREEZE    equ 8                   ; frames a hit stops a mummy
 FISH_MAX        equ 2                   ; fishmen about at once
 FISH_DELAY      equ 32                  ; frames before the next one jumps out
 FISH_AWAY       equ 48                  ; not right under Simon
@@ -261,7 +253,8 @@ SPRITE_HIDE_Y   equ 212                 ; parks a sprite below the visible area
 WHIP_P2         equ 6                   ; frames 1-5 wind-up
 WHIP_P3         equ 13                  ; frames 6-12 swing
 WHIP_P4         equ 22                  ; frames 13-21 strike (hits)
-WHIP_END        equ 24                  ; frames 22-23 recovery
+WHIP_END        equ 24
+WHIP_HIT_T      equ 17                  ; the one strike frame that hits (NES $E40B)                  ; frames 22-23 recovery
 ; Whip hit box while striking, facing right, relative to the player box
 WHIP_HIT_X1     equ 20
 WHIP_HIT_X2     equ 43

@@ -278,7 +278,9 @@ def candles(rom, stage, section, level_px):
             cx, cy = (chunk - 1) * 64 + rom.fixed(p + 1), rom.fixed(p + 2)
             if 8 <= cx < level_px - 8:
                 tall = k in (KIND_SKEL, KIND_PILLAR)
-                out.append((cx - 8, cy - (64 if tall else 57), ITEM_NONE, k))
+                # (a ghost: "item" 1 = record $8D, out at the right edge)
+                item = (1 if kind & 0x80 else 0) if k == KIND_GHOST else ITEM_NONE
+                out.append((cx - 8, cy - (64 if tall else 57), item, k))
             continue
         if kind == ENEMY_MUMMY:
             # 16x48: sprite top = NES y - 23 (as the engine's y: - 73)

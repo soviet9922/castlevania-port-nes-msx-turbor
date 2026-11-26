@@ -813,6 +813,10 @@ proc zombie_watch {{}} {{
             if {{[peek $b] == 8}} {{ set ::fish_seen 1 }}
             if {{[peek $b] < 6 || [peek $b] > 8}} continue
             set d [expr {{[peek [expr {{$b+1}}]] + 256*[peek [expr {{$b+2}}]] - $px}}]
+            # the whip hits on one frame, 17 frames into the swing (NES): a
+            # running panther (2 px a frame) is struck at ~34 px nearer
+            if {{[peek $b] == 6 && $d >= 14 && $d <= 80}} {{ poke {fa} 0; keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
+            if {{[peek $b] == 6 && $d <= -14 && $d >= -80}} {{ poke {fa} 1; keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
             if {{$d >= 14 && $d <= 36}} {{ poke {fa} 0; keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
             if {{$d <= -14 && $d >= -50}} {{ poke {fa} 1; keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
         }}
@@ -1054,7 +1058,9 @@ def run():
     # expected whip (NES timing): wind-up 5, swing 7, strike 9 (hits), recovery 2
     poses = [p for p, _ in whip_seq]
     start = next((i for i, p in enumerate(poses) if p >= 4), None)
-    expected_whip = [(4, 0)] * 5 + [(5, 0)] * 7 + [(6, 1)] * 9 + [(7, 0)] * 2 + [(0, 0)]
+    # strike: 9 frames; the whip hits on one of them, the 5th (NES $E40B)
+    expected_whip = ([(4, 0)] * 5 + [(5, 0)] * 7 + [(6, 0)] * 4 + [(6, 1)] + [(6, 0)] * 4
+                     + [(7, 0)] * 2 + [(0, 0)])
     actual_whip = whip_seq[start:start + len(expected_whip)] if start is not None else []
     def frame_bytes(area, name):
         """an area's sprite list for a frame (from its frame table)"""
@@ -1091,11 +1097,10 @@ def run():
         ("player lands again", land["on_ground"] == 1
          and land["py"] == walk["py"]),
         ("jump follows the jump table frame by frame", actual_arc == expected_arc),
-        ("whip runs wind-up 5 / swing 7 / strike 9 / recovery 2 frames",
+        ("whip runs wind-up 5 / swing 7 / strike 9 (hits on 1) / recovery 2 frames",
          actual_whip == expected_whip),
         ("whip hit box reaches 28 px in front (facing left)",
-         strike["whip_active"] == 1
-         and strike["whip_x1"] == strike["px"] - 28 and strike["whip_x2"] == strike["px"] - 5),
+         strike["whip_x1"] == strike["px"] - 28 and strike["whip_x2"] == strike["px"] - 5),
         # NTSC VBLANK is 70 lines of 63.7 us; the HUD split follows soon after
         (f"VBLANK work fits in the vertical blank ({vblank_us} us of 4450)",
          vblank_us < 4450),

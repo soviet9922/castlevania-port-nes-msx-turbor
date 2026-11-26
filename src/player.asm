@@ -341,8 +341,14 @@ simon_hurt:
         ld a,(hurt_state)
         or a
         ret nz
+        ld a,(area_hdr+AH_STAGE)        ; NES $E74A: 8 in stages 1-6,
+        cp 7                            ; 12 from stage 7
+        ld c,ZOMBIE_DAMAGE
+        jr c,.dmg
+        ld c,DAMAGE_LATE
+.dmg:
         ld a,(hp)
-        sub ZOMBIE_DAMAGE
+        sub c
         jr c,.dead
         jr z,.dead
         ld (hp),a
@@ -805,8 +811,12 @@ player_animate:
 
 ; Hit box of the extended whip in world coordinates (mirrored when facing left).
 whip_hitbox:
+        ld a,c                          ; the NES tests the whip on one frame
+        cp WHIP_HIT_T                   ; of the strike only: one hit a swing
+        jr nz,.box
         ld a,1
         ld (whip_active),a
+.box:
         ld hl,(px)
         ld a,(facing)
         or a

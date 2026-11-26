@@ -166,7 +166,18 @@ dbg_time        equ dbg_hp+1            ; 1  infinite time
 dbg_music       equ dbg_time+1          ; 1  sound test: music number (SND_)
 dbg_sfx         equ dbg_music+1         ; 1  ... effect number
 dbg_stick       equ dbg_sfx+1           ; 1  stick last frame (one step a press)
-RAM_END         equ dbg_stick+1
+hit_src         equ dbg_stick+1         ; 1  weapon_hits: what hit (0 whip, else sub_kind)
+medusa_on       equ hit_src+1           ; 1  bit 0: a head spawner near now, bit 1: last frame
+med_wake        equ medusa_on+1         ; 1  Medusa: frames until she starts (0: asleep / awake)
+med_idx         equ med_wake+1          ; 1  ... her next flight length (index)
+med_vy          equ med_idx+1           ; 2  ... y speed (8.8, + down in the wave)
+med_yf          equ med_vy+2            ; 1  ... y fraction
+med_frz         equ med_yf+1            ; 1  ... frames frozen by a hit
+rng             equ med_frz+1           ; 1  random byte (as the NES's $6F, a step a frame)
+drop_idx        equ rng+1               ; 1  enemies' sub-weapon drops: next of the stage's 4
+obj_ext         equ drop_idx+1          ; 4*OBJ_MAX  per slot: x fraction, y fraction, speed (2)
+spawner_sx      equ obj_ext+4*OBJ_MAX   ; 2  the active spawner's screen x
+RAM_END         equ spawner_sx+2
         ASSERT RAM_END < 0xF380
         ASSERT RAM_END <= RAMCODE
 RAMCODE         equ 0xD000              ; code copied from ROM (src/ramcode.asm)

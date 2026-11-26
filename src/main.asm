@@ -119,6 +119,7 @@ vblank_done:                            ; (tests measure VBLANK work up to here)
         call player_update
         call check_area_exit
         call objects_spawn
+        call rng_step
         call enemies_update
         call crushers_tick
         call objects_update

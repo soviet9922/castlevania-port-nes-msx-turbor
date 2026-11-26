@@ -350,15 +350,18 @@ spawn_candle:
 .knight:
         ld (ix+0),OBJ_KNIGHT
         ld (ix+7),KIND_BRAZIER          ; 16x32 box
-        ld (ix+5),-1
-        ld a,(frame_count)              ; when it next faces Simon
-        and 63
-        add a,KNIGHT_TURN
-        ld (ix+10),a
+        xor a
+        ld (ix+4),a                     ; x fraction
+        ld (ix+9),a                     ; damage taken
+        ld (ix+10),a                    ; (first turn after 256 frames)
+        ld (ix+11),a                    ; state 0, not frozen
+        call knight_face                ; it starts facing Simon
         jp knight_frame
 .medusa:
         ld (ix+0),OBJ_MEDUSA
         ld (ix+6),OBJF_MEDUSA
+        xor a
+        ld (med_wake),a
         jr .boss_common
 .hbat:
         ld (ix+0),OBJ_HBAT
@@ -1215,6 +1218,11 @@ enemies_update:
         ld a,(freeze_t)                 ; stopwatch: no new enemies either
         or a
         ret nz
+        ld hl,medusa_on                 ; a Medusa head spawner near last frame?
+        ld a,(hl)
+        add a,a
+        and 2
+        ld (hl),a
         ld a,(enemies_off)
         and 1
         ret nz
@@ -1240,6 +1248,7 @@ enemies_update:
         ld de,(cam_x)
         or a
         sbc hl,de
+        ld (spawner_sx),hl              ; (its screen x)
         ld de,SPAWNER_LEFT
         add hl,de
         bit 7,h
@@ -1254,6 +1263,19 @@ enemies_update:
         djnz .lp
         ret
 .active:
+        ld a,(spawner_type)             ; a Medusa head spawner runs only on
+        cp ENEMY_MEDUSA                 ; the screen (NES: x 8..$F8)
+        jr nz,.run
+        ld hl,(spawner_sx)
+        ld a,h
+        or a
+        jr nz,.next
+        ld a,l
+        cp 8
+        jr c,.next
+        cp 0xF9
+        jr nc,.next
+.run:
         pop bc
         pop hl
         ld a,(spawner_type)
@@ -1423,22 +1445,26 @@ bat_update:
         ld de,16
         add hl,de
         bit 7,h
-        jr nz,.gone
+        jp nz,.gone
         ld de,256+16+1
         or a
         sbc hl,de
-        jr nc,.gone
-
+        jp nc,.gone
+.hits:
         call weapon_hits
         jr nc,.touch
-        ld a,(ix+0)                     ; (a Medusa head scores more)
+        ld a,(ix+0)                     ; (a Medusa head scores more,
+        cp OBJ_SNAKE                    ; a snake less)
+        ld a,SCORE_SNAKE
+        jr z,.score
+        ld a,(ix+0)
         cp OBJ_MHEAD
         ld a,SCORE_BAT
         jr nz,.score
         ld a,SCORE_MEDUSA
 .score:
-        call add_score
-        jr .burst
+        ld c,0
+        jp enemy_killed
 .touch:                                 ; bat x+2..x+13 vs Simon px+3..px+12
         ld a,(invuln_t)
         or a
@@ -1479,6 +1505,14 @@ bat_update:
         ret nc                          ; below him
         ld b,(ix+5)                     ; knocked the way the bat flies
         call simon_hurt
+        ld a,(ix+0)                     ; a Medusa head or a snake goes on; a
+        cp OBJ_MHEAD                    ; bat dies as if whipped (NES $E72B)
+        ret z
+        cp OBJ_SNAKE
+        ret z
+        ld a,SCORE_BAT
+        ld c,0
+        jp enemy_killed
 .burst:
         ld (ix+0),OBJ_BURST
         ld (ix+4),0
@@ -1779,12 +1813,12 @@ fish_update:
         ld de,16
         add hl,de
         bit 7,h
-        jr nz,.gone
+        jp nz,.gone
         ld de,256+16+1
         or a
         sbc hl,de
-        jr nc,.gone
-
+        jp nc,.gone
+.hits:
         call weapon_hits
         jp nc,zombie_update.touch
         ld a,SCORE_FISH
@@ -1980,7 +2014,7 @@ fireball_update:
         add a,(ix+9)
         ld (ix+3),a
         cp MT_ROWS*16
-        jr nc,.gone                     ; left the playfield
+        jp nc,.gone                     ; left the playfield
 .no_dy:
 
         ld de,(cam_x)                   ; off the screen: gone
@@ -1996,7 +2030,13 @@ fireball_update:
         jr nc,.gone
 
         call weapon_hits
-        jr c,.gone
+        jr nc,.touch
+        ld a,(ix+10)                    ; a pillar's: whipped, 100 points
+        cp 2
+        jr nz,.gone
+        ld a,SCORE_SNAKE
+        ld c,2
+        jp enemy_killed
 .touch:                                 ; ball x+4..x+11 vs Simon px+3..px+12
         ld a,(invuln_t)
         or a
@@ -2041,6 +2081,9 @@ fireball_update:
 .hit:
         ld b,(ix+5)
         call simon_hurt
+        ld a,(ix+10)                    ; a pillar's flies on (NES)
+        cp 2
+        ret z
 .gone:
         ld (ix+0),OBJ_NONE
         ret
@@ -2214,11 +2257,6 @@ boss_update:
         ld a,1
         ld (hud_dirty),a
         ld b,BOSS_DAMAGE
-        ld a,(ix+0)
-        cp OBJ_MEDUSA
-        jr nz,.damage
-        ld b,MEDUSA_DAMAGE
-.damage:
         ld a,(boss_hp)
         sub b
         jr z,.dead
@@ -2720,6 +2758,8 @@ sway_table:
 ; Carry if the whip (while it can hit) or the flying dagger hits the object at
 ; IX. A dagger that hits is spent.
 weapon_hits:
+        xor a
+        ld (hit_src),a
         ld a,(whip_active)
         or a
         jr z,.dagger
@@ -2733,8 +2773,10 @@ weapon_hits:
         ld hl,dagger_x1
         call .try
         ret nc
-        ld a,(sub_kind)                 ; the dagger is spent; the axe and the
-        cp 1                            ; holy water's fire go on
+        ld a,(sub_kind)
+        ld (hit_src),a
+        cp 1                            ; the dagger is spent; the axe and the
+                                        ; holy water's fire go on
         jr nz,.pierce
         xor a
         ld (dagger_on),a
@@ -2746,6 +2788,30 @@ weapon_hits:
         ld bc,8
         ldir
         jp whip_hits_object
+
+; A = the damage of the hit weapon_hits found, in the NES's units x 4
+; ($E5E5: the whip 6 at level 0, 8 at levels 1-2; the dagger 6, the axe 8,
+; the holy water's fire 2 a frame)
+hit_damage:
+        ld a,(hit_src)
+        or a
+        jr nz,.sub
+        ld a,(whip_level)
+        or a
+        ld a,24
+        ret z
+        ld a,32
+        ret
+.sub:
+        cp 1
+        ld a,24
+        ret z
+        ld a,(hit_src)
+        cp 2
+        ld a,32
+        ret z
+        ld a,8
+        ret
 
 ; Carry if the box at hit_x1..hit_y2 overlaps the object at IX
 whip_hits_object:
@@ -2788,6 +2854,24 @@ whip_hits_object:
         inc h
         jr .box_x
 .not_boss:
+        cp KIND_MEDUSA                  ; Medusa: 28x28 around her middle
+        jr nz,.not_medusa
+        ld de,27
+        ld bc,27*256 + 2
+        ld l,(ix+1)
+        ld h,(ix+2)
+        ld a,l
+        add a,10
+        ld l,a
+        jr nc,.box_x
+        inc h
+        jr .box_x
+.not_medusa:
+        cp KIND_MUMMY                   ; a mummy: 16x44 from its top + 2
+        jr nz,.not_mummy
+        ld bc,43*256 + 2
+        jr .box_ready
+.not_mummy:
         cp KIND_CANDLE
         jr nz,.box_ready
         ld bc,15*256 + 8
