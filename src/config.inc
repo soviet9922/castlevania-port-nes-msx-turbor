@@ -156,6 +156,9 @@ SCORE_FISH      equ 0x03
 SCORE_BOSS      equ 0x30
 SCORE_KNIGHT    equ 0x04                ; block 2, measured on the NES
 SCORE_MEDUSA    equ 0x03
+SCORE_EAGLE     equ 0x03                ; block 4 (NES $DF35)
+SCORE_DRAGON    equ 0x10
+SCORE_FRANK     equ 0x50                ; stage 12's boss: 5000
 SCORE_SNAKE     equ 0x01                ; snake, bandage, bone, fireball: 100
 
 ; Health and getting hit (measured in the NES entrance hall)
@@ -165,6 +168,7 @@ DAMAGE_LATE     equ 12                  ; an enemy's touch from stage 7 (NES $E7
 DAMAGE_LAST     equ 16                  ; ... from stage 12
 ENEMY_ZOMBIE    equ 0x01                ; spawner types (NES enemy records)
 ENEMY_BAT       equ 0x02
+ENEMY_EAGLE     equ 0x12                ; block 4: an eagle carrying a fleaman
 BAT_EVERY       equ 384                 ; frames from a bat to the next (NES $C0 ticks)
 CROUCH_TOP      equ 20
 BOSS_HP         equ 64                  ; the boss's health (the NES's $01A9)
@@ -234,6 +238,7 @@ MAX_SPRITES     equ 32                  ; hardware sprites in total
 
 ; Objects (src/objects.asm)
 OBJ_MAX         equ 8
+PARTS_MAX       equ 7                   ; drawn-only parts (the bone dragon's)
 OBJ_SIZE        equ 12
 MAX_CANDLES     equ 64                  ; per area (flag bits)
 SPRITE_HIDE_Y   equ 212                 ; parks a sprite below the visible area

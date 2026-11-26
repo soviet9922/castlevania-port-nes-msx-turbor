@@ -181,13 +181,21 @@ spawner_x       equ spawner_sx+2        ; 2  the active spawner's world x
 spawner_i       equ spawner_x+2         ; 1  its index in the area's list
 spawn_tick      equ spawner_i+1         ; SPAWNERS_MAX  per spawner: ticks (2 frames) to wait
 spawn_st        equ spawn_tick+SPAWNERS_MAX ; SPAWNERS_MAX  0 off the screen, 1 just on, 2 on
-boss_t          equ spawn_st+SPAWNERS_MAX ; 1  the bat boss: frames in its state
+spawn_cnt       equ spawn_st+SPAWNERS_MAX ; SPAWNERS_MAX  per spawner: a counter (eagles' heights)
+boss_t          equ spawn_cnt+SPAWNERS_MAX ; 1  the bat boss: frames in its state
 boss_frz        equ boss_t+1            ; 1  ... frames stopped by a hit
 boss_vx         equ boss_frz+1          ; 2  ... speed across (8.8, along its facing)
 boss_vy         equ boss_vx+2           ; 2  ... speed down (8.8, signed)
 boss_xf         equ boss_vy+2           ; 1  ... fractions
 boss_yf         equ boss_xf+1           ; 1
-RAM_END         equ boss_yf+1
+part_table      equ boss_yf+1           ; PARTS_MAX*OBJ_SIZE  drawn-only objects (as obj_table)
+drg_state       equ part_table+PARTS_MAX*OBJ_SIZE ; 1  the bone dragon's head: state
+drg_t           equ drg_state+1         ; 1  ... its timer
+drg_frz         equ drg_t+1             ; 1  ... frames frozen by a hit
+drg_dmg         equ drg_frz+1           ; 1  ... damage taken (192: dead)
+drg_parts       equ drg_dmg+1           ; 6*6  head, vertebrae 1-5: x offset, y dir,
+                                        ;      y offset (8.8), speed (8.8)
+RAM_END         equ drg_parts+36
         ASSERT RAM_END < 0xF380
         ASSERT RAM_END <= RAMCODE
 RAMCODE         equ 0xC600              ; code copied from ROM (src/ramcode.asm)

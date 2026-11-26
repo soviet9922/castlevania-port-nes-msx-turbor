@@ -52,7 +52,12 @@ OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
               "knight1_l", "knight2_l", "knight3_l", "knight1_r", "knight2_r", "knight3_r",
               "skel1_l", "skel2_l", "skel1_r", "skel2_r",
               "mummy2_l", "mummy3_l", "mummy2_r", "mummy3_r",
-              "pillar_r", "pillar_fl", "pillar_fr", "mummy_fl", "mummy_fr"]
+              "pillar_r", "pillar_fl", "pillar_fr", "mummy_fl", "mummy_fr",
+              "flea2_l", "flea2_r", "eagle1_l", "eagle2_l", "eagle1_r", "eagle2_r",
+              "rskel1_l", "rskel2_l", "rskel1_r", "rskel2_r",
+              "rpile_l", "rhalf_l", "rpile_r", "rhalf_r",
+              "dhead", "dhead2", "vert",
+              "frank1_l", "frank2_l", "frank3_l", "frank1_r", "frank2_r", "frank3_r"]
 
 # Black panther: 32x16, palette 3, art faces left (recorded in the hall).
 # Run cycle run1 -> run2 -> run3, 7 frames each; the leap shows run2.
@@ -72,6 +77,11 @@ KIND_FLEA, KIND_SKEL, KIND_PILLAR, KIND_RAVEN, KIND_GHOST = 9, 10, 11, 12, 13
 ENEMY_FLEA, ENEMY_SKEL, ENEMY_PILLAR, ENEMY_RAVEN = 0x4C, 0x50, 0x4E, 0x4F
 ENEMY_GHOST = 0x0D              # (and $8D) outside stage 6, where they are crushers
 KIND_MUMMY = 14                 # stage 9's boss: two mummies (record $5A, object $1A)
+KIND_RSKEL = 15                 # block 4: the red skeleton (record $53, object $13)
+KIND_DRAGON = 16                # block 4: the bone dragon (record $54, objects $14-$16)
+KIND_FRANK = 18                 # stage 12's boss (record $5C: Frank $1C and Igor $1F)
+ENEMY_FRANK = 0x5C
+ENEMY_RSKEL, ENEMY_DRAGON = 0x53, 0x54
 ENEMY_MUMMY = 0x5A
 ENEMY_MEDUSA_BOSS = 0x5B        # its enemy group record (object $1B)
 ENEMY_BOSS = 0x59               # enemy group record type: the stage 3 boss
@@ -243,12 +253,47 @@ for _n, _ts in (("mummy2", [(0xDC, 0xDE), (0xC0, 0xC2), (0xC4, 0xC6)]),
     FRAME_SPRITES[_n + "_l"] = [(t, 8 * i, 16 * r, 1, 0) for r, ts in enumerate(_ts) for i, t in enumerate(ts)]
     FRAME_SPRITES[_n + "_r"] = [(t, 8 - 8 * i, 16 * r, 1, 1) for r, ts in enumerate(_ts) for i, t in enumerate(ts)]
 
+# block 4 (from the NES's frame table, tools/nes_frames.py: (tile, dx, dy,
+# palette, flip) from the object's middle; _box() puts them in its box,
+# _mirror() turns art facing left to the right)
+def _box(sprites, ox, oy):
+    return [(t, dx + ox, dy + oy, p, f) for t, dx, dy, p, f in sprites]
+def _mirror(sprites, w):
+    return [(t, w - 8 - dx, dy, p, f ^ 1) for t, dx, dy, p, f in sprites]
+# the eagle ($3A, $3B: 32x32, palette 1); the fleaman's other picture ($82)
+for _n, _ts in (("eagle1", 0xB0), ("eagle2", 0xC0)):
+    _l = _box([(_ts + 2 * i, -16 + 8 * i, -15, 1, 0) for i in range(4)]
+              + [(_ts + 8 + 2 * i, -16 + 8 * i, 1, 1, 0) for i in range(4)], 16, 15)
+    FRAME_SPRITES[_n + "_l"], FRAME_SPRITES[_n + "_r"] = _l, _mirror(_l, 32)
+FRAME_SPRITES["flea2_l"] = _box([(0x78, -8, -7, 3, 0), (0x7A, 0, -7, 3, 0)], 8, 7)
+FRAME_SPRITES["flea2_r"] = _mirror(FRAME_SPRITES["flea2_l"], 16)
+# the red skeleton ($22, $23: the skeleton's tiles in palette 3; the bone pile
+# $BE / the half pile $BA, 16x16 at the bottom of its 16x32 box)
+for _n, _ts in (("rskel1", (0x80, 0x82, 0x84, 0x86)), ("rskel2", (0x88, 0x8A, 0x8C, 0x8E))):
+    _l = _box([(_ts[0], -8, -15, 3, 0), (_ts[1], 0, -15, 3, 0),
+               (_ts[2], -8, 1, 3, 0), (_ts[3], 0, 1, 3, 0)], 8, 15)
+    FRAME_SPRITES[_n + "_l"], FRAME_SPRITES[_n + "_r"] = _l, _mirror(_l, 16)
+for _n, _a, _b in (("rpile", 0x9E, 0x9C), ("rhalf", 0x9A, 0x98)):
+    _l = _box([(_a, -8, 1, 3, 1), (_b, 0, 1, 3, 1)], 8, 15)
+    FRAME_SPRITES[_n + "_l"], FRAME_SPRITES[_n + "_r"] = _l, _mirror(_l, 16)
+# the bone dragon: the skull ($CD, mouth open $CE) and a vertebra ($CF, 8x16)
+FRAME_SPRITES["dhead"] = _box([(0xD0, -8, -7, 1, 0), (0xD2, 0, -7, 1, 0)], 8, 7)
+FRAME_SPRITES["dhead2"] = _box([(0xD4, -8, -7, 1, 0), (0xD6, 0, -7, 1, 0)], 8, 7)
+FRAME_SPRITES["vert"] = _box([(0xD8, -4, -7, 1, 0)], 8, 7)
+# Frankenstein's monster ($8F, $90, $91: 16x48, palette 1; the mummy's shape)
+for _n, _ts in (("frank1", ((0xF2, 0xF4), (0xF6, 0xF8), (0xFA, 0xE4))),
+                ("frank2", ((0xE6, 0xE8), (0xEA, 0xEC), (0xEE, 0xF0))),
+                ("frank3", ((0xDA, 0xDC), (0xDE, 0xE0), (0xE2, 0xE4)))):
+    _l = [(t, 8 * i, 16 * r, 1, 0) for r, ts in enumerate(_ts) for i, t in enumerate(ts)]
+    FRAME_SPRITES[_n + "_l"], FRAME_SPRITES[_n + "_r"] = _l, _mirror(_l, 16)
+
 ENEMY_ZOMBIE = 0x01             # spawner types in the enemy group records
 ENEMY_BAT = 0x02
 ENEMY_FISH = 0x03
 ENEMY_MEDUSA = 0x06             # Medusa heads (type $05 spawns them only in the
                                 # second quest: $2B, bank 6 $8431)
-SPAWNER_TYPES = (ENEMY_ZOMBIE, ENEMY_BAT, ENEMY_FISH, ENEMY_MEDUSA)
+ENEMY_EAGLE = 0x12              # block 4: an eagle carrying a fleaman (object $12)
+SPAWNER_TYPES = (ENEMY_ZOMBIE, ENEMY_BAT, ENEMY_FISH, ENEMY_MEDUSA, ENEMY_EAGLE)
 
 
 def candles(rom, stage, section, level_px):
@@ -317,6 +362,21 @@ def candles(rom, stage, section, level_px):
                 item = (1 if kind & 0x80 else 0) if k == KIND_GHOST else ITEM_NONE
                 out.append((cx - 8, cy - (64 if tall else 57), item, k))
             continue
+        if kind in (ENEMY_RSKEL, ENEMY_DRAGON):
+            # red skeleton: 16x32 box (top = NES y - 64); the dragon: its root
+            # vertebra's 16x16 box (middle = the record)
+            cx, cy = (chunk - 1) * 64 + rom.fixed(p + 1), rom.fixed(p + 2)
+            if 8 <= cx < level_px - 8:
+                if kind == ENEMY_RSKEL:
+                    out.append((cx - 8, cy - 64, ITEM_NONE, KIND_RSKEL))
+                else:
+                    out.append((cx - 8, cy - 56, ITEM_NONE, KIND_DRAGON))
+            continue
+        if kind == ENEMY_FRANK:
+            # 16x48 as the mummy: sprite top = NES y - 23 (the engine's: - 73)
+            cx, cy = (chunk - 1) * 64 + rom.fixed(p + 1), rom.fixed(p + 2)
+            out.append((cx - 8, cy - 73, ITEM_NONE, KIND_FRANK))
+            continue
         if kind == ENEMY_MUMMY:
             # 16x48: sprite top = NES y - 23 (as the engine's y: - 73)
             cx, cy = (chunk - 1) * 64 + rom.fixed(p + 1), rom.fixed(p + 2)
@@ -357,6 +417,11 @@ ITEM_FRAMES = {ITEM_WHIPUP: "whipup", ITEM_HEART: "heart",
 # Frames to fold into another one when an area is over the pattern budget,
 # least visible loss first.
 FOLDS = [  # (the NES frames added last go first)
+         ("frank3_l", "frank1_l"), ("frank3_r", "frank1_r"),
+         ("flea2_l", "flea_l"), ("flea2_r", "flea_r"),
+         ("rhalf_l", "rpile_l"), ("rhalf_r", "rpile_r"),
+         ("rskel2_l", "rskel1_l"), ("rskel2_r", "rskel1_r"),
+         ("eagle2_l", "eagle1_l"), ("eagle2_r", "eagle1_r"),
          ("pillar_fl", "pillar"), ("pillar_fr", "pillar_r"),
          ("mummy_fl", "mummy_l"), ("mummy_fr", "mummy_r"),
          ("knight3_l", "knight1_l"), ("knight3_r", "knight1_r"),
@@ -397,7 +462,14 @@ def needed_frames(candle_list, spawners, carried=()):
         elif kind == KIND_MUMMY:
             need |= {n for n in OBJ_FRAMES if n.startswith("mummy")} | {"bandage1", "bandage2", "orb"}
         elif kind == KIND_FLEA:
-            need |= {"flea_l", "flea_r"}
+            need |= {"flea_l", "flea_r", "flea2_l", "flea2_r"}
+        elif kind == KIND_RSKEL:
+            need |= {n for n in OBJ_FRAMES if n[:5] in ("rskel", "rpile", "rhalf")}
+        elif kind == KIND_FRANK:
+            need |= {n for n in OBJ_FRAMES if n.startswith("frank")}
+            need |= {"flea_l", "flea_r", "flea2_l", "flea2_r", "fireball", "orb"}
+        elif kind == KIND_DRAGON:
+            need |= {"dhead", "dhead2", "vert", "fireball"}
         elif kind == KIND_GHOST:
             need |= {"ghost_l", "ghost_r"}
         elif kind == KIND_SKEL:
@@ -425,6 +497,9 @@ def needed_frames(candle_list, spawners, carried=()):
         need |= {n for n in OBJ_FRAMES if n.startswith("fish")} | {"fireball"}
     if ENEMY_MEDUSA in kinds:
         need |= {n for n in OBJ_FRAMES if n.startswith("mhead")}
+    if ENEMY_EAGLE in kinds:
+        need |= {n for n in OBJ_FRAMES if n.startswith("eagle")}
+        need |= {"flea_l", "flea_r", "flea2_l", "flea2_r"}
     return need
 
 

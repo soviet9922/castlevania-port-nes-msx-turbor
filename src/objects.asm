@@ -51,6 +51,11 @@ OBJ_RAVEN       equ 24                  ; raven
 OBJ_GHOST       equ 25                  ; ghost
 OBJ_MUMMY       equ 26                  ; stage 9 boss: a mummy
 OBJ_BANDAGE     equ 27                  ; its bandages
+OBJ_EAGLE       equ 28                  ; block 4: an eagle carrying a fleaman
+OBJ_RSKEL       equ 29                  ; the red skeleton
+OBJ_DRAGON      equ 30                  ; the bone dragon (its root; the rest: parts)
+OBJ_FRANK       equ 31                  ; stage 12's boss: Frankenstein's monster
+OBJ_IGOR        equ 32                  ; ... and Igor
 
 KIND_BRAZIER    equ 0
 KIND_CANDLE     equ 1
@@ -67,6 +72,10 @@ KIND_PILLAR     equ 11
 KIND_RAVEN      equ 12
 KIND_GHOST      equ 13
 KIND_MUMMY      equ 14
+KIND_RSKEL      equ 15                  ; candle list only: a red skeleton
+KIND_DRAGON     equ 16                  ; candle list only: a bone dragon
+KIND_EAGLE      equ 17                  ; 28x28 box at +2, +2
+KIND_FRANK      equ 18                  ; candle list only: Frankenstein (and Igor)
 
 ; object frame numbers (OBJ_FRAMES in tools/convert_objects.py)
 OBJF_BRAZIER    equ 0
@@ -110,6 +119,12 @@ OBJF_SKEL       equ 94                  ; two pictures facing left, then right
 OBJF_MUMMY2     equ 98                  ; pictures 2-3 facing left, then right
 OBJF_PILLAR_R   equ 102                 ; facing right; flashing left, right
 OBJF_MUMMY_F    equ 105                 ; flickering: left, right
+OBJF_FLEA2      equ 107                 ; the fleaman on the floor: left, right
+OBJF_EAGLE      equ 109                 ; wings 1-2 left, then right
+OBJF_RSKEL      equ 113                 ; walking 1-2 left, then right
+OBJF_RPILE      equ 117                 ; the pile, half pile: left, then right
+OBJF_DHEAD      equ 121                 ; the bone dragon: skull, open, vertebra
+OBJF_FRANK      equ 124                 ; his walk 1-3 left, then right
 
 ITEM_WHIPUP     equ 0
 ITEM_HEART      equ 1
@@ -132,6 +147,11 @@ objects_reset:
         ld bc,OBJ_MAX*OBJ_SIZE-1
         ld (hl),0
         ldir
+        ld hl,part_table
+        ld de,part_table+1
+        ld bc,PARTS_MAX*OBJ_SIZE-1
+        ld (hl),0
+        ldir
         ld hl,candle_dead
         ld de,candle_dead+1
         ld bc,MAX_CANDLES/4-1           ; candle_dead + candle_live
@@ -139,9 +159,9 @@ objects_reset:
         ldir
         ld hl,0xFFFF
         ld (spawn_last),hl
-        ld hl,spawn_tick                ; spawners: timers 0, off the screen
-        ld de,spawn_tick+1
-        ld bc,2*SPAWNERS_MAX-1
+        ld hl,spawn_tick                ; spawners: timers 0, off the screen,
+        ld de,spawn_tick+1              ; counters 0
+        ld bc,3*SPAWNERS_MAX-1
         ld (hl),0
         ldir
         ret
@@ -298,6 +318,8 @@ spawn_candle:
         cp KIND_MEDUSA                  ; (not the bosses)
         jr z,.allowed
         cp KIND_MUMMY
+        jr z,.allowed
+        cp KIND_FRANK
         jr z,.allowed
 .placed:
         ld a,(enemies_off)
@@ -1314,6 +1336,9 @@ enemies_update:
         ld a,(spawner_type)
         cp ENEMY_ZOMBIE
         call z,zombie_spawner
+        ld a,(spawner_type)
+        cp ENEMY_EAGLE
+        call z,eagle_spawner
         jr .next
 .off:
         ld (hl),0                       ; off the screen (its timer is kept)
@@ -3290,6 +3315,16 @@ whip_hits_object:
         inc h
         jr .box_x
 .not_medusa:
+        cp KIND_EAGLE                   ; the eagle: 28x28 at +2, +2
+        jr nz,.not_eagle
+        ld de,27
+        ld bc,27*256 + 2
+        ld l,(ix+1)
+        ld h,(ix+2)
+        inc hl
+        inc hl
+        jr .box_x
+.not_eagle:
         cp KIND_MUMMY                   ; a mummy: 16x44 from its top + 2
         jr nz,.not_mummy
         ld bc,43*256 + 2
@@ -3374,9 +3409,37 @@ objects_draw:
         ld b,OBJ_MAX
 .obj:
         push bc
+        call draw_obj
+.next_obj:
+        ld de,OBJ_SIZE
+        add ix,de
+        push ix                         ; wrap around the table
+        pop hl
+        ld de,obj_table+OBJ_MAX*OBJ_SIZE
+        or a
+        sbc hl,de
+        jr c,.no_wrap
+        ld ix,obj_table
+.no_wrap:
+        pop bc
+        dec b
+        jp nz,.obj
+        ld ix,part_table                ; then the parts of big enemies (the
+        ld b,PARTS_MAX                  ; bone dragon's neck): drawn only
+.part:
+        push bc
+        call draw_obj
+        ld de,OBJ_SIZE
+        add ix,de
+        pop bc
+        djnz .part
+        ld iy,(spr_sat_ptr)
+        ret
+
+draw_obj:
         ld a,(ix+0)
         or a
-        jp z,.next_obj
+        ret z
         cp OBJ_GHOST                    ; (a ghost not out yet: nothing)
         jr z,.hidden
         cp OBJ_ORB                      ; (an orb not shown yet / flashing)
@@ -3386,7 +3449,7 @@ objects_draw:
 .hidden:
         ld a,(ix+9)
         or a
-        jp z,.next_obj
+        ret z
 .drawn:
         ld l,(ix+1)                     ; screen x of the box
         ld h,(ix+2)
@@ -3397,10 +3460,10 @@ objects_draw:
         or a
         jr z,.on_screen
         inc a
-        jp nz,.next_obj
+        ret nz
         ld a,l
         cp 0xE0
-        jp c,.next_obj
+        ret c
 .on_screen:
         ld (spr_bx),hl
         ld a,(ix+3)
@@ -3473,21 +3536,6 @@ objects_draw:
 .frame_done:
         ld (spr_sat_ptr),hl
         pop ix
-.next_obj:
-        ld de,OBJ_SIZE
-        add ix,de
-        push ix                         ; wrap around the table
-        pop hl
-        ld de,obj_table+OBJ_MAX*OBJ_SIZE
-        or a
-        sbc hl,de
-        jr c,.no_wrap
-        ld ix,obj_table
-.no_wrap:
-        pop bc
-        dec b
-        jp nz,.obj
-        ld iy,(spr_sat_ptr)
         ret
 
 ; A = object frame -> IX = frame data (the area's object frame table)

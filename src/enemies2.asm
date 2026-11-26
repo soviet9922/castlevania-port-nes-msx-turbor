@@ -824,8 +824,13 @@ enemies_burst:
         jr c,.next
         cp OBJ_MEDUSA
         jr z,.next
-        cp OBJ_BANDAGE+1
+        cp OBJ_DRAGON+1
         jr nc,.next
+        cp OBJ_DRAGON
+        jr nz,.burst
+        push bc
+        call dragon_parts_clear         ; (and its parts)
+        pop bc
 .burst:
         ld (ix+0),OBJ_BURST
         ld (ix+4),0
@@ -1049,6 +1054,12 @@ medusa_vram:
 ; ---------------------------------------------------------------------------
 ; IX = new object, A = kind (spawn_candle)
 block3_spawn:
+        cp KIND_FRANK
+        jp z,frank_spawn
+        cp KIND_RSKEL
+        jp z,rskel_spawn
+        cp KIND_DRAGON
+        jp z,dragon_spawn
         sub KIND_FLEA
         add a,OBJ_FLEA
         cp OBJ_BONE                     ; (KIND_PILLAR.. -> OBJ_PILLAR..)
@@ -1086,7 +1097,17 @@ block3_spawn:
         jp block3_frame
 
 block3_update:
-        ld a,(ix+0)                     ; the mummies and their bandages
+        ld a,(ix+0)                     ; block 4's
+        cp OBJ_EAGLE
+        jp z,eagle_update
+        cp OBJ_RSKEL
+        jp z,rskel_update
+        cp OBJ_DRAGON
+        jp z,dragon_update
+        cp OBJ_FRANK
+        jp z,frank_update
+        cp OBJ_IGOR
+        jp z,igor_update                ; the mummies and their bandages
         cp OBJ_MUMMY
         jp z,mummy_update
         cp OBJ_BANDAGE
@@ -1207,6 +1228,8 @@ flea_update:
         or a
         jp nz,.hits
         ld a,(ix+9)
+        cp 5
+        jp z,.ride
         or a
         jr nz,.s1
         call b3_offscreen               ; it starts when it is on the screen
@@ -1300,6 +1323,47 @@ flea_update:
 .cull:
         call b3_offscreen
         jp c,b3_gone_dead
+        jr .hits
+.ride:                                  ; 5: carried by an eagle (NES $EFD6)
+        call obj_ext_of
+        ld e,(hl)
+        inc hl
+        ld d,(hl)                       ; DE = its eagle
+        ld a,(de)
+        cp OBJ_EAGLE
+        jr nz,.drop                     ; the eagle is gone: it drops
+        ld a,(frame_count)              ; every 8 frames: Simon within 64 px
+        and 7                           ; across: it drops
+        jr nz,.carry
+        ld hl,(px)
+        push de
+        ld e,(ix+1)
+        ld d,(ix+2)
+        or a
+        sbc hl,de
+        pop de
+        call hl_abs
+        ld a,h
+        or a
+        jr nz,.carry
+        ld a,l
+        cp 64
+        jr c,.drop
+.carry:
+        ex de,hl                        ; x = the eagle's middle - 8
+        inc hl
+        ld e,(hl)
+        inc hl
+        ld d,(hl)
+        ld hl,8
+        add hl,de
+        ld (ix+1),l
+        ld (ix+2),h
+        jr .hits
+.drop:
+        ld (ix+9),1
+        ld (ix+10),0
+        ld (ix+11),0
 .hits:
         call block3_frame
         call weapon_hits
@@ -2263,7 +2327,30 @@ block3_frame:
         jp z,skel_frame
         ld c,OBJF_FLEA
         cp OBJ_FLEA
+        jr nz,.not_flea
+        ld a,(ix+9)                     ; the fleaman: $83 in the air, $82 on
+        cp 2                            ; the floor; both in turn, 9 frames
+        jr z,.floor                     ; each, waiting and riding
+        or a
+        jr z,.turns
+        cp 5
+        jr nz,.lr
+.turns:
+        ld a,(frame_count)
+        ld b,0
+.d9:
+        sub 9
+        jr c,.d9e
+        inc b
+        jr .d9
+.d9e:
+        bit 0,b
         jr z,.lr
+.floor:
+        ld c,OBJF_FLEA2
+        jr .lr
+.not_flea:
+        ld a,(ix+0)
         ld c,OBJF_GHOST
         cp OBJ_GHOST
         jr z,.lr
@@ -2549,6 +2636,1481 @@ block3_scores:
 
 obj_gone:
         ld (ix+0),OBJ_NONE
+        ret
+
+; ---------------------------------------------------------------------------
+; Block 4's enemies, from the NES code
+; ---------------------------------------------------------------------------
+
+; --- the eagle (NES spawner $F4DE, object $12 $ECFE): while its record is
+; on the screen, one every 112 frames (at most 3), from screen x 18 flying
+; right or 238 flying left (at random), at the record's height + 32, 16, 48,
+; 0 in turn, carrying a fleaman 16 px below it. It flies 1 3/4 px a frame
+; for 47 frames, hovers 17, again; its height never changes. One hit (300). ---
+; HL = its state, DE = its timer, C = the record's y (an eagle's top)
+eagle_spawner:
+        ld a,(de)
+        or a
+        ret nz
+        push de
+        push bc
+        ld a,OBJ_EAGLE                  ; (NES slots 9-11 for the eagles,
+        call count_type                 ; 4-6 for the fleamen)
+        cp 3
+        jr nc,.no
+        ld a,OBJ_FLEA
+        call count_type
+        cp 3
+        jr nc,.no
+        call obj_free_slot
+        jr c,.no
+        ld (ix+0),OBJ_EAGLE             ; (claimed: the next free slot is
+        ld (tmp_w),ix                   ; the fleaman's)
+        call obj_free_slot
+        jr nc,.both
+        ld ix,(tmp_w)
+        ld (ix+0),OBJ_NONE
+.no:
+        pop bc
+        pop de
+        ret
+.both:
+        ld (ix+0),OBJ_FLEA
+        push ix
+        pop iy                          ; IY = the fleaman
+        ld ix,(tmp_w)                   ; IX = the eagle
+        pop bc
+        pop de
+        ld a,56                         ; 112 frames to the next
+        ld (de),a
+        ld hl,spawn_cnt                 ; its height: + 32, 16, 48, 0 in turn
+        ld a,(spawner_i)
+        and SPAWNERS_MAX-1
+        ld e,a
+        ld d,0
+        add hl,de
+        inc (hl)
+        ld a,(hl)
+        and 3
+        ld hl,eagle_heights
+        call table_a
+        add a,c
+        ld (ix+3),a
+        add a,24                        ; the fleaman's top: 16 px below the
+        ld (iy+3),a                     ; eagle's middle, - 8
+        ld hl,(cam_x)
+        ld a,(rng)
+        and 1
+        ld de,2                         ; screen x 18 (its middle), flying
+        ld (ix+5),1                     ; right
+        jr nz,.side
+        ld de,222                       ; or 238, flying left
+        ld (ix+5),-1
+.side:
+        add hl,de
+        ld (ix+1),l
+        ld (ix+2),h
+        ld de,8
+        add hl,de
+        ld (iy+1),l
+        ld (iy+2),h
+        ld a,(ix+5)
+        ld (iy+5),a
+        xor a
+        ld (ix+4),a
+        ld (ix+9),a
+        ld (ix+11),a
+        ld (ix+7),KIND_EAGLE
+        ld (ix+8),0xFF
+        ld (iy+4),a
+        ld (iy+10),a
+        ld (iy+11),a
+        ld (iy+9),5                     ; riding
+        ld (iy+7),KIND_BAT
+        ld (iy+8),0xFF
+        push ix                         ; the fleaman's eagle (obj_ext)
+        push iy
+        pop ix
+        call obj_hits_of
+        ld (hl),0
+        call obj_ext_of
+        pop de
+        ld (hl),e
+        inc hl
+        ld (hl),d
+        call block3_frame
+        push de
+        pop ix
+        jp eagle_frame
+eagle_heights:  db 0, 32, 16, 48
+
+eagle_update:
+        ld a,(freeze_t)
+        or a
+        jr nz,.hits
+        ld a,(ix+9)
+        or a
+        jr nz,.s1
+        ld (ix+4),48                    ; (its first frame: no move)
+        ld (ix+9),1
+        jr .hits
+.s1:
+        dec (ix+4)
+        cp 1
+        jr nz,.hover
+        ld a,(ix+4)                     ; flying
+        or a
+        jr nz,.move
+        ld (ix+4),16                    ; 47 frames flying, then hovering
+        ld (ix+9),2
+        jr .hits
+.move:
+        ld a,0xC0                       ; 1 3/4 px a frame
+        call step_x_frac
+        ld l,(ix+1)                     ; its middle leaves screen x 16..240:
+        ld h,(ix+2)                     ; gone
+        ld de,(cam_x)
+        or a
+        sbc hl,de
+        ld a,h
+        or a
+        jp nz,obj_gone
+        ld a,l
+        cp 225
+        jp nc,obj_gone
+        jr .hits
+.hover:
+        ld a,(ix+4)
+        or a
+        jr nz,.hits
+        ld (ix+4),48
+        ld (ix+9),1
+.hits:
+        call eagle_frame
+        call weapon_hits
+        jr nc,.touch
+        ld a,SCORE_EAGLE
+        ld c,1                          ; (a big heart)
+        jp enemy_killed
+.touch:
+        ld a,16
+        ld bc,18*256+26
+        jp b3_touch
+
+; wings: 17 frames each (16 here)
+eagle_frame:
+        ld a,(frame_count)
+        rrca
+        rrca
+        rrca
+        rrca
+        and 1
+        bit 7,(ix+5)
+        jr nz,.l
+        add a,2
+.l:
+        add a,OBJF_EAGLE
+        ld (ix+6),a
+        ret
+
+; --- the red skeleton (NES 6:$8A16, object $13 5:$91A4): a bone pile that
+; gets up (60 frames, then 50), walks in legs of 48 frames at 5/8 px with 16
+; still between them, facing Simon before the first leg and then every 4, 3,
+; 5 or 4 legs; it turns at walls 12 px ahead and falls off floor ends. A hit
+; (400 points, every time) collapses it: 32 frames, 84 lying, it gets up
+; again. It never dies.
+;   +4 timer  +5 facing  +9 state (0 lying, 1 getting up, 2 walking,
+;   3 pausing, 4 collapsed, 5 falling)  +10 legs to the next turn
+;   +11 collapse frames  obj_ext: x fraction, y fraction, fall speed (1/16)
+rskel_spawn:
+        ld (ix+0),OBJ_RSKEL
+        ld (ix+7),KIND_BRAZIER          ; 16x32 box
+        ld (ix+4),60
+        ld (ix+9),0
+        ld (ix+10),1
+        ld (ix+11),0
+        call obj_ext_of
+        xor a
+        ld (hl),a
+        inc hl
+        ld (hl),a
+        inc hl
+        ld (hl),a
+        ld (ix+5),-1
+        jp rskel_frame
+
+rskel_update:
+        ld a,(freeze_t)                 ; the stopwatch: only a collapse
+        or a                            ; goes on
+        jr z,.go
+        ld a,(ix+9)
+        cp 4
+        jp nz,.hits
+.go:
+        ld a,(ix+9)
+        or a
+        jr nz,.s1
+        dec (ix+4)                      ; lying
+        jp nz,.cull
+        ld (ix+9),1
+        ld (ix+4),50
+        jp .cull
+.s1:
+        dec a
+        jr nz,.s2
+        dec (ix+4)                      ; getting up
+        jp nz,.cull
+.walk:
+        dec (ix+10)                     ; a leg: face Simon every 4/3/5/4
+        jr nz,.leg
+        call knight_face
+        call rng_and3
+        ld hl,rskel_legs
+        call table_a
+        ld (ix+10),a
+.leg:
+        ld (ix+4),48
+        ld (ix+9),2
+        jp .cull
+.s2:
+        dec a
+        jr nz,.s3
+        dec (ix+4)                      ; walking
+        jr nz,.step
+        ld (ix+4),16
+        ld (ix+9),3
+        jp .cull
+.step:
+        call obj_ext_of                 ; 5/8 px a frame
+        ld a,(hl)
+        add a,0xA0
+        ld (hl),a
+        jr nc,.probe
+        ld a,(ix+5)
+        call move_dir_a
+.probe:
+        ld de,8+12                      ; a wall 12 px ahead at its middle
+        bit 7,(ix+5)
+        jr z,.wr
+        ld de,8-12
+.wr:
+        ld a,16
+        call knight_probe
+        jr nc,.no_wall
+        ld a,(ix+5)
+        neg
+        ld (ix+5),a
+        jp .cull
+.no_wall:
+        call b3_offscreen               ; (on the screen) floor under it?
+        jp c,.cull
+        ld de,8
+        ld a,32
+        call knight_probe
+        jp c,.cull
+        ld (ix+9),5                     ; no: it falls
+        call obj_ext_of
+        inc hl
+        ld (hl),0
+        inc hl
+        ld (hl),0
+        jp .cull
+.s3:
+        dec a
+        jr nz,.s4
+        dec (ix+4)                      ; pausing
+        jp nz,.cull
+        jp .walk
+.s4:
+        dec a
+        jr nz,.s5
+        dec (ix+11)                     ; collapsed
+        jp nz,.cull
+        ld (ix+9),0
+        ld (ix+4),84
+        jp .cull
+.s5:
+        call obj_ext_of                 ; falling: 1/8 px faster a frame
+        inc hl
+        push hl
+        inc hl
+        ld a,(hl)
+        add a,2
+        ld (hl),a
+        pop hl
+        add a,(hl)
+        ld c,a
+        and 15
+        ld (hl),a
+        ld a,c
+        rrca
+        rrca
+        rrca
+        rrca
+        and 15
+        add a,(ix+3)
+        cp MT_ROWS*16
+        jp nc,b3_gone_dead
+        ld (ix+3),a
+        ld de,8
+        ld a,32
+        call knight_probe
+        jr nc,.cull
+        ld a,(ix+3)                     ; landed
+        add a,16
+        and 0xF8
+        sub 16
+        ld (ix+3),a
+        ld (ix+9),2
+.cull:
+        ld l,(ix+1)                     ; gone 64 px beyond the screen (and
+        ld h,(ix+2)                     ; made again when its place is near)
+        ld de,(cam_x)
+        or a
+        sbc hl,de
+        ld de,64
+        add hl,de
+        bit 7,h
+        jp nz,obj_release
+        ld de,240+128+1
+        or a
+        sbc hl,de
+        jp nc,obj_release
+.hits:
+        call rskel_frame
+        ld a,(ix+9)                     ; hittable walking, pausing, falling
+        cp 2
+        ret c
+        cp 4
+        ret z
+        call b3_offscreen
+        ret c
+        call weapon_hits
+        jr nc,.touch
+        ld a,SCORE_KNIGHT               ; 400 points, every hit
+        call add_score
+        ld a,SND_HIT
+        call sfx_play
+        ld (ix+9),4
+        ld (ix+11),32
+        jp rskel_frame
+.touch:
+        ld a,16
+        ld bc,10*256+26
+        jp b3_touch
+rskel_legs:     db 4, 3, 5, 4
+
+; its pictures: walking (17 frames each, held when it pauses), the pile, the
+; half pile getting up and collapsing
+rskel_frame:
+        ld a,(ix+9)
+        cp 2
+        jr z,.walk
+        cp 3
+        ret z                           ; (pausing: as it was)
+        cp 5
+        ret z
+        ld c,0                          ; C = 0 the pile, 1 the half pile
+        or a
+        jr z,.pile
+        cp 1
+        jr nz,.down
+        ld a,(ix+4)                     ; getting up: the pile 25, half 25
+        cp 25
+        jr nc,.pile
+        inc c
+        jr .pile
+.down:
+        ld a,(ix+11)                    ; collapsing: half 25, then the pile
+        cp 8
+        jr c,.pile
+        inc c
+.pile:
+        ld a,c
+        bit 7,(ix+5)
+        jr nz,.pl
+        add a,2
+.pl:
+        add a,OBJF_RPILE
+        ld (ix+6),a
+        ret
+.walk:
+        ld a,(frame_count)
+        rrca
+        rrca
+        rrca
+        rrca
+        and 1
+        bit 7,(ix+5)
+        jr nz,.wl
+        add a,2
+.wl:
+        add a,OBJF_RSKEL
+        ld (ix+6),a
+        ret
+
+; --- the bone dragon (NES 6:$8867, objects $14-$16 5:$8AAD-$8CC1): a root
+; vertebra fixed in a right-hand wall (this object), 5 vertebrae and the head
+; (drawn as parts, part_table 0-5). 8 frames after it appears the neck grows
+; out to the left (the head to 52 px, the vertebrae to 40, 32, 24, 16, 8).
+; The head moves up or down 1 3/4 px a frame: aimed at Simon's height every
+; 32 frames, turned at the end of each leg (52/36/60/28 frames) and after
+; each attack; 8 px from its neighbour it pushes it (1 3/4 px, slowing 1/8 a
+; frame), and so on down the chain. Every 32 frames, 1 time in 2: the mouth
+; opens 16 frames, it fires at Simon (if he is left of it and near its
+; height), 16 more. Only the head can be hurt: damage adds up (hit_damage),
+; 192 kills it (1000 points); a hit that doesn't freezes it 16 frames. Every
+; part hurts Simon. One dragon at a time (the NES's fixed slots 4-10).
+; drg_parts: 6 bytes each (head, vertebrae 1-5): x offset left of the root,
+; y direction (0 still, 1 up, 2 down), y offset from the next part towards
+; the root (8.8, -8..+8), its speed (8.8)
+; ---------------------------------------------------------------------------
+DP_SIZE         equ 6
+
+dragon_spawn:
+        push ix                         ; (one at a time: an old one goes)
+        pop de
+        push ix
+        ld ix,obj_table
+        ld b,OBJ_MAX
+.old:
+        ld a,(ix+0)
+        cp OBJ_DRAGON
+        jr nz,.on
+        ld a,ixl
+        cp e
+        jr z,.on
+        ld (ix+0),OBJ_NONE
+.on:
+        push de
+        ld de,OBJ_SIZE
+        add ix,de
+        pop de
+        djnz .old
+        pop ix
+        ld (ix+0),OBJ_DRAGON
+        ld (ix+7),KIND_BAT
+        ld (ix+9),0
+        ld (ix+4),8
+        ld (ix+6),OBJF_DHEAD+2
+        ld hl,drg_state
+        ld de,drg_state+1
+        ld bc,4+6*DP_SIZE-1
+        ld (hl),0
+        ldir
+        ld a,12                         ; the head starts 12 px out
+        ld (drg_parts),a
+        jp dragon_parts_clear
+
+dragon_parts_clear:
+        ld hl,part_table
+        ld de,part_table+1
+        ld bc,6*OBJ_SIZE-1
+        ld (hl),0
+        ldir
+        ret
+
+dragon_update:
+        ld l,(ix+1)                     ; 112 px beyond the screen: gone (made
+        ld h,(ix+2)                     ; again when its place is near)
+        ld de,(cam_x)
+        or a
+        sbc hl,de
+        ld de,112+8
+        add hl,de
+        bit 7,h
+        jr nz,.gone
+        ld de,256+224+1
+        or a
+        sbc hl,de
+        jr c,.here
+.gone:
+        call dragon_parts_clear
+        jp obj_release
+.here:
+        ld a,(freeze_t)
+        or a
+        jp nz,.place
+        ld a,(ix+9)
+        or a
+        jr nz,.awake
+        dec (ix+4)                      ; 8 frames, then it grows out
+        jp nz,.place
+        ld (ix+9),1
+        ld a,1
+        ld (drg_state),a
+        jp .place
+.awake:
+        ld a,(drg_frz)                  ; frozen by a hit: all of it
+        or a
+        jr z,.ai
+        dec a
+        ld (drg_frz),a
+        jp .place
+.ai:
+        ld b,5                          ; the vertebrae, root side first
+        ld hl,drg_parts+5*DP_SIZE
+.vert:
+        ld a,b                          ; its length: 48 - 8 * k
+        add a,a
+        add a,a
+        add a,a
+        neg
+        add a,48
+        cp (hl)
+        jr z,.grown
+        inc (hl)                        ; growing out
+        jr .vnext
+.grown:
+        push hl                         ; slowing: vy -= 1/8 px, not below 0
+        inc hl
+        inc hl
+        inc hl
+        inc hl
+        ld e,(hl)
+        inc hl
+        ld d,(hl)
+        ex de,hl
+        ld de,-32
+        add hl,de
+        ex de,hl
+        bit 7,d
+        jr z,.vy
+        ld de,0
+        ld (hl),d
+        dec hl
+        ld (hl),e
+        dec hl
+        dec hl
+        dec hl
+        ld (hl),0                       ; (stopped)
+        jr .vpop
+.vy:
+        ld (hl),d
+        dec hl
+        ld (hl),e
+.vpop:
+        pop hl
+        push hl
+        push bc
+        call dragon_chain
+        pop bc
+        pop hl
+.vnext:
+        ld de,-DP_SIZE
+        add hl,de
+        djnz .vert
+        call dragon_head                ; the head last
+.place:
+        call dragon_place
+        jp dragon_hits
+
+; the head's states (drg_state: 0 waiting, 1 growing, 2 a moment, 3 moving,
+; 4 mouth open before firing, 5 after)
+dragon_head:
+        ld hl,drg_t
+        ld a,(drg_state)
+        or a
+        ret z
+        dec a
+        jr nz,.s2
+        ld a,(drg_parts)                ; growing: to 52 px
+        inc a
+        ld (drg_parts),a
+        cp 52
+        ret c
+        ld (hl),8
+        ld a,2
+        ld (drg_state),a
+        ret
+.s2:
+        dec a
+        jr nz,.s3
+        dec (hl)
+        ret nz
+        ld a,2                          ; then down, 1 3/4 px a frame
+        ld (drg_parts+1),a
+        ld de,0x01C0
+        ld (drg_parts+4),de
+        ld (hl),56
+        ld a,3
+        ld (drg_state),a
+        ret
+.s3:
+        dec a
+        jr nz,.s4
+        dec (hl)
+        jr z,.new_leg
+        jr .move
+.s4:
+        dec a
+        jr nz,.s5
+        dec (hl)
+        jr nz,.move
+        call dragon_fire
+        ld (hl),16
+        ld a,5
+        ld (drg_state),a
+        jr .move
+.s5:
+        dec (hl)
+        jr nz,.move
+        ld a,3
+        ld (drg_state),a
+.new_leg:
+        call rng_and3                   ; 52/36/60/28 frames, the other way
+        ld hl,dragon_legs
+        call table_a
+        ld (drg_t),a
+        ld a,(drg_parts+1)
+        xor 3
+        ld (drg_parts+1),a
+        jr .chain
+.move:
+        ld a,(frame_count)
+        and 31
+        jr nz,.not0
+        ld a,(drg_state)                ; 1 time in 2: an attack
+        cp 3
+        jr nz,.chain
+        ld a,(rng)
+        and 1
+        jr nz,.chain
+        ld a,4
+        ld (drg_state),a
+        ld a,16
+        ld (drg_t),a
+        jr .chain
+.not0:
+        cp 8
+        jr nz,.chain
+        ld a,(py)                       ; at Simon's height: his middle py+16,
+        add a,8                         ; its middle y+8
+        ld hl,part_table+3
+        cp (hl)
+        ld a,2
+        jr nc,.yd
+        dec a
+.yd:
+        ld (drg_parts+1),a
+.chain:
+        ld hl,drg_parts
+        ld b,0
+        jp dragon_chain
+dragon_legs:    db 52, 36, 60, 28
+
+; the chain step of part B (HL = its data): its y offset moves by its speed
+; (up / down), held within -8..+8; at the limit it pushes the next part
+dragon_chain:
+        push hl
+        pop iy
+        ld a,(iy+1)
+        or a
+        ret z
+        ld e,(iy+4)
+        ld d,(iy+5)
+        ld l,(iy+2)
+        ld h,(iy+3)
+        dec a
+        jr nz,.down
+        or a
+        sbc hl,de                       ; up: the offset falls
+        jr .clamp
+.down:
+        add hl,de
+.clamp:
+        ld (iy+2),l
+        ld (iy+3),h
+        ld a,h
+        bit 7,a
+        jr nz,.neg
+        cp 8
+        ret c
+        ld (iy+3),8
+        jr .push
+.neg:
+        cp -7
+        ret nc
+        ld (iy+3),-8
+.push:
+        ld a,b                          ; (the root isn't pushed)
+        cp 5
+        ret z
+        ld a,(iy+1)
+        ld (iy+DP_SIZE+1),a
+        ld (iy+DP_SIZE+4),0xC0
+        ld (iy+DP_SIZE+5),1
+        ret
+
+; the parts' places: x = the root's - its offset, y = the next part's + its
+; y offset; into part_table
+dragon_place:
+        ld b,5
+        ld c,(ix+3)                     ; C = the next part's y (the root's)
+        ld iy,part_table+5*OBJ_SIZE
+        ld hl,drg_parts+5*DP_SIZE
+.lp:
+        push hl
+        ld a,(hl)                       ; x offset
+        inc hl
+        inc hl
+        inc hl
+        ld e,a
+        ld a,c
+        add a,(hl)                      ; + y offset
+        ld c,a
+        ld (iy+3),a
+        ld l,(ix+1)
+        ld h,(ix+2)
+        ld d,0
+        or a
+        sbc hl,de
+        ld (iy+1),l
+        ld (iy+2),h
+        ld (iy+0),OBJ_DRAGON
+        ld (iy+7),KIND_BAT
+        ld (iy+6),OBJF_DHEAD+2          ; a vertebra
+        pop hl
+        ld de,-DP_SIZE
+        add hl,de
+        ld de,-OBJ_SIZE
+        add iy,de
+        ld a,b
+        dec b
+        or a
+        jr nz,.lp
+        ld a,(drg_state)                ; the head: mouth open from 4
+        cp 4
+        ld a,OBJF_DHEAD
+        jr c,.shut
+        inc a
+.shut:
+        ld (part_table+6),a
+        ret
+
+; fire at Simon from the head, if it is on the screen, he is left of it and
+; within -39..+40 px of its height (NES $8BE4): 1 1/2 px a frame, aimed
+dragon_fire:
+        push hl
+        push ix
+        call .try
+        pop ix
+        pop hl
+        ret
+.try:
+        ld ix,part_table                ; IX = the head
+        call b3_offscreen
+        ret c
+        ld hl,(px)                      ; Simon left of it
+        ld e,(ix+1)
+        ld d,(ix+2)
+        or a
+        sbc hl,de
+        ret p
+        call hl_abs
+        ld a,h
+        or a
+        ld b,l
+        jr z,.bx
+        ld b,255
+.bx:
+        ld a,(py)                       ; his middle py+16, its y+8
+        add a,8
+        sub (ix+3)
+        ld c,0
+        jr nc,.dyp
+        neg
+        inc c
+.dyp:
+        cp 40
+        ret nc
+        ld hl,(part_table+1)
+        ld a,(part_table+3)
+        ld e,a
+        jp fire_at_simon
+
+; a fireball from a 16x16 shooter at (HL = x, E = top) at Simon's middle,
+; 1 1/2 px a frame on the long axis (NES shoot_at_simon $EC94), at most 2
+fire_at_simon:
+        push hl
+        push de
+        ld a,OBJ_FIREBALL
+        call count_type
+        pop de
+        pop hl
+        cp 2
+        ret nc
+        push hl
+        push de
+        ex de,hl                        ; dx = Simon - the shooter
+        ld hl,(px)
+        or a
+        sbc hl,de
+        ld c,1                          ; C bit 7: left
+        bit 7,h
+        jr z,.r
+        ld c,0x80
+.r:
+        call hl_abs
+        ld a,h
+        or a
+        ld b,l
+        jr z,.bx
+        ld b,255
+.bx:
+        pop de
+        push de
+        ld a,(py)                       ; dy = Simon's middle - its middle
+        add a,8
+        sub e
+        jr nc,.dyp
+        neg
+        inc c                           ; C bit 0: up
+.dyp:
+        ld d,a                          ; D = |dy|, B = |dx|
+        push bc
+        push de
+        call obj_free_slot
+        pop de
+        pop bc
+        pop hl                          ; (E)
+        ld a,l
+        pop hl
+        ret c
+        ld (ix+1),l
+        ld (ix+2),h
+        ld (ix+3),a
+        ld (ix+0),OBJ_FIREBALL
+        ld (ix+4),0
+        ld (ix+5),1
+        bit 7,c
+        jr z,.dir
+        ld (ix+5),-1
+.dir:
+        ld (ix+6),OBJF_FIREBALL
+        ld (ix+7),KIND_FIREBALL
+        ld (ix+8),0xFF
+        ld (ix+10),1                    ; (aimed: ball_step)
+        push bc
+        ld a,b
+        or d
+        jr nz,.aim
+        ld b,1                          ; (on him: straight across)
+.aim:
+        ld a,d
+        cp b
+        jr nc,.ylong
+        ld (ix+11),96                   ; x long: 1 1/2 px (1/64 units)
+        ld l,b
+        ld de,96
+        call boss_muldiv
+        ld a,l
+        jr .vy
+.ylong:
+        ld l,a                          ; y long
+        ld a,b
+        ld de,96
+        call boss_muldiv
+        ld (ix+11),l
+        ld a,96
+.vy:
+        pop bc
+        bit 0,c
+        jr z,.down
+        neg
+.down:
+        ld (ix+9),a
+        call obj_ext_of
+        ld (hl),0
+        inc hl
+        ld (hl),0
+        ret
+
+; hits on the head, touches on every part
+dragon_hits:
+        push ix
+        ld ix,part_table                ; the head
+        call weapon_hits
+        pop ix
+        jr nc,.touch
+        call hit_damage
+        ld hl,drg_dmg
+        add a,(hl)
+        jr c,.dead
+        cp PILLAR_HP
+        jr nc,.dead
+        ld (hl),a
+        ld a,16
+        ld (drg_frz),a
+        ld a,SND_HIT
+        call sfx_play
+        jr .touch
+.dead:
+        ld b,5                          ; the vertebrae burst (and leave hearts)
+        ld iy,part_table+5*OBJ_SIZE
+.burst:
+        push bc
+        push ix
+        ld l,(iy+1)
+        ld h,(iy+2)
+        ld c,(iy+3)
+        call obj_free_slot
+        jr c,.nb
+        ld (ix+1),l
+        ld (ix+2),h
+        ld (ix+3),c
+        ld (ix+0),OBJ_BURST
+        ld (ix+4),0
+        ld (ix+6),OBJF_BURST
+        ld (ix+5),ITEM_SMALLHEART
+        ld (ix+8),0xFF
+.nb:
+        pop ix
+        ld de,-OBJ_SIZE
+        add iy,de
+        pop bc
+        djnz .burst
+        ld a,(part_table+1)             ; the head burns where it is
+        ld (ix+1),a
+        ld a,(part_table+2)
+        ld (ix+2),a
+        ld a,(part_table+3)
+        ld (ix+3),a
+        call dragon_parts_clear
+        call mark_dead
+        ld a,SCORE_DRAGON
+        ld c,0
+        jp enemy_killed
+.touch:
+        ld a,8                          ; the root
+        ld bc,5*256+14
+        call b3_touch
+        ret c
+        push ix
+        ld ix,part_table
+        ld a,8                          ; the head
+        ld bc,10*256+18
+        call b3_touch
+        jr c,.tdone
+        ld b,5
+.tv:
+        push bc
+        ld de,OBJ_SIZE
+        add ix,de
+        ld a,8
+        ld bc,5*256+14
+        call b3_touch
+        pop bc
+        jr c,.tdone
+        djnz .tv
+.tdone:
+        pop ix
+        ret
+
+; ---------------------------------------------------------------------------
+; Frankenstein's monster and Igor (stage 12's boss), from the NES code
+; (6:$88C5, Frank $1C 5:$8A0A, Igor $1F 5:$8967). When his place comes into
+; view every other enemy goes; Igor sits on his shoulders. The camera at the
+; room (the area's end) locks it, the boss music plays; 120 frames later
+; Frank walks at Simon 3/4 px a frame for 60 frames carrying Igor, then lets
+; him go, and walks in legs of 60/36/84/24 frames, at Simon from 80 px, else
+; away, turning at the screen's edges (his picture always faces Simon). Igor
+; spits a fireball when let go and at the top of every hop; he hops 3, 5, 4
+; or 6 px up, 1 1/2 px across, lands on any floor, crouches 8 frames; he
+; turns only at the screen's edges. A hit on Igor stops him 84 frames
+; (flickering). Frank takes half the weapon's damage (3 / 4) from BOSS_HP and
+; stops 8 frames; beaten (5000) he burns, Igor goes, the orb appears.
+; Frank: +4 timer  +5 facing  +9 state (0 asleep, 1 waking, 2 carrying Igor,
+;   3 walking, 4 burning)  +10 walk direction  +11 frames frozen by a hit
+;   obj_ext: x fraction, picture counter, Igor (2)
+; Igor: +4 timer  +5 facing  +9 state (0 riding, 1 rising, 2 falling,
+;   3 crouching)  +10 frames stopped by a hit  obj_ext: x fraction,
+;   y fraction, vy (8.8, + up)
+; ---------------------------------------------------------------------------
+frank_spawn:
+        push ix                         ; every other enemy goes (NES $F47C)
+        call enemies_burst
+        push ix
+        ld ix,obj_table
+        ld b,OBJ_MAX
+.gone:
+        ld a,(ix+0)
+        cp OBJ_BURST
+        jr nz,.gn
+        ld (ix+0),OBJ_NONE
+.gn:
+        ld de,OBJ_SIZE
+        add ix,de
+        djnz .gone
+        pop ix
+        pop ix
+        ld (ix+0),OBJ_FRANK
+        ld (ix+7),KIND_MUMMY            ; 16x44 box
+        ld (ix+9),0
+        ld (ix+11),0
+        call knight_face
+        ld a,BOSS_HP
+        ld (boss_hp),a
+        ld a,1
+        ld (hud_dirty),a
+        call obj_ext_of
+        xor a
+        ld (hl),a
+        inc hl
+        ld (hl),a
+        inc hl
+        ld (hl),a                       ; (no Igor yet)
+        inc hl
+        ld (hl),a
+        push hl
+        push ix
+        ld l,(ix+1)
+        ld h,(ix+2)
+        ld a,(ix+3)
+        sub 8                           ; Igor: on his shoulders
+        ld c,a
+        ld b,(ix+5)
+        call obj_free_slot
+        jr c,.no_igor
+        ld (ix+1),l
+        ld (ix+2),h
+        ld (ix+3),c
+        ld (ix+5),b
+        ld (ix+0),OBJ_IGOR
+        ld (ix+4),0
+        ld (ix+7),KIND_BAT
+        ld (ix+8),0xFF
+        ld (ix+9),0
+        ld (ix+10),0
+        ld (ix+6),OBJF_FLEA2
+        push ix
+        call obj_ext_of
+        xor a
+        ld b,4
+.clr:
+        ld (hl),a
+        inc hl
+        djnz .clr
+        pop de                          ; DE = Igor
+        pop ix
+        pop hl
+        ld (hl),d                       ; Frank's Igor
+        dec hl
+        ld (hl),e
+        jp frank_frame
+.no_igor:
+        pop ix
+        pop hl
+        jp frank_frame
+
+frank_update:
+        ld a,(ix+9)
+        cp 4
+        jr nz,.alive
+        inc (ix+4)
+        jp boss_update.burning
+.alive:
+        ld a,(ix+11)                    ; frozen by a hit
+        or a
+        jr z,.nf
+        dec (ix+11)
+        jp .hits
+.nf:
+        ld a,(freeze_t)
+        or a
+        jp nz,.hits
+        call obj_ext_of                 ; his walk picture: the counter
+        inc hl
+        inc (hl)
+        call knight_face
+        ld a,(ix+9)
+        or a
+        jr nz,.s1
+        ld hl,(cam_x)                   ; asleep until the screen is at his
+        ld de,(area_hdr+AH_MAXCAM)      ; room (the area's end)
+        or a
+        sbc hl,de
+        jp nz,.hits
+        ld a,SND_BOSS
+        call music_restart
+        ld hl,(cam_x)                   ; the screen locks
+        ld (cam_min),hl
+        ld a,1
+        ld (cam_lock),a
+        ld (ix+9),1
+        ld (ix+4),120
+        jp .hits
+.s1:
+        dec a
+        jr nz,.s2
+        dec (ix+4)                      ; waking
+        jp nz,.hits
+        ld (ix+9),2
+        ld (ix+4),60
+        jp .hits
+.s2:
+        dec a
+        jr nz,.s3
+        dec (ix+4)                      ; carrying Igor
+        jr z,.let_go
+        call frank_igor                 ; Igor's x = his (before his move)
+        jr z,.carry
+        ld (iy+1),e
+        ld (iy+2),d
+.carry:
+        ld a,(ix+5)
+        call frank_step
+        jp .hits
+.let_go:
+        call frank_igor
+        jr z,.pick
+        ld a,(iy+9)
+        or a
+        jr nz,.pick
+        ld (iy+9),1
+        jr .pick
+.s3:
+        dec (ix+4)                      ; walking
+        jr z,.pick
+        ld a,(ix+10)
+        call frank_step
+        ld l,(ix+1)                     ; turning at screen x 16 / 240 (his
+        ld h,(ix+2)                     ; middle)
+        ld de,(cam_x)
+        or a
+        sbc hl,de
+        ld a,h
+        or a
+        jr nz,.turn
+        ld a,l
+        cp 8
+        jr c,.turn
+        cp 232
+        jr c,.hits
+.turn:
+        ld a,(ix+10)
+        neg
+        ld (ix+10),a
+        jr .hits
+.pick:
+        ld a,(ix+5)                     ; at Simon from 80 px, else away
+        ld (ix+10),a
+        ld hl,(px)
+        ld e,(ix+1)
+        ld d,(ix+2)
+        or a
+        sbc hl,de
+        call hl_abs
+        ld a,h
+        or a
+        jr nz,.leg
+        ld a,l
+        cp 80
+        jr nc,.leg
+        ld a,(ix+10)
+        neg
+        ld (ix+10),a
+.leg:
+        call rng_and3
+        ld hl,frank_legs
+        call table_a
+        ld (ix+4),a
+        ld (ix+9),3
+.hits:
+        call frank_frame
+        ld a,(ix+9)                     ; asleep or waking: no hits, no harm
+        cp 2
+        ret c
+        call weapon_hits
+        jr nc,.touch
+        ld a,SND_HIT
+        call sfx_play
+        call hit_damage                 ; half the weapon's damage; holy
+        rrca                            ; water's fire 1 every 8 frames
+        rrca
+        rrca
+        and 31
+        ld b,a
+        ld a,(hit_src)
+        cp 3
+        jr nz,.dmg
+        ld b,0
+        ld a,(frame_count)
+        and 7
+        jr nz,.dmg
+        inc b
+.dmg:
+        ld a,1
+        ld (hud_dirty),a
+        ld a,(boss_hp)
+        sub b
+        jr z,.dead
+        jr c,.dead
+        ld (boss_hp),a
+        ld (ix+11),BOSS_FREEZE
+        ret
+.dead:
+        xor a
+        ld (boss_hp),a
+        ld a,SCORE_FRANK
+        call add_score
+        call frank_igor                 ; Igor: a flame
+        jr z,.burn
+        ld (iy+0),OBJ_BURST
+        ld (iy+4),0
+        ld (iy+6),OBJF_BURST
+        ld (iy+5),ITEM_NONE
+.burn:
+        ld (ix+9),4                     ; Frank burns at his middle, then the
+        ld (ix+4),0                     ; orb
+        ld a,(ix+3)
+        add a,16
+        ld (ix+3),a
+        ld (ix+7),KIND_BAT
+        ret
+.touch:
+        ld a,24
+        ld bc,12*256+34
+        jp b3_touch
+frank_legs:     db 60, 36, 84, 24
+
+; IY = his Igor, DE = Frank's x; Z if Igor is gone
+frank_igor:
+        call obj_ext_of
+        inc hl
+        inc hl
+        ld e,(hl)
+        inc hl
+        ld d,(hl)
+        push de
+        pop iy
+        ld e,(ix+1)
+        ld d,(ix+2)
+        ld a,iyh
+        or iyl
+        ret z
+        ld a,(iy+0)
+        cp OBJ_IGOR
+        ret
+
+; x += 3/4 px along A (+1 / -1)
+frank_step:
+        ld c,a
+        call obj_ext_of
+        ld a,(hl)
+        add a,0xC0
+        ld (hl),a
+        ret nc
+        ld a,c
+        jp move_dir_a
+
+; his walk: $8F $90 $91 $90, 25 frames each (24 here)
+frank_frame:
+        call obj_ext_of
+        inc hl
+        ld a,(hl)
+        cp 96
+        jr c,.c
+        xor a
+        ld (hl),a
+.c:
+        ld c,0
+.d24:
+        sub 24
+        jr c,.p
+        inc c
+        jr .d24
+.p:
+        ld a,c
+        cp 3
+        jr nz,.q
+        ld a,1
+.q:
+        bit 7,(ix+5)
+        jr nz,.l
+        add a,3
+.l:
+        add a,OBJF_FRANK
+        ld (ix+6),a
+        ret
+
+igor_update:
+        ld a,(ix+10)                    ; stopped by a hit: flickering, no
+        or a                            ; AI, no collision
+        jr z,.go
+        dec (ix+10)
+        ld a,(frame_count)              ; (shown every other frame)
+        and 1
+        ld a,OBJF_FLEA
+        jr z,.fl
+        ld a,OBJF_BURST+3
+.fl:
+        ld (ix+6),a
+        ret
+.go:
+        ld a,(freeze_t)
+        or a
+        jp nz,.hits
+        ld a,(ix+9)
+        or a
+        jr nz,.s1
+        call knight_face                ; riding: faces Simon, 82 / 83 in
+        call obj_ext_of                 ; turn
+        inc hl
+        inc hl
+        xor a
+        ld (hl),a
+        inc hl
+        ld (hl),a
+        ld a,(frame_count)
+        ld c,0
+.d9:
+        sub 9
+        jr c,.d9e
+        inc c
+        jr .d9
+.d9e:
+        bit 0,c
+        ld a,OBJF_FLEA2
+        jr z,.f0
+        ld a,OBJF_FLEA
+.f0:
+        call igor_pic
+        jp .hits
+.s1:
+        cp 3
+        jr nz,.air
+        dec (ix+4)                      ; crouching
+        jp nz,.hits
+        call rng_and3                   ; a hop: 3, 5, 4 or 6 px up
+        ld hl,igor_hops
+        call table_a
+        ld c,a
+        call obj_ext_of
+        inc hl
+        inc hl
+        ld (hl),0
+        inc hl
+        ld (hl),c
+        ld (ix+9),1
+        ld a,OBJF_FLEA
+        call igor_pic
+        jp .hits
+.air:
+        call obj_ext_of                 ; 1 1/2 px across
+        ld a,(hl)
+        add a,0x80
+        ld (hl),a
+        ld a,1
+        adc a,0
+        bit 7,(ix+5)
+        jr z,.xr
+        neg
+.xr:
+        call move_dir_a
+        call obj_ext_of                 ; gravity: vy -= 1/8 px, y -= vy
+        inc hl
+        push hl
+        inc hl
+        ld e,(hl)
+        inc hl
+        ld d,(hl)
+        ex de,hl
+        ld bc,-32
+        add hl,bc
+        ex de,hl
+        ld (hl),d
+        dec hl
+        ld (hl),e
+        pop hl
+        ld a,(hl)
+        sub e
+        ld (hl),a
+        ld a,(ix+3)
+        sbc a,d
+        ld (ix+3),a
+        call snake_ground               ; any floor (also rising)
+        jr nc,.clamps
+        ld a,(ix+3)
+        add a,16
+        and 0xF8
+        sub 16
+        ld (ix+3),a
+        ld a,OBJF_FLEA2
+        call igor_pic
+        ld (ix+4),8
+        ld a,(ix+9)
+        inc a
+        ld (ix+9),a
+.clamps:
+        ld l,(ix+1)                     ; the screen's edges: turn
+        ld h,(ix+2)
+        ld de,(cam_x)
+        or a
+        sbc hl,de
+        ld a,h
+        or a
+        jr nz,.edge
+        ld a,l
+        cp 1
+        jr c,.edge
+        cp 239
+        jr c,.top
+.edge:
+        ld a,(ix+5)
+        neg
+        ld (ix+5),a
+        call move_dir_a
+.top:
+        ld a,(ix+3)                     ; not above the playfield's top
+        cp 0xC0
+        jr c,.shot
+        ld (ix+3),0
+        call obj_ext_of
+        inc hl
+        inc hl
+        ld (hl),0
+        inc hl
+        ld (hl),0
+.shot:
+        ld a,(ix+9)                     ; rising, past the top: a fireball
+        cp 1
+        jr nz,.hits
+        call obj_ext_of
+        inc hl
+        inc hl
+        inc hl
+        bit 7,(hl)
+        jr z,.hits
+        ld (ix+9),2
+        ld a,OBJF_FLEA2                 ; (spitting)
+        call igor_pic
+        push ix
+        ld l,(ix+1)
+        ld h,(ix+2)
+        ld e,(ix+3)
+        call fire_at_simon
+        pop ix
+.hits:
+        call weapon_hits
+        jr nc,.touch
+        ld a,SND_HIT                    ; no damage: he stops 84 frames
+        call sfx_play
+        ld (ix+10),84
+        ret
+.touch:
+        ld a,8
+        ld bc,10*256+18
+        jp b3_touch
+igor_hops:      db 3, 5, 4, 6
+
+; A = a fleaman picture facing left -> by his facing
+igor_pic:
+        bit 7,(ix+5)
+        jr nz,.l
+        inc a
+.l:
+        ld (ix+6),a
         ret
 
 ; ---------------------------------------------------------------------------
