@@ -369,7 +369,7 @@ stream_frame:
         inc c
         djnz .lp
         ld a,(cur_area)                 ; the area's bank again
-        inc a
+        call area_bank
         ld (page2_bank),a
         ld (ASCII16_PAGE2),a
         ret

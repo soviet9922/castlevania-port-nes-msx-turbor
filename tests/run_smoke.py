@@ -344,7 +344,24 @@ def tcl_script(syms, result_file):
                        poke [expr {{$b+6}}] 50; poke [expr {{$b+9}}] 0; poke $b 3 }}
     after time 115.5 {{ set b [expr {{{objt} + 6*{obj_size}}}]
                        set f [open "{result_file}" a]; puts $f "high_item [peek $b] [peek [expr {{$b+3}}]]"; close $f }}
-    after time 115.7 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}] $::vbl_worst_fc"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
+    # ---- block 2 (stages 4-6), when the converted build has it ----
+    after time 116 {{ if {{{areas} > 5}} {{ poke {syms["area_hdr"] + 44} 5; poke {syms["clear_t"]} 1; poke {syms["clear_phase"]} 4; poke {eoff} 3 }} }}
+    after time 116.6 {{ {dump('40_stage4')}
+                       # up stage 4's first staircase
+                       set x 622; poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
+                       keymatrixdown 8 0x20 }}
+    after time 118.9 {{ keymatrixup 8 0x20; {dump('41_stage4_stairs')}
+                       # the long staircase up into section 1, from its foot
+                       set x 590; poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
+                       poke {py} 32; poke {py + 1} 0; keymatrixdown 8 0x20 }}
+    after time 124.2 {{ keymatrixup 8 0x20; {dump('42_stage4_upper')}
+                       # onto the ledge at the door, at the left end
+                       set x 276; poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
+                       poke {py} 32; poke {py + 1} 0; keymatrixdown 8 0x10 }}
+    after time 124.6 {{ keymatrixup 8 0x10 }}
+    after time 127.6 {{ {dump('43_door_left')} }}
+    after time 132.6 {{ {dump('44_stage5')} }}
+    after time 132.8 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}] $::vbl_worst_fc"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
 """ if areas > 1 else f"""
     after time 9 {{ snd_report; set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
@@ -693,7 +710,7 @@ proc wait_game {{}} {{
     }}
 }}
 after time 0.1 wait_game
-after time 149 {{ exit }}
+after time 160 {{ exit }}
 """
 
 
@@ -771,7 +788,7 @@ def run():
     cmd = ["openmsx", "-machine", MACHINE, "-cart", ROM, "-script", script]
     if not os.environ.get("DISPLAY") and shutil.which("xvfb-run"):
         cmd = ["xvfb-run", "-a"] + cmd
-    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
     if not os.path.exists(result_file):
         print(proc.stdout, proc.stderr)
         sys.exit("FAIL: openMSX produced no results")
@@ -909,6 +926,9 @@ def run():
     stage3_walk = (gen == "converted" and
                    frame_bytes(4, "zombie_l1") != frame_bytes(4, "zombie_l2") and
                    frame_bytes(4, "zombie_r1") != frame_bytes(4, "zombie_r2"))
+    n_areas = len([d for d in os.listdir(os.path.join(BUILD, "gen", gen)) if d.startswith("area_")])
+    block2 = n_areas > 5
+    stage4, stage4_time = (5, 400) if block2 else (0, 300)    # after the stage 3 boss
     checks = [
         ("the music plays on the PSG and the whip has a sound effect",
          sound is not None and sound[0] > 0 and sound[1] == 1 and sound[2] == 1),
@@ -1031,28 +1051,44 @@ def run():
             and int(rules["tally_time"]["score"]) == int(rules["before_orb"]["score"]) + 120),
            ("then the hearts, 100 points each (NES)",
             rules["tally_hearts"]["hearts"] == "0" and rules["tally_hearts"]["phase"] == "4"
-            and int(rules["tally_hearts"]["score"]) == int(rules["before_orb"]["score"]) + 420),
+            and int(rules["tally_hearts"]["score"]) == int(rules["tally_time"]["score"])
+            + 100 * int(rules["tally_time"]["hearts"])),
            ("after the stage clear the next block starts: 5 hearts, the stage's timer",
-            snaps["30_restart"]["cur_area"] == 0 and snaps["30_restart"]["hearts"] == 5
-            and rules["after_clear"]["phase"] == "0" and 290 < int(rules["after_clear"]["time"]) <= 300)]
+            snaps["30_restart"]["cur_area"] == stage4 and snaps["30_restart"]["hearts"] == 5
+            and rules["after_clear"]["phase"] == "0"
+            and stage4_time - 10 < int(rules["after_clear"]["time"]) <= stage4_time)]
           if boss_hp is not None and "30_restart" in snaps else []),
         *([("kills score points, shown in the HUD",
             int(rules["after_clear"]["score"]) > 0
             and rules["after_clear"]["hud"] == rules["after_clear"]["score"]),
-           ("the timer counts down from 300",
-            0 < int(rules["after_clear"]["time"]) < 300),
+           ("the timer counts down from the stage's start",
+            0 < int(rules["after_clear"]["time"]) < stage4_time),
            ("when time runs out Simon dies (death animation)",
             int(rules["dying"]["dying"]) > 0 and int(rules["dying"]["pose"]) in (14, 15)),
            ("then he loses a life and restarts with full health and time",
             int(rules["after_death"]["lives"]) == int(rules["after_clear"]["lives"]) - 1
             and rules["after_death"]["dying"] == "0" and rules["after_death"]["hp"] == "64"
-            and int(rules["after_death"]["time"]) >= 298),
+            and int(rules["after_death"]["time"]) >= stage4_time - 2),
            ("dying with no lives left is game over",
             int(rules["game_over"]["over"]) > 0),
            ("after game over a new game starts: score 0, 3 lives",
             rules["new_game"]["score"] == "000000" and rules["new_game"]["lives"] == "3"
             and rules["new_game"]["area"] == "0")]
           if "new_game" in rules else []),
+        *([("stage 4 starts on its floor, the camera at its one screen (NES: x 320, camera 256)",
+            snaps["40_stage4"]["cur_area"] == 5 and snaps["40_stage4"]["px"] == 568
+            and snaps["40_stage4"]["cam_x"] == 512),
+           ("stage 4's first staircase leads up to the ledge",
+            snaps["41_stage4_stairs"]["py"] == 64 and snaps["41_stage4_stairs"]["stair_state"] == 0),
+           ("its long staircase leads up into section 1",
+            snaps["42_stage4_upper"]["cur_area"] == 6 and snaps["42_stage4_upper"]["py"] == 64),
+           ("the door at the left end: the screen scrolls left to it, Simon walks through",
+            snaps["43_door_left"]["cur_area"] == 6 and snaps["43_door_left"]["cam_x"] < 256
+            and snaps["43_door_left"]["facing"] == 1),
+           ("stage 5 starts at its right end, facing left (NES: x 720, camera 512)",
+            snaps["44_stage5"]["cur_area"] == 7 and snaps["44_stage5"]["px"] == 968
+            and snaps["44_stage5"]["cam_x"] == 768 and snaps["44_stage5"]["facing"] == 1)]
+          if block2 and "44_stage5" in snaps else []),
         *([("the chain whip has its own poses, the same reach as the leather whip",
             any(16 <= int(p) < 24 for p in weapons["chain"]["poses"].split(","))
             and int(weapons["chain"]["reach"]) == whip_reach),

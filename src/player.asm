@@ -20,7 +20,6 @@ player_reset:
         ld (invuln_t),a
         ld (crouching),a
         ld (pyoff),a
-        ld (facing),a
         ld (pframe),a
         ld (air_dx),a
         ld (anim_t),a
@@ -29,6 +28,8 @@ player_reset:
         ld (whip_active),a
         inc a
         ld (on_ground),a
+        ld a,(area_hdr+AH_FACE)
+        ld (facing),a
         ret
 
 ; Fell into a pit: the life is lost straight away (no death animation).

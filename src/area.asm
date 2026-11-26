@@ -2,7 +2,8 @@
 ; Areas
 ;
 ; Each area (courtyard, entrance hall, ...) lives in its own 16 KB ROM bank
-; (area n = bank n+1) that starts with a header (tools/areas_asm.py). The
+; (area_bank: areas 0-5 in banks 1-6, the others from bank 16, after Simon's
+; and the sound banks) that starts with a header (tools/areas_asm.py). The
 ; current area's bank stays mapped at 0x8000 while it is played, because
 ; column streaming and collision read its map directly. The header is copied
 ; to area_hdr so the engine can use its values without banking.
@@ -12,7 +13,7 @@
 ; (or, with keep_player set, keeps him where he is: section change).
 load_area:
         ld (cur_area),a
-        inc a
+        call area_bank
         ld (page2_bank),a               ; (for the sound interrupt)
         ld (ASCII16_PAGE2),a            ; ASCII16: bank seen at 0x8000
         ld hl,0x8000
@@ -51,7 +52,7 @@ load_area:
         call load_band
 
         call objects_load_patterns      ; (enables interrupts)
-        ld a,SND_STAGE                  ; the stage's music (carries on if
+        ld a,(area_hdr+AH_MUSIC)        ; the stage's music (carries on if
         call music_play                 ; it is already playing)
         di
         ld hl,0
@@ -66,10 +67,8 @@ load_area:
         or a
         jr nz,.keep
         call player_reset
-        jr .placed
 .keep:
         call camera_update              ; camera around Simon's position
-.placed:
         call full_redraw
         ld a,0xFF
         ld (loaded_frames),a            ; Simon's patterns must be streamed again
@@ -90,6 +89,14 @@ load_area:
         ld c,1
         call vdp_wreg
         ei
+        ret
+
+; A = area number -> A = its ROM bank (tools/areas_asm.py)
+area_bank:
+        inc a
+        cp 7
+        ret c                           ; areas 0-5: banks 1-6
+        add a,16-7                      ; areas 6 and up: banks 16 and up
         ret
 
 ; Copy one band's background tiles.  A = band, HL = patterns, DE = colours,
@@ -137,11 +144,19 @@ check_area_exit:
         and l
         inc a
         ret z                           ; 0xFFFF: this area has no exit
-        ex de,hl
+        ex de,hl                        ; DE = exit x
         ld hl,(px)
-        or a
+        ld a,(area_hdr+AH_EXIT_LEFT)
+        or a                            ; (clears carry)
+        jr nz,.left_exit
+        sbc hl,de                       ; px >= exit x
+        ret c
+        jr .at_exit
+.left_exit:
+        ex de,hl                        ; a door at the left end: px <= exit x
         sbc hl,de
         ret c
+.at_exit:
         ld a,(area_hdr+AH_EXITY)        ; on the right floor? (the hall's door
         cp 0xFF                         ; is on the upper floor)
         jr z,.go
@@ -163,6 +178,7 @@ check_area_exit:
         ld (seq_phase),a
         ld (whip_t),a
         ld (whip_active),a
+        ld a,(area_hdr+AH_EXIT_LEFT)
         ld (facing),a
         ld hl,0
         ld (seq_t),hl
@@ -240,14 +256,9 @@ door_tick:
         jr nz,.phase1
         xor a                           ; 0: standing while the screen scrolls
         ld (pframe),a
-        ld hl,(cam_x)
         ld de,(area_hdr+AH_DOOR_CAM)
-        or a
-        sbc hl,de
-        jr nc,.half_open
-        ld hl,(cam_x)
-        inc hl
-        jp camera_goto
+        call cam_toward
+        ret nz
 .half_open:
         ld a,SND_DOOR
         call sfx_play
@@ -273,6 +284,9 @@ door_tick:
         add hl,hl
         add hl,hl
         add hl,hl
+        ld a,(area_hdr+AH_EXIT_LEFT)
+        or a
+        jr nz,.through_left
         ld de,24
         add hl,de
         ex de,hl
@@ -280,6 +294,15 @@ door_tick:
         or a
         sbc hl,de
         ret c
+        jr .through
+.through_left:
+        ld de,-32                       ; (left door: px + 16 <= its right edge - 24)
+        add hl,de
+        ld de,(px)
+        or a
+        sbc hl,de
+        ret c
+.through:
         ld a,1                          ; past it: half open again
         ld (door_pending),a
         ld a,3
@@ -305,31 +328,23 @@ door_tick:
         ; 4: he walks on to AH_WALK_END (where he starts in the next stage)
         ; and the screen scrolls on to AH_CAM_END (where the next stage's
         ; map begins): then the next stage loads without a jump
-        ld hl,(px)
-        ld de,(area_hdr+AH_WALK_END)
-        or a
-        sbc hl,de
-        jr nc,.stand
+        call walk_left_to_go           ; HL = distance left to walk
+        ld a,h
+        or l
+        jr z,.stand
         call door_walk
         jr .scroll
 .stand:
         xor a
         ld (pframe),a
 .scroll:
-        ld hl,(cam_x)
         ld de,(area_hdr+AH_CAM_END)
-        or a
-        sbc hl,de
-        jr nc,.both
-        ld hl,(cam_x)
-        inc hl
-        jp camera_goto
-.both:
-        ld hl,(px)
-        ld de,(area_hdr+AH_WALK_END)
-        or a
-        sbc hl,de
-        ret c
+        call cam_toward
+        ret nz
+        call walk_left_to_go
+        ld a,h
+        or l
+        ret nz
         jr seq_next_area
 .next_phase:
         ld (door_pending),a             ; door tiles: 1 half open, 2 open
@@ -339,10 +354,52 @@ door_tick:
         ld (seq_t),hl
         ret
 
-; Simon walks right, 1 px per frame
+; HL = how far Simon still walks to AH_WALK_END (0 = there or past it)
+walk_left_to_go:
+        ld hl,(px)
+        ld de,(area_hdr+AH_WALK_END)
+        ld a,(area_hdr+AH_EXIT_LEFT)
+        or a
+        jr nz,.left
+        ex de,hl                        ; walking right: end - px
+.left:
+        or a
+        sbc hl,de                       ; walking left: px - end
+        ret nc
+        ld hl,0
+        ret
+
+; Scroll the camera 1 px toward DE (the door sequence's direction).
+; NZ while it is still moving, Z when it is there.
+cam_toward:
+        ld hl,(cam_x)
+        or a
+        sbc hl,de
+        ret z
+        ld hl,(cam_x)
+        ld a,(area_hdr+AH_EXIT_LEFT)
+        or a
+        jr nz,.dec
+        inc hl
+        jr .go
+.dec:
+        dec hl
+.go:
+        call camera_goto
+        or 1                            ; NZ: still moving
+        ret
+
+; Simon walks through the door, 1 px per frame (left at a left door)
 door_walk:
         ld hl,(px)
+        ld a,(area_hdr+AH_EXIT_LEFT)
+        or a
+        jr nz,.left
         inc hl
+        jr .step
+.left:
+        dec hl
+.step:
         ld (px),hl
         ld a,(seq_t)
         rlca
@@ -396,8 +453,14 @@ walk_pose:
         add hl,de
         ld a,(hl)
         ld (pframe),a
-        xor a
+        ld a,(seq_kind)                 ; at a left door he faces left
+        cp 2
+        ld a,0
+        jr nz,.face
+        ld a,(area_hdr+AH_EXIT_LEFT)
+.face:
         ld (facing),a
+        xor a
         ld (pyoff),a
         ret
 
@@ -423,6 +486,16 @@ door_vram:
 .src:
         ld (door_src),hl
         ld hl,(area_hdr+AH_DOOR_COL)
+        ld a,(area_hdr+AH_EXIT_LEFT)    ; a left door's 3 columns: its own
+        or a                            ; and the 2 to its left
+        jr z,.dst
+        dec hl
+        dec hl
+        ld a,c                          ; (shut: the map's own columns too)
+        cp 3
+        jr nz,.dst
+        ld (door_src),hl
+.dst:
         ld (door_dst),hl
         ld b,3
 .col:
@@ -438,9 +511,9 @@ door_vram:
         djnz .col
         ret
 
-; one column: map column door_src (rows DOOR_ROW..) -> screen column door_dst
+; one column: map column door_src (rows AH_DOOR_ROW..) -> screen column door_dst
 door_column:
-        ld hl,(door_src)                ; AH_TILES + col * PF_ROWS + DOOR_ROW
+        ld hl,(door_src)                ; AH_TILES + col * PF_ROWS + door row
         ld d,h
         ld e,l
         add hl,hl                       ; *2
@@ -456,14 +529,24 @@ door_column:
         sbc hl,bc                       ; *22 (PF_ROWS)
         ld de,(area_hdr+AH_TILES)
         add hl,de
-        ld de,DOOR_ROW
+        ld a,(area_hdr+AH_DOOR_ROW)
+        ld e,a
+        ld d,0
         add hl,de
+        push de
         ex de,hl                        ; DE = first map tile
+        pop hl                          ; HL = door row * 32
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        add hl,hl
         ld a,(door_dst)
         and 31
-        ld l,a
-        ld h,0
-        ld bc,VRAM_PNT+(HUD_ROWS+DOOR_ROW)*32
+        ld c,a
+        ld b,0
+        add hl,bc
+        ld bc,VRAM_PNT+HUD_ROWS*32
         add hl,bc                       ; HL = its name-table address
         ld b,DOOR_ROWS
 .lp:

@@ -2,7 +2,7 @@
 
 ## Milestone 0: engine skeleton ✅ (this commit)
 
-- [x] Build system: sjasmplus + Python, 128 KB ASCII16 MegaROM
+- [x] Build system: sjasmplus + Python, ASCII16 MegaROM (512 KB with block 2)
 - [x] Boot, R800 switch on turbo R, page 2 slot select, mapper banking
 - [x] Screen 4 setup, palette, BIOS font, HUD
 - [x] V9958 hardware horizontal scroll with fixed HUD (line-interrupt split)
@@ -30,7 +30,8 @@
 - [x] Stage 2: the rest of the route and its exit door, into stage 3
 - [x] Stage 3's boss: wake, hover, swoop, health in the HUD, burns, orb, stage clear
 - [x] Stage clear sequence (timer and hearts to score), per-stage timer after a death
-- [ ] Block 2 (stages 4-6); the castle map between blocks
+- [x] Block 2's maps (stages 4-6): graphics, collision, stairs, candles, doors at the left, music
+- [ ] Block 2's enemies and Medusa; the castle map between blocks
 - [ ] Palette selection table, stages 2 and up
 
 ## Milestone 2: Simon (in progress)

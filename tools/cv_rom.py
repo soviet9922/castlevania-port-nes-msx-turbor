@@ -21,9 +21,13 @@ STAGE_LAYOUTS = {
 # Palette strings in the fixed bank: $3F $00, 16 colours, $FE
 STAGE_PALETTES = {
     "1-courtyard": 0xCE28,
+    "2-castle": 0xCE3B,         # block 2 (stages 4-6), read from the PPU
 }
 
 GAMEPLAY_CHR_SET = 3            # loaded when a game starts
+# Block 2 (stages 4-6) loads set 4 over set 3 when it starts: replaying both
+# reproduces stage 4's pattern tables exactly (checked against the PPU)
+BLOCK_CHR_SETS = {1: (3,), 2: (3, 4)}
 BG_PATTERN_TABLE = 0x1000
 
 
@@ -35,6 +39,7 @@ class CastlevaniaROM:
         n = data[4]
         self.prg = data[16:16 + n * PRG_BANK]
         self.nbanks = n
+        self.chr_sets = (GAMEPLAY_CHR_SET,)     # chr_ram()'s default (per block)
         mapper = (data[6] >> 4) | (data[7] & 0xF0)
         if mapper != 2 or n != 8 or data[5] != 0:
             raise ValueError("this is not the expected Castlevania ROM layout")
@@ -50,8 +55,11 @@ class CastlevaniaROM:
     def fixed(self, addr):
         return self.rd(self.nbanks - 1, addr)
 
-    def chr_ram(self, sets=(GAMEPLAY_CHR_SET,)):
-        """Replay the game's CHR-RAM loader for the given sets."""
+    def chr_ram(self, sets=None):
+        """Replay the game's CHR-RAM loader for the given sets (default:
+        self.chr_sets, the block being converted)."""
+        if sets is None:
+            sets = self.chr_sets
         ram = bytearray(0x2000)
         for n in sets:
             y = self.rd16(7, CHR_SET_TABLE + 2 * n)

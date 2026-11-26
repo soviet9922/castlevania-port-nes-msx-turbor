@@ -13,7 +13,7 @@ How the NES game's hardware features map onto the MSX turbo R.
 | Sprites | 64, 8x8/8x16, 3 colours + transparent, 8 per line | 32, 16x16, 1 colour per line (3 with OR-ing), 8 per line |
 | Scrolling | hardware, both axes | V9958 hardware horizontal + vertical |
 | Sound | 2 pulse, triangle, noise, DPCM | PSG (3 ch) + MSX-MUSIC FM (9 ch) + 8-bit PCM |
-| Cartridge | UNROM: 128 KB PRG, CHR-RAM | ASCII16 MegaROM, 128 KB |
+| Cartridge | UNROM: 128 KB PRG, CHR-RAM | ASCII16 MegaROM, 256 KB (512 KB with block 2) |
 
 The engine requires a **V9958** (MSX2+ or turbo R) for the horizontal
 scroll registers. It runs on an MSX2+ with a 3.58 MHz Z80 too, which is
@@ -289,8 +289,10 @@ HUD has two colours per tile row), converted from the NES HUD's icons.
 
 ## Areas and ROM banks
 
-Each area (courtyard, entrance hall, …) is one 16 KB ROM bank (area n =
-bank n+1) that starts with a header: palette, background tiles per band,
+Each area (courtyard, entrance hall, …) is one 16 KB ROM bank that starts with a
+header. Areas 0-5 are in banks 1-6; bank 7 holds Simon's sprites and banks 8-15 the
+sound, so areas 6 and up go in banks 16 and up and the ROM grows to 512 KB
+(`area_bank`). The header holds: palette, background tiles per band,
 map, collision, candle list, object sprites, start position, and an exit
 (x position, the highest y at which it counts, plus next area). The current area's bank stays mapped at
 0x8000 because column streaming and collision read it directly. The header
@@ -325,6 +327,18 @@ normal camera limit (`AH_MAXCAM`) stays where it was, so those columns only show
 during the sequence. The game logic, the timer and the enemies wait meanwhile. An exit only starts while
 Simon stands on the ground (not in a jump, on stairs or knocked back), so a jump into
 the gate or a door starts the sequence when he lands.
+
+Block 2 (stages 4-6) runs right to left on the NES: its doors are at the left end of
+a section. Its areas start with 8 extra map columns, the last 8 columns of the next
+stage's first section (they come straight before the section's map in the ROM), so
+every x there is the NES x + 256. `AH_MINCAM` keeps them off the screen in normal
+play (stage 4's first section is one screen: its least and greatest camera x are the
+same). At a door with `AH_EXIT_LEFT` set, the sequence runs mirrored: the screen
+scrolls left to `AH_DOOR_CAM`, the door opens to the left (the converter mirrors the
+NES door picture), Simon walks left into the next stage's columns, and the next stage
+loads at its right end with Simon facing left (`AH_FACE`), as on the NES. The door's
+height varies (`AH_DOOR_ROW`), and each area names its music (`AH_MUSIC`: block 2
+has its own). Block 2's enemies and its boss are not converted yet.
 
 `load_area` turns the display off, loads the palette, tiles and object
 patterns, resets objects and the player, redraws the screen and turns

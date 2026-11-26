@@ -34,7 +34,18 @@ SOLID_TILES = range(0x60, 0x6C)
 
 # Stage maps in bank 4: world column 0 is the stage's header word + 24 bytes
 # (6 bytes per 32-px column; the 4 columns before it are pre-drawn off-screen).
+# Each block has its own 4x4 tile-block table (word per stage at $FA01) and
+# graphics (cv_rom.BLOCK_CHR_SETS) and background palette.
 MAP_BANK, BLOCKS = 4, 0x830A
+BLOCK_TABLES = {1: 0x830A, 2: 0x8B25}
+BLOCK_PALETTES = {1: "1-courtyard", 2: "2-castle"}
+BLOCK_MUSIC = {1: "STAGE", 2: "STAGE2"}         # NES $2A, $2D (table at $FB56)
+
+# Block 2 runs right to left: its doors are at the left end of a section, and
+# the 8 map columns before a section's world column 0 are the last 8 columns of
+# the next stage's first section (the stage that the door leads to). Its areas
+# include those columns, so every x in them is the NES x + BLOCK2_X_OFF.
+BLOCK2_X_OFF = 256
 
 # Areas in ROM bank order. Map ranges are [start, end) addresses in bank 4.
 AREAS = [
@@ -94,6 +105,83 @@ AREAS = [
         "stage": 3, "section": 0,
         "start_x": 40,                  # NES: world x 48 (centre), upper floor
         "exit_x": None,
+        "next_area": 5,                 # after the boss and the stage clear
+    },
+    # ---- block 2 (all x: NES x + BLOCK2_X_OFF) ----
+    {
+        "name": "4-lower",
+        "block": 2,
+        "map": (0x8825 - 48, 0x8885),   # stage 4, section 0 (512 px; the NES
+        "stage": 4, "section": 0,       # camera stays at 256: one screen)
+        "x_off": BLOCK2_X_OFF,
+        "start_x": 312 + BLOCK2_X_OFF,  # NES $CA0C: world x 320 (centre),
+        "start_y": 192 - 64,            # on the floor (y 192)
+        "min_cam": 256 + BLOCK2_X_OFF,
+        "exit_x": None,
+        "above": 6,                     # a staircase leads up to section 1
+    },
+    {
+        "name": "4-upper",
+        "block": 2,
+        "map": (0x8915 - 48, 0x8975),   # stage 4, section 1 (512 px) after the
+        "stage": 4, "section": 1,       # last 8 columns of stage 5's section 0
+        "x_off": BLOCK2_X_OFF,
+        "start_x": 440 + BLOCK2_X_OFF,  # (not used: entered by the stairs)
+        "below": 5,
+        "respawn": 5,
+        "exit_x": 284, "exit_y": 40,    # the door at the left end, upper floor
+        "exit_left": True, "exit_kind": 2,
+        "door_col": 33, "door_row": 2, "door_cam": 128,
+        "next_area": 7,
+    },
+    {
+        "name": "5-lower",
+        "block": 2,
+        "map": (0x8885 - 48, 0x8915),   # stage 5, section 0 (768 px)
+        "stage": 5, "section": 0,
+        "x_off": BLOCK2_X_OFF,
+        "start_x": 712 + BLOCK2_X_OFF,  # NES $CA0C: world x 720 (centre), y 96,
+        "start_y": 96 - 64,             # facing left
+        "start_face": 1,
+        "exit_x": None,
+        "above": 8,
+    },
+    {
+        "name": "5-upper",
+        "block": 2,
+        "map": (0x8A95 - 48, 0x8B25),   # stage 5, section 1 (768 px) after the
+        "stage": 5, "section": 1,       # last 8 columns of stage 6's section 0
+        "x_off": BLOCK2_X_OFF,
+        "start_x": 300 + BLOCK2_X_OFF,  # (not used: entered by the stairs)
+        "below": 7,
+        "respawn": 7,
+        "exit_x": 284, "exit_y": 72,    # the door at the left end
+        "exit_left": True, "exit_kind": 2,
+        "door_col": 33, "door_row": 6, "door_cam": 128,
+        "next_area": 9,
+    },
+    {
+        "name": "6-lower",
+        "block": 2,
+        "map": (0x8A05 - 48, 0x8A95),   # stage 6, section 0 (768 px)
+        "stage": 6, "section": 0,
+        "x_off": BLOCK2_X_OFF,
+        "start_x": 712 + BLOCK2_X_OFF,  # NES $CA0C: world x 720 (centre), y 128,
+        "start_y": 128 - 64,            # facing left
+        "start_face": 1,
+        "exit_x": None,
+        "above": 10,
+    },
+    {
+        "name": "6-upper",
+        "block": 2,
+        "map": (0x8975 - 48, 0x8A05),   # stage 6, section 1 (768 px): Medusa's
+        "stage": 6, "section": 1,       # room at its left end
+        "x_off": BLOCK2_X_OFF,
+        "start_x": 600 + BLOCK2_X_OFF,  # (not used: entered by the stairs)
+        "below": 9,
+        "respawn": 9,
+        "exit_x": None,
     },
 ]
 
@@ -102,7 +190,8 @@ AREAS = [
 # and his y moves by SECTION_DY (measured: y 207 in section 1 = y 49 in
 # section 0). Must match SECTION_DY in src/config.inc.
 SECTION_DY = 158
-LINK_LEN = 64                   # length of the off-screen part of such a staircase
+LINK_LEN = 64                   # least length of the off-screen part of such a staircase
+SECTION_DOWN_Y, SECTION_UP_Y = 144, -15     # must match src/config.inc
 
 
 # Stairs (bank 6, $9CBD): word at $FBF3 + 2*stage -> list of 2-byte endpoints,
@@ -150,9 +239,11 @@ def _link_staircase(end):
     t, x, y = end
     d = -1 if t & 1 else 1
     ex, ey = x + 2 - 8, y - 64
-    if t & 2:                                   # a top: continues down
-        return (ex - d * LINK_LEN, ey + LINK_LEN, ex, ey, d)
-    return (ex, ey, ex + d * LINK_LEN, ey - LINK_LEN, d)
+    if t & 2:                                   # a top: continues down past the
+        n = max(LINK_LEN, SECTION_DOWN_Y + 16 - ey)     # section switch line
+        return (ex - d * n, ey + n, ex, ey, d)
+    n = max(LINK_LEN, ey - SECTION_UP_Y + 16)   # a foot: continues up past it
+    return (ex, ey, ex + d * n, ey - n, d)
 
 
 def _staircase(a, b):
@@ -175,15 +266,23 @@ def nes_to_msx_rgb(c):
     return tuple(min(7, (v * 7 + 127) // 255) for v in c)
 
 
+def nes_width(area):
+    """The area's own width in px on the NES (without columns added for doors)."""
+    return area.get("play_px", (area["map"][1] - area["map"][0]) // 6 * 32 - area.get("x_off", 0))
+
+
 def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), preview=True):
     import cv_rom
     out_dir = os.path.join(out_root, f"area_{index}")
     os.makedirs(out_dir, exist_ok=True)
+    block = area.get("block", 1)
+    rom.chr_sets = cv_rom.BLOCK_CHR_SETS[block]
     chr_ram = rom.chr_ram()
-    pal = rom.palette(area["palette"])
+    pal = rom.palette(area.get("palette", BLOCK_PALETTES[block]))
+    x_off = area.get("x_off", 0)
 
     key = f"area{index}"
-    cv_rom.STAGE_LAYOUTS[key] = (MAP_BANK, area["map"][0], area["map"][1], BLOCKS)
+    cv_rom.STAGE_LAYOUTS[key] = (MAP_BANK, area["map"][0], area["map"][1], BLOCK_TABLES[block])
     tiles, pals = rom.stage_nametable(key)
     width = len(tiles[0]) * 8
 
@@ -235,8 +334,11 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
     # start: standing on the first solid tile below the top, at start_x
     sx = area["start_x"]
     col = (sx + 8) // 8
-    row = next(r for r in range(4, msx_area.PF_ROWS) if solid[r][col])
-    sy = row * 8 - 32
+    if "start_y" in area:
+        sy = area["start_y"]
+    else:
+        row = next((r for r in range(4, msx_area.PF_ROWS) if solid[r][col]), 4)
+        sy = row * 8 - 32
 
     # --- candles and object sprites (colours: exact slot, else nearest) ---
     def slot_for_nes(nes):
@@ -246,12 +348,16 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
         return min(range(1, 16), key=lambda s: (sum((a - b) ** 2 for a, b in
                                                     zip(msx_pal[s], rgb)), s))
     door_vcol = 0
+    exit_left = area.get("exit_left", False)
     if area.get("exit_kind") == 2:
         door_vcol = len(pixels[0]) // 8
-        add_door_columns(rom, pixels, solid, area["door_col"], slot_for_nes, nes_to_slot[pal[0]])
-    play_px = area.get("play_px", width)    # objects only from the area itself
-    cl = convert_objects.candles(rom, area["stage"], area["section"], play_px)
-    en = convert_objects.enemy_spawners(rom, area["stage"], area["section"], play_px)
+        add_door_columns(rom, pixels, solid, area["door_col"], slot_for_nes, nes_to_slot[pal[0]],
+                         left=exit_left, door_row=area.get("door_row", DOOR_ROW))
+    play_px = nes_width(area)               # objects only from the area itself
+    cl = [(x + x_off, y, it, k) for x, y, it, k in
+          convert_objects.candles(rom, area["stage"], area["section"], play_px)]
+    en = [(x + x_off, y, t) for x, y, t in
+          convert_objects.enemy_spawners(rom, area["stage"], area["section"], play_px)]
     objs = convert_objects.object_sprites(
         rom, slot_for_nes, convert_objects.needed_frames(cl, en, carried), carried)
     write_object_sprites(out_dir, index, objs)
@@ -259,7 +365,8 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
     convert_objects.write_candles(os.path.join(out_dir, "candles.bin"), cl)
     convert_objects.write_enemies(os.path.join(out_dir, "enemies.bin"), en)
 
-    st = stairs(rom, area["stage"], area["section"])
+    st = [(fx + x_off, fy, tx + x_off, ty, d)
+          for fx, fy, tx, ty, d in stairs(rom, area["stage"], area["section"])]
     data = bytearray([len(st)])
     for fx, fy, tx, ty, d in st:
         data += bytes([fx & 0xFF, fx >> 8, fy & 0xFF, tx & 0xFF, tx >> 8, ty & 0xFF, d & 0xFF])
@@ -267,6 +374,16 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
         f.write(data)
 
     params = msx_area.write_area(out_dir, pixels, msx_pal, solid, sx, sy, area["name"])
+    nxt = AREAS[area.get("next_area", 0)]
+    if area.get("exit_kind") == 2 and exit_left:
+        # the next stage's last 8 columns are this area's first 8: its x is
+        # this area's x + (its width - 256); it starts at its camera maximum
+        nxt_w = (nxt["map"][1] - nxt["map"][0]) // 6 * 32
+        walk_end, cam_end = nxt["start_x"] - (nxt_w - 256), 0
+    elif area.get("exit_kind") == 2:
+        walk_end, cam_end = area.get("play_px", width) + nxt["start_x"], area.get("play_px", width)
+    else:
+        walk_end, cam_end = 0, area.get("play_px", width)
     params.update(dir=f"area_{index}", obj_patterns=n_obj_patterns, subs=sorted(objs.subs),
                   sub_slot=objs.sub_slot, swaps=len(objs.swaps), swap_slot=objs.n_main,
                   exit_x=area.get("exit_x"), exit_y=area.get("exit_y", 0xFF),
@@ -275,10 +392,11 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
                   stage_no=area["stage"] if area["stage"] >= 1 else 1,
                   exit_kind=area.get("exit_kind", 0), door_col=area.get("door_col", 0),
                   door_cam=area.get("door_cam", 0), door_vcol=door_vcol,
-                  walk_end=area.get("play_px", width) + AREAS[area["next_area"]]["start_x"]
-                  if area.get("exit_kind") == 2 else 0,
-                  cam_end=area.get("play_px", width),
-                  **({"max_cam": area["max_cam"]} if "max_cam" in area else {}),
+                  walk_end=walk_end, cam_end=cam_end,
+                  min_cam=area.get("min_cam", x_off), music=BLOCK_MUSIC[block],
+                  start_face=area.get("start_face", 0), exit_left=int(exit_left),
+                  door_row=area.get("door_row", DOOR_ROW),
+                  max_cam=area.get("max_cam", width - 256),     # (not the door's columns)
                   next_area=area.get("next_area", 0))
 
     if preview:
@@ -336,26 +454,35 @@ DOOR_ROW = 2                        # playfield row (NES nametable row 8); must 
 DOOR_ROWS = 6
 
 
-def add_door_columns(rom, pixels, solid, door_col, slot_for_nes, backdrop):
+def add_door_columns(rom, pixels, solid, door_col, slot_for_nes, backdrop, left=False,
+                     door_row=None):
     """Append 6 tile columns to the level image (never on screen): the door's 3
     columns half open, then open, drawn over the wall. The door sequence copies
-    them into the name table (src/area.asm, door_vram)."""
+    them into the name table (src/area.asm, door_vram). A door at the left end
+    of an area opens to the left: the picture is mirrored, and its 3 columns are
+    the door's column and the 2 to its left."""
     from cv_rom import tile_pixels
+    DOOR_ROW = door_row if door_row is not None else globals()["DOOR_ROW"]
     chr_ram = rom.chr_ram()
     pal = [rom.fixed(convert_objects.SPRITE_PALETTES + 3 * 4 + v) for v in range(4)]
-    x0 = door_col * 8
+    x0 = (door_col - 2) * 8 if left else door_col * 8
     for sprites, dark_first in ((DOOR_HALF, True), (DOOR_OPEN, True)):
         block = [row[x0:x0 + 24] for row in pixels]
+        if left:
+            sprites = [(tile, 16 - dx, dy, True) for tile, dx, dy in sprites]
+        else:
+            sprites = [(tile, dx, dy, False) for tile, dx, dy in sprites]
         if dark_first:
+            dark = slice(16, 24) if left else slice(0, 8)
             for y in range(DOOR_ROW * 8, (DOOR_ROW + DOOR_ROWS) * 8):
-                block[y][0:8] = [backdrop] * 8
-        for tile, dx, dy in sprites:
+                block[y][dark] = [backdrop] * 8
+        for tile, dx, dy, unmirror in sprites:
             table, top = (tile & 1) * 0x1000, tile & 0xFE
             for half in (0, 1):
                 px = tile_pixels(chr_ram, table, top + half)
                 for y in range(8):
                     for x in range(8):
-                        v = px[y][7 - x]            # mirrored (NES attribute $43)
+                        v = px[y][x if unmirror else 7 - x]     # mirrored (NES attribute $43)
                         if v:
                             block[DOOR_ROW * 8 + dy + half * 8 + y][dx + x] = slot_for_nes(pal[v])
         for y, row in enumerate(pixels):
@@ -421,6 +548,7 @@ def cv_rom_tile_pixels(chr_ram, table, n):
 
 
 def convert(rom_path, out_dir, nes_pal_path=None):
+    import cv_rom
     rom = CastlevaniaROM(rom_path)
     nes_rgb = load_nes_palette(nes_pal_path)
     os.makedirs(out_dir, exist_ok=True)
@@ -437,10 +565,12 @@ def convert(rom_path, out_dir, nes_pal_path=None):
     # it (areas are in play order)
     areas, carried = [], set()
     for i, a in enumerate(AREAS):
-        width = a.get("play_px", (a["map"][1] - a["map"][0]) // 6 * 32)
+        width = nes_width(a)
+        rom.chr_sets = cv_rom.BLOCK_CHR_SETS[a.get("block", 1)]
         items = {it for _, _, it, _ in convert_objects.candles(rom, a["stage"], a["section"], width)}
         carried |= items & set(convert_objects.SUB_FRAMES)
         areas.append(convert_area(rom, a, i, out_dir, nes_rgb, simon_slots, carried))
+    rom.chr_sets = cv_rom.BLOCK_CHR_SETS[1]
     write_hud_icons(rom, out_dir)
     areas_asm.write(out_dir, areas)
 

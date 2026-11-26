@@ -70,7 +70,12 @@ AH_SUB_SLOT     equ 78                  ; first object pattern of the sub-weapon
 AH_SWAP_SPT     equ 79                  ; swap window: zombies' patterns, the boss's
 AH_SWAP_SZ      equ 83                  ; their sizes in bytes (0 = no swapping here)
 AH_SWAP_SLOT    equ 87                  ; first object pattern of the swap window
-AH_SIZE         equ 88
+AH_MINCAM       equ 88                  ; least camera x (2 bytes)
+AH_MUSIC        equ 90                  ; the area's music (SND_ number)
+AH_FACE         equ 91                  ; Simon's facing at the start (1 = left)
+AH_EXIT_LEFT    equ 92                  ; 1 = the exit (door) is at the left end
+AH_DOOR_ROW     equ 93                  ; the door's top playfield row
+AH_SIZE         equ 94
 
 ; Exit sequences (measured on the NES)
 GATE_FRAMES     equ 120                 ; walking into the castle gate, 1 px every 3 frames

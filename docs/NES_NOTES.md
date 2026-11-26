@@ -267,6 +267,42 @@ health to 0 and walks onto the orb.
   in stage 2 restarts at 200) and at the start of a block; between stages of a
   block the timer carries on.
 
+## Block 2 (stages 4-6)
+
+Recorded with a savestate made at the real start of stage 4 (after the stage 3
+boss and the tally), and by reading the tables below.
+
+- **Graphics:** CHR set 4 is loaded over set 3 when the block starts; replaying sets
+  3 and 4 reproduces stage 4's pattern tables exactly (both tables).
+- **Palette:** `$CE3B` for the whole block (read from the PPU in every section).
+  The sprite palette is the same as block 1's.
+- **Maps:** the word at `$FB2A + 2*stage` points into bank 4 at a list of section
+  map words (stage 4: `$880D`, `$88FD`; stage 5: `$886D`, `$8A7D`; stage 6: `$89ED`,
+  `$895D`; the lists overlap). World column 0 is the word + 24, as in block 1, and
+  each map runs on to the next one's column 0. The 4x4 tile-block table is the word at
+  `$FA01 + 2*stage`: `$830A` for block 1, `$8B25` for block 2. A section's map
+  matched the PPU nametables exactly.
+- **Start positions** (`$C9B1`, table `$CA0C`, 2 bytes per stage): byte 0 = y (bits
+  7-3) and the camera's page (bits 2-0); byte 1 = screen x (bits 7-1, bit 7 also sets
+  the facing: left) and the section (bit 0). Stage 4: x 320, y 192, camera 256; stage 5:
+  x 720, y 96, camera 512, facing left; stage 6: x 720, y 128, camera 512, facing left.
+- **The block runs right to left.** The doors are at the left end of a section, and
+  the 8 map columns before a section's column 0 are the last 8 columns of the next
+  stage's first section (stage 4 section 1 -> stage 5 section 0, stage 5 section 1 ->
+  stage 6 section 0): that's what the screen scrolls into at the door.
+- **Stage 4:** section 0 is one screen (the camera stays at 256). Its first staircase
+  leads to a ledge, a jump left reaches the y 96 ledge, and the staircase from
+  (336, 96) continues in section 1 to its top at (461, 128) (126 px of it in section 1).
+  Section 1 scrolls (camera 0-256); a fall there restarts at stage 4's start.
+- **Stairs between sections:** an end without a partner (stage 5: foot (48, 64) in
+  section 0, top (93, 176) in section 1; stage 6: foot (656, 64), top (717, 160)).
+- **Doors:** a 1x6-tile column of solid tiles (`$62`-`$67`) at map column 1: stage 4
+  section 1 at nametable rows 8-13, stage 5 section 1 at rows 12-17.
+- **Enemy records** (enemy groups, as in block 1): `$47` (object `$07`, hangs still at
+  first), `$48` (object `$08`, purple and white, paces its platform at about 1/2 px
+  per frame), `$05`, `$06`, `$4E`, `$0D`, `$8D`, and `$5B` in stage 6 section 1 (the
+  boss room). Not identified yet.
+
 ## Exit sequences
 
 Recorded with a variant of `record_exit.lua` that also dumps the PPU nametables.
@@ -432,7 +468,7 @@ Recorded in the entrance hall (`tools/nes_probe/record_hall.lua`):
 - The descending stair pose and the whip poses on stairs (the port reuses the
   climbing and standing poses).
 - The candle drop rule (codes other than 4 and 8, and code 0 on wall candles).
-- Stages 2 and up (`$81A2`, `$8202`, `$8292` in bank 4; other banks for later blocks).
+- Block 2's enemies and its boss; blocks 3 and up.
 - Bats, panthers and the other enemy types; enemy item drops; the score
   values; lives, death and the timer;
 - Simon's sprite assembly table, the whip's exact

@@ -1,7 +1,7 @@
 ; ===========================================================================
 ;  Castlevania port for MSX turbo R - engine skeleton
 ;
-;  Cartridge: ASCII16 MegaROM, 128 KB (8 banks of 16 KB)
+;  Cartridge: ASCII16 MegaROM, 256 or 512 KB (banks of 16 KB)
 ;    bank 0    -> 0x4000-0x7FFF  code + data shared by all areas (fixed)
 ;    bank 1..n -> 0x8000-0xBFFF  one bank per area (see src/area.asm)
 ;
@@ -189,6 +189,6 @@ code_end:
         ds 0x8000-$, 0xFF
 
 ; ---------------------------------------------------------------------------
-; Banks 1..n: one per area (generated), then empty banks up to 128 KB
+; Banks 1..n: one per area (generated; see tools/areas_asm.py for the layout)
 ; ---------------------------------------------------------------------------
         INCLUDE "areas.asm"

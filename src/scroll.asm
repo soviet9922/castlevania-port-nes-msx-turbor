@@ -150,6 +150,14 @@ camera_update:
         jr c,.not_max
         ex de,hl                        ; clamp to the area's maximum
 .not_max:
+        ld de,(area_hdr+AH_MINCAM)      ; and to its minimum
+        push hl
+        or a
+        sbc hl,de
+        pop hl
+        jr nc,.not_min
+        ex de,hl
+.not_min:
         ld a,(cam_lock)                 ; boss fight: never scroll back left
         or a
         jr z,.unlocked
