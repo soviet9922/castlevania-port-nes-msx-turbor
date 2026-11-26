@@ -385,7 +385,7 @@ courtyard).
 
 Bank 0, the code page, is full. The enemies of blocks 2 and 3 and Medusa
 (`src/enemies2.asm`) are stored in Simon's bank and copied at start-up to `RAMCODE`
-(0xD000), where they run (`src/ramcode.asm`, sjasmplus `DISP`). They call the engine in
+(0xC600), where they run (`src/ramcode.asm`, sjasmplus `DISP`). They call the engine in
 bank 0 and read the current area's bank at 0x8000 like the rest of the object code.
 
 ### Late frames
