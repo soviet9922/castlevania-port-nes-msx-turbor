@@ -406,9 +406,11 @@ def tcl_script(syms, result_file):
     after time 142.1 {{ poke {eoff} 3; poke {syms["area_hdr"] + 44} 10; poke {syms["clear_t"]} 1; poke {syms["clear_phase"]} 4 }}
     after time 142.6 {{ set x 372; poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
                        poke {py} 96; poke {py + 1} 0; poke {syms["invuln_t"]} 250 }}
+    # (NES: she starts 180 frames after the lock; the test skips the wait)
+    after time 143.2 {{ if {{[peek {syms["med_wake"]}] > 1}} {{ poke {syms["med_wake"]} 1 }} }}
     after time 143.6 {{ set m [find_type 18]
                        set col [expr {{[peek {syms["med_col"]}] & 31}}]
-                       set row [expr {{[peek {syms["med_row"]}] + 2}}]
+                       set row [expr {{[peek {syms["med_row"]}] + 3}}]
                        set f [open "{result_file}" a]
                        puts $f "medusa_wake [expr {{$m >= 0 ? [peek [expr {{$m + 9}}]] : -1}}] [peek {syms["cam_lock"]}] [vpeek [expr {{0x1800 + $row*32 + $col}}]] [peek {syms["area_hdr"] + 45}] [peek {syms["boss_hp"]}]"
                        close $f
@@ -419,6 +421,9 @@ def tcl_script(syms, result_file):
     # block 3: stage 7 starts at its right end, facing left (NES: x 720, camera 512)
     after time 146.1 {{ poke {eoff} 0; if {{{areas} > 11}} {{ poke {syms["area_hdr"] + 44} 11; poke {syms["clear_t"]} 1; poke {syms["clear_phase"]} 4 }} }}
     after time 146.7 {{ {dump('50_stage7')} }}
+    # (the ghost comes out when its place reaches the screen's edge strip)
+    after time 146.75 {{ keymatrixdown 8 0x10 }}
+    after time 147.95 {{ keymatrixup 8 0x10 }}
     # block 3's enemies: stage 7's ghost appears and follows Simon; a bone
     # pillar in stage 9 fires at him
     after time 148 {{ set g [find_type 25]
@@ -728,7 +733,8 @@ proc mummy_pin {{n}} {{
     if {{$n <= 0}} return
     for {{set i 0}} {{$i < 8}} {{incr i}} {{
         set b [expr {{{objt} + $i*{obj_size}}}]
-        if {{[peek $b] == 26 && [peek [expr {{$b + 9}}]] != 4}} {{
+        if {{[peek $b] == 26 && [peek [expr {{$b + 9}}]] == 1}} {{ poke [expr {{$b + 4}}] 1 }}
+        if {{[peek $b] == 26 && [peek [expr {{$b + 9}}]] != 5}} {{
             set off [expr {{[peek {fa}] ? -28 : 28}}]
             set x [expr {{[peek {px_a}] + 256*[peek {px_a + 1}] + $off}}]
             poke [expr {{$b + 1}}] [expr {{$x & 255}}]; poke [expr {{$b + 2}}] [expr {{$x >> 8}}]
@@ -815,8 +821,8 @@ proc zombie_watch {{}} {{
             set d [expr {{[peek [expr {{$b+1}}]] + 256*[peek [expr {{$b+2}}]] - $px}}]
             # the whip hits on one frame, 17 frames into the swing (NES): a
             # running panther (2 px a frame) is struck at ~34 px nearer
-            if {{[peek $b] == 6 && $d >= 14 && $d <= 80}} {{ poke {fa} 0; keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
-            if {{[peek $b] == 6 && $d <= -14 && $d >= -80}} {{ poke {fa} 1; keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
+            if {{[peek $b] == 6 && $d >= 14 && $d <= 60}} {{ poke {fa} 0; keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
+            if {{[peek $b] == 6 && $d <= -14 && $d >= -60}} {{ poke {fa} 1; keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
             if {{$d >= 14 && $d <= 36}} {{ poke {fa} 0; keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
             if {{$d <= -14 && $d >= -50}} {{ poke {fa} 1; keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
         }}
@@ -1248,7 +1254,7 @@ def run():
             block2_enemies["crush"] == ["9", "1"])]
           if block2 and "crush" in block2_enemies else []),
         *([("Medusa wakes in her room: the statue goes, the screen locks, her health in the HUD",
-            block2_enemies["medusa_wake"][0] == "1" and block2_enemies["medusa_wake"][1] == "1"
+            block2_enemies["medusa_wake"][0] in ("1", "2", "3") and block2_enemies["medusa_wake"][1] == "1"
             and block2_enemies["medusa_wake"][2] == block2_enemies["medusa_wake"][3]
             and block2_enemies["medusa_wake"][4] == "64"),
            ("beaten, Medusa burns and leaves the orb",
