@@ -7,6 +7,8 @@
 --   FRAMES     frames to record (default 600)
 --   INPUT      held buttons, e.g. "left" or "right,B" (default none)
 --   INVINCIBLE 1: keep Simon's health topped up (default 1)
+--   POKES      RAM writes made once after loading, "addr=value,..." (hex),
+--              e.g. "40=60,41=1,3F=60" to put Simon somewhere
 -- Output lines: "frame cam simon_x simon_y | slot:id:x:y:state ..."
 -- (world x = screen x + camera). Addresses and positions only.
 local out = os.getenv("PROBE_OUT") or "."
@@ -19,6 +21,9 @@ for b in string.gmatch(os.getenv("INPUT") or "", "[^,]+") do held[b] = true end
 
 local st = savestate.object(slot)
 savestate.load(st)
+for a, v in string.gmatch(os.getenv("POKES") or "", "(%x+)=(%x+)") do
+  memory.writebyte(tonumber(a, 16), tonumber(v, 16))
+end
 local f = io.open(out .. "/objects_" .. run .. ".txt", "w")
 for n = 1, frames do
   joypad.set(1, held)
