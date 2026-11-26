@@ -422,7 +422,8 @@ def tcl_script(syms, result_file):
     after time 146.1 {{ poke {eoff} 0; if {{{areas} > 11}} {{ poke {syms["area_hdr"] + 44} 11; poke {syms["clear_t"]} 1; poke {syms["clear_phase"]} 4 }} }}
     after time 146.7 {{ {dump('50_stage7')} }}
     # (the ghost comes out when its place reaches the screen's edge strip)
-    after time 146.75 {{ keymatrixdown 8 0x10 }}
+    after time 146.75 {{ set x 620; poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
+                        keymatrixdown 8 0x10 }}
     after time 147.95 {{ keymatrixup 8 0x10 }}
     # block 3's enemies: stage 7's ghost appears and follows Simon; a bone
     # pillar in stage 9 fires at him

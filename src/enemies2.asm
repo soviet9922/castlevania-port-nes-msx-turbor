@@ -2765,20 +2765,16 @@ mummy_update:
         ret
 
 ; Carry if IX's partner is no longer a mummy (not there or burning)
+        ASSERT (obj_table & 0xFF) + OBJ_MAX*OBJ_SIZE <= 256
 mummy_partner:
-        push ix
-        pop hl
+        ld c,ixl                        ; (the slots share one 256-byte page)
         push ix
         ld ix,obj_table
         ld de,OBJ_SIZE
         ld b,OBJ_MAX
 .lp:
-        push hl
-        push ix
-        pop bc
-        or a
-        sbc hl,bc
-        pop hl
+        ld a,ixl
+        cp c
         jr z,.next                      ; (itself)
         ld a,(ix+0)
         cp OBJ_MUMMY
