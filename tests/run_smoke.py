@@ -256,7 +256,9 @@ def tcl_script(syms, result_file):
     after time 80.1 {{ {dump('27_boss')}
                        set f [open "{result_file}" a]; puts $f "boss_hp [peek {syms["boss_hp"]}] $::boss_awake $::boss_sleepf"; close $f
                        poke {syms["boss_hp"]} 1 }}
-    after time 80.3 {{ }}
+    # (the NES boss hovers 41 px above Simon: held in the whip's reach to end it)
+    after time 80.3 {{ set ::boss_hunt 0; poke {fa} 0; boss_pin 60 }}
+    after time 80.5 {{ keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
     after time 86.1 {{ set ::boss_hunt 0; {dump('28_boss_dead')}
                        # a known tally: 12 timer steps and 3 hearts
                        poke {syms["time_bcd"]} 0x12; poke {syms["time_bcd"] + 1} 0; poke {syms["time_t"]} 0
@@ -769,6 +771,17 @@ proc clear_type {{t}} {{
     for {{set i 0}} {{$i < 8}} {{incr i}} {{ set b [expr {{{objt} + $i*{obj_size}}}]; if {{[peek $b] == $t}} {{ poke $b 0 }} }}
 }}
 # put the boss at box x (y 40), hovering, a few frames before it may fire
+proc boss_pin {{n}} {{
+    if {{$n <= 0}} return
+    set b [find_type 10]
+    if {{$b >= 0 && [peek [expr {{$b + 9}}]] != 4}} {{
+        set x [expr {{[peek {px_a}] + 256*[peek {px_a + 1}] + 10}}]
+        poke [expr {{$b+1}}] [expr {{$x & 255}}]; poke [expr {{$b+2}}] [expr {{$x >> 8}}]
+        poke [expr {{$b+3}}] [expr {{[peek {py}] + 4}}]; poke [expr {{$b+9}}] 3
+        poke {syms["boss_t"]} 200; poke {syms["boss_frz"]} 0
+    }}
+    after frame "boss_pin [expr {{$n - 1}}]"
+}}
 # the boss hovering at x, its hover ending the next frame: below Simon (1)
 # or above him (0)
 proc boss_place {{x below}} {{
