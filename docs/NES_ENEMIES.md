@@ -129,6 +129,41 @@ is (px+8, py+16), and port y = NES y - 48.
   ~24 px up and down), stand 8 and walk on. Both burn 60 frames when beaten;
   the last leaves the orb.
 
+## Block 4 (stages 10-12)
+
+- **Stages:** block 4's tile blocks are at `$975B`, its palette is `$CE61` (the per-block
+  table at `$CD15`), its graphics sets are 3 and 6 (`$C8B0`), and its music is
+  `$39` for stage 10 and block 2's `$2D` for stages 11 and 12. Each stage
+  ends at the NES's exit point (`$FC19`): stage 10's is halfway up its last
+  steps, stage 11's is at its right edge. Record type `$04` makes nothing in
+  the first quest.
+- **Eagle** (`$12`, spawner `$F4DE`, AI `$ECFE`): one every 112 frames while
+  its record is on the screen (at most 3). It starts at screen x 18 (flying
+  right) or 238 (flying left), at random, at the record's height + 32, 16, 48,
+  0 in turn. It flies 1 3/4 px a frame for 47 frames and hovers for 17, at a
+  fixed height. It carries a fleaman 16 px below it, which drops when the
+  eagle is gone or Simon comes within 64 px across (checked every 8 frames).
+- **Bone dragon** (`$14`-`$16`, `6:$8867`, `5:$8AAD`): a root vertebra fixed in
+  a right-hand wall, 5 vertebrae and a skull. The neck grows out to 52 px,
+  then the head moves up and down 1 3/4 px a frame. It is aimed at Simon's
+  height every 32 frames, turns at the end of each leg (52/36/60/28 frames)
+  and after each attack, and pushes the vertebrae along as a chain (each
+  within 8 px of the next). Every 32 frames, 1 time in 2, it opens its mouth
+  for 16 frames, fires at Simon (if he is left of it and near its height),
+  then waits 16 more. Only the head can be hurt: damage adds up to 192
+  (1000 points).
+- **Red skeleton** (`$13`, `5:$91A4`): it gets up from a bone pile, walks in
+  48-frame legs at 5/8 px a frame, and turns at walls. A hit collapses it
+  (400 points every time); it gets up again and never dies.
+- **Frankenstein's monster and Igor** (`$1C`, `$1F`): every other enemy goes
+  when they appear. When the camera locks they wait 120 frames, then Frank
+  walks at Simon carrying Igor for 60 frames and lets him go. After that Frank
+  walks in legs of 60/36/84/24 frames: towards Simon from 80 px away, else
+  away. Igor hops 3/5/4/6 px up, 1 1/2 px across, and spits a fireball when
+  he is let go and at the top of every hop. A hit on Igor stops him for 84
+  frames. Frank takes half the weapon's damage; beaten, he gives 5000 points
+  and leaves the orb.
+
 ## Frames
 
 `tools/nes_frames.py ROM FRAME [FACING]` runs the NES's own sprite builder
