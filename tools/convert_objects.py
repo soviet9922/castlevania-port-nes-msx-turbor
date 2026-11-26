@@ -47,7 +47,8 @@ OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
               "hbat_hang", "hbat1_l", "hbat2_l", "hbat3_l", "hbat1_r", "hbat2_r", "hbat3_r",
               "medusa1", "medusa2", "snake_l", "snake_r",
               "flea_l", "flea_r", "ghost_l", "ghost_r", "bone", "pillar",
-              "raven_perch", "raven1_l", "raven2_l", "raven3_l", "raven1_r", "raven2_r", "raven3_r"]
+              "raven_perch", "raven1_l", "raven2_l", "raven3_l", "raven1_r", "raven2_r", "raven3_r",
+              "mummy_l", "mummy_r", "bandage1", "bandage2"]
 
 # Black panther: 32x16, palette 3, art faces left (recorded in the hall).
 # Run cycle run1 -> run2 -> run3, 7 frames each; the leap shows run2.
@@ -66,6 +67,8 @@ KIND_MEDUSA = 8                 # the stage 6 boss (box as the stage 3 boss's)
 KIND_FLEA, KIND_SKEL, KIND_PILLAR, KIND_RAVEN, KIND_GHOST = 9, 10, 11, 12, 13
 ENEMY_FLEA, ENEMY_SKEL, ENEMY_PILLAR, ENEMY_RAVEN = 0x4C, 0x50, 0x4E, 0x4F
 ENEMY_GHOST = 0x0D              # (and $8D) outside stage 6, where they are crushers
+KIND_MUMMY = 14                 # stage 9's boss: two mummies (record $5A, object $1A)
+ENEMY_MUMMY = 0x5A
 ENEMY_MEDUSA_BOSS = 0x5B        # its enemy group record (object $1B)
 ENEMY_BOSS = 0x59               # enemy group record type: the stage 3 boss
 ENEMY_KNIGHT = 0x48             # block 2: a spear knight (object $08)
@@ -195,6 +198,13 @@ FRAME_SPRITES["raven_perch"] = [(0xAC, 0, 0, 3, 0), (0xAE, 8, 0, 3, 0)]
 for _n, _t in (("raven1", 0xA0), ("raven2", 0xA4), ("raven3", 0xA8)):
     FRAME_SPRITES[_n + "_l"] = [(_t, 0, 0, 3, 0), (_t + 2, 8, 0, 3, 0)]
     FRAME_SPRITES[_n + "_r"] = [(_t + 2, 0, 0, 3, 1), (_t, 8, 0, 3, 1)]
+# the mummies (stage 9 boss): 16x48, palette 1, art facing left (one walking
+# picture: two would need 24 more sprite patterns); their bandages 16x16
+_MUMMY = [(0xD0, 0xD2), (0xD4, 0xD6), (0xD8, 0xDA)]
+FRAME_SPRITES["mummy_l"] = [(t, 8 * i, 16 * r, 1, 0) for r, ts in enumerate(_MUMMY) for i, t in enumerate(ts)]
+FRAME_SPRITES["mummy_r"] = [(t, 8 - 8 * i, 16 * r, 1, 1) for r, ts in enumerate(_MUMMY) for i, t in enumerate(ts)]
+FRAME_SPRITES["bandage1"] = [(0xF4, 0, 0, 1, 0), (0xF6, 8, 0, 1, 0)]
+FRAME_SPRITES["bandage2"] = [(0xF8, 0, 0, 1, 0), (0xFA, 8, 0, 1, 0)]
 # (the spear knight uses the zombie's frames: block 2's graphics have the
 # knight in the zombie's tiles, 80-8A, palette 1)
 
@@ -270,6 +280,11 @@ def candles(rom, stage, section, level_px):
                 tall = k in (KIND_SKEL, KIND_PILLAR)
                 out.append((cx - 8, cy - (64 if tall else 57), ITEM_NONE, k))
             continue
+        if kind == ENEMY_MUMMY:
+            # 16x48: sprite top = NES y - 23 (as the engine's y: - 73)
+            cx, cy = (chunk - 1) * 64 + rom.fixed(p + 1), rom.fixed(p + 2)
+            out.append((cx - 8, cy - 73, ITEM_NONE, KIND_MUMMY))
+            continue
         if kind == ENEMY_MEDUSA_BOSS:
             # asleep she is the statue in the map; her 48x32 box: sprite top
             # = NES y - 15 (as the engine's y: - 65), centred on the record x
@@ -313,7 +328,8 @@ FOLDS = [("panther_run3_l", "panther_run1_l"), ("panther_run3_r", "panther_run1_
          ("zombie_l2", "zombie_l1"), ("zombie_r2", "zombie_r1"),
          ("flame3", "flame1"), ("flame2", "flame1"), ("flame4", "flame1"), ("axe2", "axe1"),
          ("raven3_l", "raven1_l"), ("raven3_r", "raven1_r"),
-         ("mhead2_l", "mhead1_l"), ("mhead2_r", "mhead1_r")]
+         ("mhead2_l", "mhead1_l"), ("mhead2_r", "mhead1_r"),
+         ("bandage2", "bandage1"), ("mummy_r", "mummy_l")]
 
 
 SUB_FRAMES = {ITEM_DAGGER: {"dagger_fly_r", "dagger_fly_l"},
@@ -334,6 +350,8 @@ def needed_frames(candle_list, spawners, carried=()):
             need |= {"boss_sleep", "boss_open", "boss_up", "orb", "fireball"}
         elif kind == KIND_MEDUSA:
             need |= {"medusa1", "medusa2", "snake_l", "snake_r", "orb"}
+        elif kind == KIND_MUMMY:
+            need |= {"mummy_l", "mummy_r", "bandage1", "bandage2", "orb"}
         elif kind == KIND_FLEA:
             need |= {"flea_l", "flea_r"}
         elif kind == KIND_GHOST:
@@ -376,8 +394,26 @@ SUB_SETS = {1: ["dagger_fly_r", "dagger_fly_l"],
 # frames that are never on screen together share one window of patterns: an
 # area with both zombies and the boss keeps the zombies' patterns there until
 # the boss wakes (the screen locks, the zombies go), then the boss's
-SWAP_SETS = [["zombie_l1", "zombie_l2", "zombie_r1", "zombie_r2"],
-             ["boss_open", "boss_up", "orb"]]
+SWAP_PAIRS = [
+    # stage 3: the zombies until the bat boss wakes
+    [["zombie_l1", "zombie_l2", "zombie_r1", "zombie_r2"],
+     ["boss_open", "boss_up", "orb"]],
+    # stage 9: the bridge's enemies until the mummies wake
+    [["raven_perch", "raven1_l", "raven2_l", "raven3_l", "raven1_r", "raven2_r", "raven3_r",
+      "pillar", "fireball", "mhead1_l", "mhead2_l", "mhead1_r", "mhead2_r",
+      "zombie_l1", "zombie_l2", "zombie_r1", "zombie_r2", "bone",
+      "flea_l", "flea_r", "ghost_l", "ghost_r"],
+     ["mummy_l", "mummy_r", "bandage1", "bandage2", "orb"]],
+]
+SWAP_SETS = SWAP_PAIRS[0]           # (the pair an area uses: swap_sets(need))
+
+
+def swap_sets(need):
+    """the swap pair whose two sets an area both needs, or None"""
+    for pair in SWAP_PAIRS:            # (the orb is in every boss's set: it decides nothing)
+        if all(need & (set(group) - {"orb"}) for group in pair):
+            return pair
+    return None
 
 
 class ObjectSprites:
@@ -418,8 +454,9 @@ def _object_sprites(rom, slot_for_nes, need, subs, alias):
     pals = [[rom.fixed(SPRITE_PALETTES + p * 4 + v) for v in range(4)] for p in range(4)]
     main = SpriteBank()
     per_frame = {}                          # name -> (bank, frame index, pattern offset)
-    swapping = all(need & set(group) for group in SWAP_SETS)
-    swapped = {n for group in SWAP_SETS for n in group} if swapping else set()
+    pair = swap_sets(need)
+    swapping = pair is not None
+    swapped = {n for group in pair for n in group} if swapping else set()
     for name in OBJ_FRAMES:
         if name in need and name not in swapped:
             per_frame[name] = (main, main.add_frame(_pixels(chr_ram, pals, alias.get(name, name),
@@ -427,7 +464,7 @@ def _object_sprites(rom, slot_for_nes, need, subs, alias):
     n_main = len(main.patterns)
     swap_banks = []
     if swapping:
-        for group in SWAP_SETS:
+        for group in pair:
             b = _WindowBank(main, n_main)
             b.colors, b.col_index = main.colors, main.col_index
             for name in group:

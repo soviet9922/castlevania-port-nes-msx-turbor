@@ -49,6 +49,8 @@ OBJ_BONE        equ 22                  ; its bones
 OBJ_PILLAR      equ 23                  ; bone pillar
 OBJ_RAVEN       equ 24                  ; raven
 OBJ_GHOST       equ 25                  ; ghost
+OBJ_MUMMY       equ 26                  ; stage 9 boss: a mummy
+OBJ_BANDAGE     equ 27                  ; its bandages
 
 KIND_BRAZIER    equ 0
 KIND_CANDLE     equ 1
@@ -64,6 +66,7 @@ KIND_SKEL       equ 10
 KIND_PILLAR     equ 11
 KIND_RAVEN      equ 12
 KIND_GHOST      equ 13
+KIND_MUMMY      equ 14
 
 ; object frame numbers (OBJ_FRAMES in tools/convert_objects.py)
 OBJF_BRAZIER    equ 0
@@ -100,6 +103,8 @@ OBJF_BONE       equ 75
 OBJF_PILLAR     equ 76
 OBJF_RAVEN_PERCH equ 77
 OBJF_RAVEN      equ 78                  ; wings 1-3 left, then right
+OBJF_MUMMY      equ 84                  ; left, right
+OBJF_BANDAGE    equ 86                  ; two pictures
 
 ITEM_WHIPUP     equ 0
 ITEM_HEART      equ 1
@@ -283,7 +288,9 @@ spawn_candle:
         jr z,.placed                    ; hanging bats)
         cp KIND_KNIGHT
         jr c,.allowed
-        cp KIND_MEDUSA                  ; (not the boss)
+        cp KIND_MEDUSA                  ; (not the bosses)
+        jr z,.allowed
+        cp KIND_MUMMY
         jr z,.allowed
 .placed:
         ld a,(enemies_off)

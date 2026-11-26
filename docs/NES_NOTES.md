@@ -376,6 +376,14 @@ A savestate at the start of stage 7 was made by forcing the stage-clear mode (`$
     down a frame) to his head's height, hovers about 30 frames, then chases him across,
     speeding up and overshooting.
   - Not measured: the pillar's and the ghost's hit points and points, the skeleton's.
+- **The mummies** (`$5A`, two, object `$1A`), recorded from a start patched in front of
+  the tower (the emulator's copy of the ROM only): asleep in the tower room until the
+  camera reaches it (1280), then both walk at Simon (about 3/4 px a frame), turning now
+  and then, and throw bandages (object `$22`, tiles `F4 F6` / `F8 FA`, palette 1) that
+  fly low at him in a wave, about 1 1/2 px a frame. 16x48, tiles `D0`-`DA` (and a second
+  step `DC DE C0`-`C6`), palette 1, art facing left. The HUD's bar (`$01A9`) shows both:
+  64, 1-3 a whip hit. Each is worth 3000; the first dies with the bar at 3, the second at
+  0, and the second burns (`$31`) and leaves the orb (`$2F`).
 
 ## Exit sequences
 

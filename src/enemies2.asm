@@ -751,6 +751,8 @@ block3_spawn:
         ld (hl),0
         pop af
         ld (ix+5),-1
+        cp OBJ_MUMMY
+        jp z,mummy_spawn
         ld (ix+7),KIND_BAT              ; 16x16 box
         cp OBJ_SKEL
         jr z,.tall
@@ -762,6 +764,11 @@ block3_spawn:
         jp block3_frame
 
 block3_update:
+        ld a,(ix+0)                     ; the mummies and their bandages
+        cp OBJ_MUMMY
+        jp z,mummy_update
+        cp OBJ_BANDAGE
+        jp z,bandage_update
         ld a,(freeze_t)                 ; the stopwatch holds them
         or a
         jp nz,block3_hits
@@ -1334,3 +1341,224 @@ block3_scores:
 obj_gone:
         ld (ix+0),OBJ_NONE
         ret
+
+; ---------------------------------------------------------------------------
+; The mummies (stage 9 boss, recorded on the NES). Two, placed in the tower
+; room, asleep until the screen reaches the room (the area's last screen):
+; then the screen locks, the boss music plays, the bridge's enemies go and
+; their sprite patterns make way for the mummies' (swap window, set 1). Each
+; walks 3 px every 4 frames, faces Simon every MUMMY_TURN frames and at the
+; screen's edges, and throws a bandage at him every 128 frames. Each has
+; MUMMY_HP; the HUD's enemy bar shows both together. Beaten, a mummy bursts
+; (3000 points); the last one burns and leaves the orb (boss_update.burning).
+;   +4 timer  +5 direction  +9 state (0 asleep, 1 awake, 4 burning)
+;   +10 health  +11 frames it can't be hit
+; ---------------------------------------------------------------------------
+mummy_spawn:
+        ld (ix+7),KIND_BRAZIER          ; 16x32 box from its top (its body)
+        ld (ix+10),MUMMY_HP
+        ld (ix+11),0
+        ld (ix+6),OBJF_MUMMY
+        ld a,MUMMY_HP*2
+        ld (boss_hp),a
+        ld a,1
+        ld (hud_dirty),a
+        ret
+
+mummy_update:
+        inc (ix+4)
+        ld a,(ix+9)
+        cp 4
+        jp z,boss_update.burning
+        or a
+        jr nz,.awake
+        ld hl,(cam_x)                   ; asleep until the screen is at the room
+        ld de,(area_hdr+AH_MAXCAM)
+        or a
+        sbc hl,de
+        jp nz,.frame
+        ld (ix+9),1
+        ld (ix+4),0
+        ld a,(swap_boss)                ; the first to wake sets the scene
+        or a
+        jr nz,.awake
+        ld a,SND_BOSS
+        call music_restart
+        ld hl,(cam_x)                   ; the screen locks
+        ld (cam_min),hl
+        ld a,1
+        ld (cam_lock),a
+        push ix                         ; the bridge's enemies go
+        ld ix,obj_table
+        ld de,OBJ_SIZE
+        ld b,OBJ_MAX
+.clear:
+        ld a,(ix+0)
+        cp OBJ_FIREBALL
+        jr z,.gone
+        cp OBJ_MHEAD
+        jr z,.gone
+        cp OBJ_ZOMBIE
+        jr z,.gone
+        cp OBJ_FLEA
+        jr c,.keep
+        cp OBJ_MUMMY
+        jr nc,.keep
+.gone:
+        ld (ix+0),OBJ_NONE
+.keep:
+        add ix,de
+        djnz .clear
+        ld a,1                          ; their patterns: the mummies' now
+        call load_swap_patterns
+        pop ix
+.awake:
+        ld a,(freeze_t)
+        or a
+        jp nz,.frame
+        ld a,(ix+4)                     ; face Simon now and then
+        and MUMMY_TURN-1
+        call z,wake_near
+        ld a,(ix+4)                     ; 3 px every 4 frames
+        and 3
+        jr z,.throw
+        ld a,(ix+5)
+        ld e,a
+        rla
+        sbc a,a
+        ld d,a
+        ld l,(ix+1)
+        ld h,(ix+2)
+        add hl,de
+        ld (ix+1),l
+        ld (ix+2),h
+        ld de,(cam_x)                   ; turn at the screen's edges
+        or a
+        sbc hl,de
+        ld a,h
+        or a
+        jr nz,.throw
+        ld a,l
+        cp 16
+        jr nc,.not_left
+        ld (ix+5),1
+        jr .throw
+.not_left:
+        cp 256-32
+        jr c,.throw
+        ld (ix+5),-1
+.throw:
+        ld a,(ix+8)                     ; a bandage at Simon every 128 frames
+        rrca                            ; (the two mummies, by their place in
+        rrca                            ; the list, half a cycle apart)
+        and 0x40
+        add a,(ix+4)
+        and 127
+        cp 64
+        jr nz,.frame
+        call wake_near
+        push ix
+        ld c,(ix+5)
+        ld l,(ix+1)
+        ld h,(ix+2)
+        ld a,(ix+3)
+        add a,16
+        ld b,a
+        call obj_free_slot
+        jr c,.no_bandage
+        ld (ix+1),l
+        ld (ix+2),h
+        ld (ix+3),b
+        ld (ix+10),b                    ; (the wave's top)
+        ld (ix+5),c
+        ld (ix+0),OBJ_BANDAGE
+        ld (ix+4),0
+        ld (ix+6),OBJF_BANDAGE
+        ld (ix+7),KIND_BAT
+        ld (ix+8),0xFF
+        ld (ix+9),0
+        ld (ix+11),0
+.no_bandage:
+        pop ix
+.frame:
+        ld a,OBJF_MUMMY
+        bit 7,(ix+5)
+        jr nz,.left
+        inc a
+.left:
+        ld (ix+6),a
+        ld a,(ix+9)                     ; asleep: no harm, no hits
+        or a
+        ret z
+        ld a,(ix+11)                    ; hit
+        or a
+        jr z,.can_hit
+        dec (ix+11)
+        jp zombie_update.touch
+.can_hit:
+        call weapon_hits
+        jp nc,zombie_update.touch
+        ld a,SND_HIT
+        call sfx_play
+        ld (ix+11),16
+        ld a,1
+        ld (hud_dirty),a
+        ld a,(boss_hp)                  ; the bar: both together
+        sub MUMMY_DAMAGE
+        jr nc,.bar
+        xor a
+.bar:
+        ld (boss_hp),a
+        ld a,(ix+10)
+        sub MUMMY_DAMAGE
+        jr z,.dead
+        jr c,.dead
+        ld (ix+10),a
+        ret
+.dead:
+        ld a,SCORE_BOSS
+        call add_score
+        ld a,(boss_hp)                  ; the last one: it burns, leaves the orb
+        or a
+        jr z,.last
+        ld (ix+0),OBJ_BURST
+        ld (ix+4),0
+        ld (ix+6),OBJF_BURST
+        ld (ix+5),ITEM_NONE
+        ret
+.last:
+        ld (ix+9),4
+        ld (ix+4),0
+        ld a,(ix+3)                     ; burn at its middle
+        add a,16
+        ld (ix+3),a
+        ld (ix+7),KIND_BAT
+        ret
+
+; --- a bandage: across at 1 1/2 px a frame, in an 18-px wave ---
+bandage_update:
+        inc (ix+4)
+        ld a,0x80
+        call step_x_frac
+        ld a,(ix+4)
+.mod96:
+        sub 96
+        jr nc,.mod96
+        add a,96
+        ld e,a
+        ld d,0
+        ld hl,bat_wave
+        add hl,de
+        ld a,(ix+10)
+        add a,(hl)
+        sub 9
+        ld (ix+3),a
+        ld a,(ix+4)
+        rrca
+        rrca
+        rrca
+        and 1
+        add a,OBJF_BANDAGE
+        ld (ix+6),a
+        jp bat_update.checks
+

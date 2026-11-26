@@ -371,7 +371,15 @@ columns as in block 1, so its areas need no x offset. Its enemies (fleamen, ghos
 skeletons and their bones, bone pillars and their fireballs, ravens) are placed in the
 candle list; the skeleton uses the zombie's frames, the pillar's fireball the fishman's
 (at 2 px a frame). The ghost and the pillar take several hits: `obj_hits` keeps hits
-taken and a short flash per object slot. Its boss is not converted yet.
+taken and a short flash per object slot.
+
+The mummies (stage 9's boss) are two placed enemies with 32 health each; the HUD's bar
+shows both. They wake when the screen reaches their room (the area's last screen): the
+screen locks, the bridge's enemies go, and the swap window, generalised to pairs of
+frame sets (`SWAP_PAIRS`), gives their sprite patterns to the mummies. They walk at
+Simon and throw bandages along the bat's wave; the last one to fall burns into the orb,
+and the stage clear ends block 3 (block 4 is not converted: the game goes back to the
+courtyard).
 
 ### Code in RAM
 

@@ -213,6 +213,10 @@ SCORE_GHOST     equ 0x03
 SCORE_SKEL      equ 0x03
 SCORE_PILLAR    equ 0x04
 SCORE_RAVEN     equ 0x02
+; The mummies (stage 9 boss, recorded on the NES): two, sharing the HUD's bar
+MUMMY_HP        equ 32                  ; each (the bar shows both: 64)
+MUMMY_DAMAGE    equ 2                   ; a whip hit (NES: 1-3)
+MUMMY_TURN      equ 64                  ; it faces Simon this often
 FISH_MAX        equ 2                   ; fishmen about at once
 FISH_DELAY      equ 32                  ; frames before the next one jumps out
 FISH_AWAY       equ 48                  ; not right under Simon
