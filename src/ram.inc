@@ -84,7 +84,7 @@ arc_ptr         equ hurt_t+1            ; 2  arc table in use (jump or knock-bac
 arc_len         equ arc_ptr+2           ; 1  its rising length
 zombie_spawn_t  equ arc_len+1           ; 1
 zombie_side     equ zombie_spawn_t+1    ; 1  alternates the screen edge
-zombie_wave     equ zombie_side+1    ; 1  zombies spawned in this wave
+zombie_wave     equ zombie_side+1    ; 1  zombies made, counted to 3 (the NES's $63)
 enemies_off     equ zombie_wave+1       ; 1  test hook: bit 0 = no zombies, bit 1 = no panthers
 player_dead     equ enemies_off+1       ; 1  set when health runs out
 spr_hide        equ player_dead+1       ; 1  Simon blinks this frame
@@ -177,7 +177,17 @@ rng             equ med_frz+1           ; 1  random byte (as the NES's $6F, a st
 drop_idx        equ rng+1               ; 1  enemies' sub-weapon drops: next of the stage's 4
 obj_ext         equ drop_idx+1          ; 4*OBJ_MAX  per slot: x fraction, y fraction, speed (2)
 spawner_sx      equ obj_ext+4*OBJ_MAX   ; 2  the active spawner's screen x
-RAM_END         equ spawner_sx+2
+spawner_x       equ spawner_sx+2        ; 2  the active spawner's world x
+spawner_i       equ spawner_x+2         ; 1  its index in the area's list
+spawn_tick      equ spawner_i+1         ; SPAWNERS_MAX  per spawner: ticks (2 frames) to wait
+spawn_st        equ spawn_tick+SPAWNERS_MAX ; SPAWNERS_MAX  0 off the screen, 1 just on, 2 on
+boss_t          equ spawn_st+SPAWNERS_MAX ; 1  the bat boss: frames in its state
+boss_frz        equ boss_t+1            ; 1  ... frames stopped by a hit
+boss_vx         equ boss_frz+1          ; 2  ... speed across (8.8, along its facing)
+boss_vy         equ boss_vx+2           ; 2  ... speed down (8.8, signed)
+boss_xf         equ boss_vy+2           ; 1  ... fractions
+boss_yf         equ boss_xf+1           ; 1
+RAM_END         equ boss_yf+1
         ASSERT RAM_END < 0xF380
         ASSERT RAM_END <= RAMCODE
 RAMCODE         equ 0xD000              ; code copied from ROM (src/ramcode.asm)

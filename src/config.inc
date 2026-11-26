@@ -164,17 +164,10 @@ ZOMBIE_DAMAGE   equ 8
 DAMAGE_LATE     equ 12                  ; an enemy's touch from stage 7 (NES $E74A)
 ENEMY_ZOMBIE    equ 0x01                ; spawner types (NES enemy records)
 ENEMY_BAT       equ 0x02
-BAT_DELAY       equ 192                 ; frames before a bat appears (the NES
-                                        ; varies from about 60 to 320)
+BAT_EVERY       equ 384                 ; frames from a bat to the next (NES $C0 ticks)
 CROUCH_TOP      equ 20
 BOSS_HP         equ 64                  ; the boss's health (the NES's $01A9)
-BOSS_DAMAGE     equ 6                   ; per whip hit (NES: 64 -> 58 -> 52)
-BOSS_INV        equ 16                  ; frames without hits after one
-BOSS_HOVER      equ 160                 ; frames it hovers before a swoop
-BOSS_SWOOP_MAX  equ 120                 ; a swoop ends after this many frames
-BOSS_HIGH_Y     equ 26
-BOSS_FIRE_AT    equ 80                  ; hover frame when it may spit a fireball
-BOSS_FIRE_FAR   equ 80                  ; ... if Simon is at least this far away (x)
+BOSS_FREEZE     equ 8                   ; frames a hit stops the bat boss
                                         ; (NES video: fireballs only from afar)                  ; box top of the spots it flies back to
 ; Stage clear after the orb (NES game mode $0C, measured)
 CLEAR_JINGLE    equ 223                 ; frames of the jingle before the tally
@@ -210,12 +203,10 @@ SCORE_RAVEN     equ 0x02
 MUMMY_HP        equ 32                  ; each (the bar shows both: 64)
 MUMMY_FREEZE    equ 8                   ; frames a hit stops a mummy
 FISH_MAX        equ 2                   ; fishmen about at once
-FISH_DELAY      equ 32                  ; frames before the next one jumps out
-FISH_AWAY       equ 48                  ; not right under Simon
-FISH_VY0        equ -86                 ; jump speed, 1/16 px per frame
+FISH_AWAY       equ 40                  ; not within this of Simon (NES $28)
+FISH_VY0        equ -88                 ; jump speed, 1/16 px per frame (NES 5 1/2)
 FISH_GRAVITY    equ 2
 FISH_VMAX       equ 64
-FISH_WALK       equ 80                  ; frames of walking between shots
 FISH_WATER_Y    equ 120                 ; box top when it leaves the water
 HIT_FREEZE      equ 6                   ; frames frozen when hit
 STUN_FRAMES     equ 16                  ; crouched after landing from the knock-back
@@ -225,10 +216,7 @@ HURT_FLY        equ 2
 HURT_STUN       equ 3
 
 ; Zombies (spawn at the screen edges while a zombie spawner is near)
-ZOMBIE_INTERVAL equ 32                  ; frames between spawns
-ZOMBIE_MAX      equ 3                   ; per wave
-ZOMBIE_PAUSE    equ 96                  ; frames after a wave is gone, then
-                                        ; ZOMBIE_INTERVAL more to the next one
+SPAWNERS_MAX    equ 8                   ; spawners in an area's list (at most)
 SPAWNER_LEFT    equ 64                  ; spawner active within camera-64 .. camera+320
 SPAWNER_RIGHT   equ 320
 

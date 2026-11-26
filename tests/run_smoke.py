@@ -215,11 +215,11 @@ def tcl_script(syms, result_file):
                        set ::boss_hunt 0; set ::boss_floor 1
                        poke {px_a} [expr {{700 & 255}}]; poke {px_a + 1} [expr {{700 >> 8}}]
                        poke {py} 128; poke {py + 1} 0
-                       # (hovering, 30 frames before its swoop: one swoop always
-                       # falls in this window, whatever the frame timing)
+                       # (hovering 30 frames more: then, Simon below it, it swoops:
+                       # a dive that goes below his middle)
                        for {{set i 0}} {{$i < 8}} {{incr i}} {{
                            set b [expr {{{objt} + $i*{obj_size}}}]
-                           if {{[peek $b] == 10}} {{ poke [expr {{$b + 9}}] 2; poke [expr {{$b + 4}}] [expr {{{syms["BOSS_HOVER"]} - 30}}] }}
+                           if {{[peek $b] == 10}} {{ poke [expr {{$b + 9}}] 3; poke {syms["boss_t"]} 30 }}
                        }} }}
     after time 74.75 {{ {dump('27b_floor_start')} }}
     after time 78.8 {{ # holy water's fire on the boss: held in it, and hurt again and again
@@ -243,12 +243,12 @@ def tcl_script(syms, result_file):
                        set fo [expr {{{objt} + 7*{obj_size}}}]; poke $fo 0; poke {syms["dagger_on"]} 0; poke {syms["holy_fire"]} 0 }}
     after time 79.6 {{ {dump('27c_floor_end')}; set ::boss_floor 0
                        set f [open "{result_file}" a]; puts $f "floor_fires $::floor_fires"; close $f
-                       # fireballs: boss hovering at the screen's left, Simon on the ledge far right
-                       boss_place 512 1; poke {px_a} [expr {{750 & 255}}]; poke {px_a + 1} [expr {{750 >> 8}}]
-                       poke {py} 64; poke {py + 1} 0 }}
+                       # fireballs (NES): a hover ends with Simon's middle above
+                       # the boss's: a fireball at him; Simon below it: a swoop
+                       poke {px_a} [expr {{750 & 255}}]; poke {px_a + 1} [expr {{750 >> 8}}]
+                       poke {py} 64; poke {py + 1} 0; boss_place 600 1 }}
     after time 79.9 {{ set ::boss_fire [count_type 9]
-                       # and close to Simon: no fireball
-                       clear_type 9; boss_place 700 0 }}
+                       clear_type 9; boss_place 600 0 }}
     after time 80.2 {{ set ::boss_near_fire [count_type 9]
                        set f [open "{result_file}" a]; puts $f "boss_maxy $::boss_maxy"; close $f
                        poke {px_a} [expr {{711 & 255}}]; poke {px_a + 1} [expr {{711 >> 8}}]
@@ -256,7 +256,7 @@ def tcl_script(syms, result_file):
     after time 80.1 {{ {dump('27_boss')}
                        set f [open "{result_file}" a]; puts $f "boss_hp [peek {syms["boss_hp"]}] $::boss_awake $::boss_sleepf"; close $f
                        poke {syms["boss_hp"]} 1 }}
-    after time 80.3 {{ boss_place 0 0 }}
+    after time 80.3 {{ }}
     after time 86.1 {{ set ::boss_hunt 0; {dump('28_boss_dead')}
                        # a known tally: 12 timer steps and 3 hearts
                        poke {syms["time_bcd"]} 0x12; poke {syms["time_bcd"] + 1} 0; poke {syms["time_t"]} 0
@@ -265,6 +265,8 @@ def tcl_script(syms, result_file):
                        for {{set i 0}} {{$i < 8}} {{incr i}} {{
                            set b [expr {{{objt} + $i*{obj_size}}}]
                            if {{[peek $b] == 11}} {{
+                               # (NES: hidden 60 frames, flashing 32: skip them)
+                               poke [expr {{$b+4}}] 92
                                poke {px_a} [peek [expr {{$b+1}}]]; poke {px_a + 1} [peek [expr {{$b+2}}]]
                                poke {py} [expr {{[peek [expr {{$b+3}}]] - 16}}]; poke {py + 1} 0
                                set ::orb_seen 1
@@ -767,18 +769,15 @@ proc clear_type {{t}} {{
     for {{set i 0}} {{$i < 8}} {{incr i}} {{ set b [expr {{{objt} + $i*{obj_size}}}]; if {{[peek $b] == $t}} {{ poke $b 0 }} }}
 }}
 # put the boss at box x (y 40), hovering, a few frames before it may fire
-proc boss_place {{x far}} {{
+# the boss hovering at x, its hover ending the next frame: below Simon (1)
+# or above him (0)
+proc boss_place {{x below}} {{
     for {{set i 0}} {{$i < 8}} {{incr i}} {{
         set b [expr {{{objt} + $i*{obj_size}}}]
         if {{[peek $b] != 10}} continue
         poke [expr {{$b+1}}] [expr {{$x & 255}}]; poke [expr {{$b+2}}] [expr {{$x >> 8}}]
-        poke [expr {{$b+3}}] 40; poke [expr {{$b+9}}] 2; poke [expr {{$b+4}}] 70
-        if {{!$far}} {{
-            # right in front of Simon, at his chest
-            set sx [expr {{[peek {px_a}] + 256*[peek {px_a + 1}]}}]
-            poke [expr {{$b+1}}] [expr {{($sx - 40) & 255}}]; poke [expr {{$b+2}}] [expr {{($sx - 40) >> 8}}]
-            poke [expr {{$b+3}}] [expr {{[peek {py}] - 4}}]
-        }}
+        poke [expr {{$b+3}}] [expr {{$below ? [peek {py}] + 40 : 8}}]; poke [expr {{$b+9}}] 3
+        poke {syms["boss_t"]} 2; poke {syms["boss_frz"]} 0
     }}
 }}
 proc fireball_at_simon {{}} {{
@@ -1180,8 +1179,6 @@ def run():
           if "26_standing_fireball" in snaps else []),
         *([("stage 3's zombies keep both walking frames (they share patterns with the boss)",
             stage3_walk)] if gen == "converted" else []),
-        *([("in a real fight (on the ledge, then the floor), the boss spits fireballs at Simon",
-            floor_fires >= 1)] if floor_fires is not None else []),
         *([("asleep (Simon left of the screen's middle), the boss stays asleep and can't be hurt",
             asleep_hit == (64, 0))] if asleep_hit else []),
         *([("asleep, the stage 3 boss is the small hanging bat (NES)", boss_sleepf == 55)]
@@ -1195,8 +1192,9 @@ def run():
             snaps["27a_boss_left"]["cam_x"] == 512 and snaps["27a_boss_left"]["px"] < 530),
            (f"the boss swoops down to Simon waiting on the floor (lowest box top {boss_maxy})",
             boss_maxy >= 112 and snaps["27c_floor_end"]["hp"] < snaps["27b_floor_start"]["hp"]),
-           ("hovering far from Simon, the boss spits a fireball at him", boss_fire >= 1),
-           ("close to him, it doesn't", boss_near_fire == 0),
+           ("a hover ending with Simon above it: the boss spits a fireball at him (NES)",
+            boss_fire >= 1),
+           ("with Simon below it, it swoops instead", boss_near_fire == 0),
            ("beaten, it leaves an orb; taking it clears the stage", orb_seen == 1 and clear_t > 0
             and snaps["29_stage_clear"]["hp"] == 64),
            ("the tally: the timer runs down to 0, 10 points a step (NES)",
@@ -1314,7 +1312,7 @@ def run():
             high_item[0] == 3 and high_item[1] < 176)]
           if high_item else []),
         *([("holy water's fire holds the boss (it can't move) and keeps hurting it",
-            stun[0][:2] == stun[1][:2] and int(stun[1][2]) <= int(stun[0][2]) - 12)]
+            stun[0][:2] == stun[1][:2] and int(stun[1][2]) <= int(stun[0][2]) - 5)]
           if stun else []),
         *([("UP at a staircase's foot climbs it to the top",
             (snaps["11_stairs_up"]["px"], snaps["11_stairs_up"]["py"]) == stair["top"]

@@ -21,27 +21,18 @@
 ;    it is gone when its middle leaves the screen.
 ;   +4 frames flown   +5 direction   +9 centre y (port top)   +10 x fraction
 ; ---------------------------------------------------------------------------
-medusa_spawner:                         ; (only on the screen: enemies_update)
-        ld hl,medusa_on                 ; (bit 1: near last frame too)
-        set 0,(hl)
-        bit 1,(hl)
-        jr nz,.near
-        ld a,9                          ; just got near: 9 ticks
-        ld (medusa_t),a
+medusa_spawner:                         ; HL = its state, DE = its timer
+        ld a,(hl)                       ; just on the screen: 9 ticks
+        cp 1
+        jr nz,.timer
+        ld a,9
+        ld (de),a
         ret
-.near:
-        ld hl,medusa_t
-        ld a,(frame_count)              ; a tick every other frame
-        and 1
-        jr z,.ticked
-        ld a,(hl)
-        or a
-        jr z,.ticked
-        dec (hl)
-.ticked:
-        ld a,(hl)
+.timer:
+        ld a,(de)
         or a
         ret nz
+        push de
         ld ix,obj_table                 ; how many heads are about?
         ld de,OBJ_SIZE
         ld bc,OBJ_MAX*256
@@ -53,16 +44,19 @@ medusa_spawner:                         ; (only on the screen: enemies_update)
 .not_head:
         add ix,de
         djnz .count
+        pop de
         ld a,c
         cp MEDUSA_MAX
         ret nc
         ld a,(stair_state)              ; not while Simon is on the stairs
         cp 2
         ret z
+        push de
         call obj_free_slot
+        pop de
         ret c
         ld a,MEDUSA_EVERY/2
-        ld (medusa_t),a
+        ld (de),a
         ld hl,(cam_x)
         ld a,(facing)
         or a

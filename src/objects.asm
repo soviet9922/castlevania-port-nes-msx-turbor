@@ -139,9 +139,11 @@ objects_reset:
         ldir
         ld hl,0xFFFF
         ld (spawn_last),hl
-        xor a
-        ld (zombie_wave),a
-        ld (zombie_spawn_t),a
+        ld hl,spawn_tick                ; spawners: timers 0, off the screen
+        ld de,spawn_tick+1
+        ld bc,2*SPAWNERS_MAX-1
+        ld (hl),0
+        ldir
         ret
 
 ; A = candle index -> HL = byte in candle_dead, B = bit mask (DE, C clobbered)
@@ -800,7 +802,7 @@ zombie_update:
         jr nz,.falling
         ld a,(ix+4)
         and 7
-        jr z,.no_step                   ; rests 1 frame in 8
+        jp z,.no_step                   ; rests 1 frame in 8
         ld a,(ix+5)
         ld e,a
         rla
@@ -811,6 +813,23 @@ zombie_update:
         add hl,de
         ld (ix+1),l
         ld (ix+2),h
+        ld de,8+16                      ; a wall 16 px ahead at its middle:
+        bit 7,(ix+5)                    ; it turns round (NES 5:$8038)
+        jr z,.wall
+        ld de,8-16
+.wall:
+        add hl,de
+        ld a,(ix+3)
+        add a,16
+        ld e,a
+        ld d,0
+        call solid_at
+        jr nc,.no_wall
+        ld a,(ix+5)
+        neg
+        ld (ix+5),a
+        jr .no_step
+.no_wall:
         call zombie_ground              ; walked off a platform's edge: it
         jr c,.no_step                   ; drops to the floor below (NES)
         ld (ix+9),1
@@ -849,7 +868,8 @@ zombie_update:
         ld (ix+3),a
         ld (ix+9),0
 .no_step:
-        ld a,(ix+4)
+        ld a,(ix+4)                     ; legs: every 16 frames (NES 17)
+        rrca
         rrca
         rrca
         rrca
@@ -864,31 +884,23 @@ zombie_update:
         add a,c
         ld (ix+6),a
 
-        ld l,(ix+1)                     ; walked off the screen: gone
-        ld h,(ix+2)
+        ld l,(ix+1)                     ; its middle off the screen: gone
+        ld h,(ix+2)                     ; (NES: outside x 8..$F8)
         ld de,(cam_x)
         or a
         sbc hl,de
-        ld de,16
-        add hl,de
-        bit 7,h
-        jp nz,.gone
-        ld de,256+16+1
+        ld a,h
         or a
-        sbc hl,de
-        jr nc,.gone
+        jp nz,.gone
+        ld a,l
+        cp 241
+        jp nc,.gone
 
         call weapon_hits
         jr nc,.touch
-        ld a,SND_HIT                    ; (struck: candle or enemy)
-        call sfx_play
-        ld (ix+0),OBJ_BURST
-        ld (ix+4),0
-        ld (ix+6),OBJF_BURST
-        ld (ix+5),ITEM_NONE
         ld a,SCORE_ZOMBIE
-        call add_score
-        ret
+        ld c,0
+        jp enemy_killed
 
 .touch:                                 ; zombie x+2..x+13 vs Simon px+3..px+12
         ld a,(invuln_t)
@@ -986,6 +998,23 @@ panther_update:
         ld (hl),a
 
 .awake:
+        ld l,(ix+1)                     ; awake, its middle off the screen:
+        ld h,(ix+2)                     ; gone (NES: outside x 8..$F8)
+        ld de,8
+        add hl,de
+        ld de,(cam_x)
+        or a
+        sbc hl,de
+        ld a,h
+        or a
+        jr nz,.gone_p
+        ld a,l
+        cp 241
+        jr c,.on_screen
+.gone_p:
+        ld (ix+0),OBJ_NONE
+        ret
+.on_screen:
         inc (ix+4)                      ; move 2 px in the running direction
         ld a,(ix+5)
         add a,a
@@ -1129,16 +1158,10 @@ panther_update:
         add hl,de
         ld (ix+1),l
         ld (ix+2),h
-        ld a,SND_HIT                    ; (struck: candle or enemy)
-        call sfx_play
-        ld (ix+0),OBJ_BURST
-        ld (ix+4),0
-        ld (ix+6),OBJF_BURST
-        ld (ix+5),ITEM_NONE
         ld (ix+7),KIND_BRAZIER
         ld a,SCORE_PANTHER
-        call add_score
-        ret
+        ld c,0
+        jp enemy_killed
 
 .touch:                                 ; panther x+4..x+27, y..y+15
         ld a,(invuln_t)
@@ -1214,20 +1237,15 @@ zombie_ground:
         jp solid_at
 
 ; ---------------------------------------------------------------------------
-; Zombie spawners: while one is near the camera, a zombie appears every
-; ZOMBIE_INTERVAL frames at alternating screen edges, in waves of ZOMBIE_MAX.
-; Like the NES, the next wave starts only after the last one is gone
-; (killed or walked off screen) plus a pause.
+; Enemy spawners, as the NES ($F382): every spawner whose place is on the
+; screen (x 8..$F8 from the camera) runs, each with its own timer, counted
+; down every other frame (a "tick" = 2 frames, $F4CA) while it is on the
+; screen; spawn_st is 1 on the first frame it is on the screen, then 2.
 ; ---------------------------------------------------------------------------
 enemies_update:
         ld a,(freeze_t)                 ; stopwatch: no new enemies either
         or a
         ret nz
-        ld hl,medusa_on                 ; a Medusa head spawner near last frame?
-        ld a,(hl)
-        add a,a
-        and 2
-        ld (hl),a
         ld a,(enemies_off)
         and 1
         ret nz
@@ -1237,6 +1255,8 @@ enemies_update:
         or a
         ret z
         ld b,a
+        xor a
+        ld (spawner_i),a
 .lp:
         ld e,(hl)
         inc hl
@@ -1250,97 +1270,180 @@ enemies_update:
         push hl
         push bc
         ex de,hl
+        ld (spawner_x),hl
         ld de,(cam_x)
         or a
         sbc hl,de
         ld (spawner_sx),hl              ; (its screen x)
-        ld de,SPAWNER_LEFT
-        add hl,de
-        bit 7,h
-        jr nz,.next
-        ld de,SPAWNER_RIGHT+SPAWNER_LEFT+1
+        call spawner_slot               ; HL = its state, DE = its timer
+        ld a,(spawner_sx+1)
         or a
-        sbc hl,de
-        jr c,.active
+        jr nz,.off
+        ld a,(spawner_sx)
+        cp 8
+        jr c,.off
+        cp 0xF9
+        jr nc,.off
+        ld a,(hl)                       ; on the screen: 1 the first frame,
+        or a                            ; then 2
+        ld a,1
+        jr z,.st
+        inc a
+.st:
+        ld (hl),a
+        ld a,(frame_count)              ; its timer ticks every other frame
+        and 1
+        jr z,.run
+        ld a,(de)
+        or a
+        jr z,.run
+        dec a
+        ld (de),a
+.run:
+        pop bc
+        push bc
+        ld a,(spawner_type)
+        cp ENEMY_BAT
+        call z,bat_spawner
+        ld a,(spawner_type)
+        cp ENEMY_FISH
+        call z,fish_spawner
+        ld a,(spawner_type)
+        cp ENEMY_MEDUSA
+        call z,medusa_spawner
+        ld a,(spawner_type)
+        cp ENEMY_ZOMBIE
+        call z,zombie_spawner
+        jr .next
+.off:
+        ld (hl),0                       ; off the screen (its timer is kept)
 .next:
+        ld hl,spawner_i
+        inc (hl)
         pop bc
         pop hl
         djnz .lp
         ret
-.active:
-        ld a,(spawner_type)             ; a Medusa head spawner runs only on
-        cp ENEMY_MEDUSA                 ; the screen (NES: x 8..$F8)
-        jr nz,.run
-        ld hl,(spawner_sx)
+
+; HL = spawn_st + spawner_i, DE = spawn_tick + spawner_i (B, C kept)
+spawner_slot:
+        ld a,(spawner_i)
+        and SPAWNERS_MAX-1
+        ld e,a
+        ld d,0
+        ld hl,spawn_tick
+        add hl,de
+        push hl
+        ld hl,spawn_st
+        add hl,de
+        pop de
+        ret
+
+; A = how many objects of type A there are (B, C kept)
+count_type:
+        push bc
+        ld ix,obj_table
+        ld de,OBJ_SIZE
+        ld b,OBJ_MAX
+        ld c,0
+.lp:
+        cp (ix+0)
+        jr nz,.not
+        inc c
+.not:
+        add ix,de
+        djnz .lp
+        ld a,c
+        pop bc
+        ret
+
+; HL = the screen edge's left x (cam_x + 0 or + 240): A = 0 the right edge,
+; else the left; but not the edge whose middle is within 64 px of Simon's
+; middle: then the other. -> HL, and A = 0 right, 1 left
+edge_away:
+        or a
+        ld a,0
+        jr z,.r
+        inc a
+.r:
+        push af
+        call .x
+        ld de,(px)
+        or a
+        sbc hl,de                       ; edge middle - Simon middle (both +8)
+        call abs_hl
         ld a,h
         or a
-        jr nz,.next
+        jr nz,.far
         ld a,l
-        cp 8
-        jr c,.next
-        cp 0xF9
-        jr nc,.next
-.run:
-        pop bc
-        pop hl
-        ld a,(spawner_type)
-        cp ENEMY_BAT
-        jp z,bat_spawner
-        cp ENEMY_FISH
-        jp z,fish_spawner
-        cp ENEMY_MEDUSA
-        jp z,medusa_spawner
+        cp 64
+        jr nc,.far
+        pop af
+        xor 1                           ; too near: the other edge
+        push af
+.far:
+        pop af
+.x:
+        ld hl,(cam_x)
+        or a
+        ret nz
+        ld de,240
+        add hl,de
+        ret
+
+; HL = |HL|
+abs_hl:
+        bit 7,h
+        ret z
+        xor a
+        sub l
+        ld l,a
+        sbc a,a
+        sub h
+        ld h,a
+        ret
+
+; --- zombies (NES 6:$805D): at most 3; a random edge (not the one within 64
+; px of Simon), only if there is floor there; then 32 frames to the next,
+; 288 after every third (zombie_wave, never reset, as the NES's $63) ---
+zombie_spawner:
+        ld a,(de)
+        or a
+        ret nz
         ld a,(swap_boss)                ; (their patterns are the boss's now)
         or a
         ret nz
-        ld hl,zombie_spawn_t
-        inc (hl)
-        ld a,(zombie_wave)
-        cp ZOMBIE_MAX
-        jr c,.in_wave
-        push bc                         ; wave complete: wait until its
-        call count_zombies              ; zombies are all gone, then pause
-        pop bc
-        ld hl,zombie_spawn_t
-        jr z,.all_gone
-        ld (hl),0
-        ret
-.all_gone:
-        ld a,(hl)
-        cp ZOMBIE_PAUSE
-        ret c
-        xor a
-        ld (hl),a
-        ld (zombie_wave),a
-        ret
-.in_wave:
-        ld a,(hl)
-        cp ZOMBIE_INTERVAL
-        ret c
-        ld (hl),0
+        push de
         push bc
-        call count_zombies
-        pop bc
-        cp ZOMBIE_MAX
-        ret nc
+        ld a,OBJ_ZOMBIE
+        call count_type
+        cp 3
+        jr nc,.no
         call obj_free_slot
-        ret c
-        ld hl,zombie_wave
-        inc (hl)
-        ld hl,(cam_x)
-        ld a,(zombie_side)
-        xor 1
-        ld (zombie_side),a
-        jr z,.left_edge
-        ld de,240                       ; right edge, walking left
-        add hl,de
+        jr c,.no
+        ld a,(rng)
+        and 1
+        call edge_away                  ; HL = left x, A = 1 left edge
         ld (ix+5),-1
-        jr .place
-.left_edge:
-        ld (ix+5),1                     ; left edge, walking right
-.place:
+        or a
+        jr z,.dir
+        ld (ix+5),1
+.dir:
+        pop bc
+        push bc
+        push hl
+        ld de,8                         ; floor at the edge (its middle, y+36)?
+        add hl,de
+        ld a,c
+        add a,36
+        ld e,a
+        ld d,0
+        call solid_at
+        pop hl
+        jr nc,.no
         ld (ix+1),l
         ld (ix+2),h
+        pop bc
         ld (ix+3),c
         ld (ix+0),OBJ_ZOMBIE
         ld (ix+4),0
@@ -1349,52 +1452,69 @@ enemies_update:
         ld (ix+7),KIND_BRAZIER          ; 16x32 box for the whip
         ld (ix+8),0xFF
         ld (ix+9),0
+        pop de
+        ld hl,zombie_wave
+        ld a,(hl)
+        inc (hl)
+        cp 3
+        ld a,16                         ; 32 frames
+        jr c,.t
+        ld (hl),1
+        ld a,144                        ; 288 frames after a third
+.t:
+        ld (de),a
+        ret
+.no:
+        pop bc
+        pop de
         ret
 
 ; ---------------------------------------------------------------------------
-; Bat (measured in NES stage 2): while a bat spawner is near and no bat is
-; flying, one appears after BAT_DELAY frames at the screen edge Simon faces,
-; at his height, and flies at him: 9 px every 8 frames across, dipping 18 px
-; and back every 96 frames. Wings: 3 frames of 9 (1 2 3 2). Touching Simon
-; hurts him and kills the bat; the whip kills it.
+; Bat (NES 6:$80E7): every 384 frames while its spawner is on the screen, at
+; most 3, not while Simon is on the stairs: at the edge Simon faces (the
+; other when that one is within 64 px of him), at his middle -19, -11, -3 or
+; +1 (by the frame), flying at him 1 1/8 px a frame, dipping 18 px and back
+; every ~100 frames. Wings: 3 frames of 9 (1 2 3 2). Touching Simon hurts
+; him and kills the bat; the whip kills it.
 ;   +4 timer   +5 direction   +9 start y   +10 x fraction
 ; ---------------------------------------------------------------------------
 bat_spawner:
-        ld ix,obj_table                 ; a bat flying already?
-        ld de,OBJ_SIZE
-        ld b,OBJ_MAX
-.find:
-        ld a,(ix+0)
-        cp OBJ_BAT
-        jr z,.flying
-        add ix,de
-        djnz .find
-        ld hl,bat_spawn_t
-        inc (hl)
-        ld a,(hl)
-        cp BAT_DELAY
-        ret c
-        ld (hl),0
-        ld a,(hurt_state)               ; not while Simon is knocked back
+        ld a,(de)
         or a
         ret nz
+        push de
+        ld a,OBJ_BAT
+        call count_type
+        pop de
+        cp 3
+        ret nc
+        ld a,(stair_state)              ; not while Simon is on the stairs
+        cp 2
+        ret z
+        push de
         call obj_free_slot
+        pop de
         ret c
-        ld hl,(cam_x)
-        ld a,(facing)
-        or a
-        jr nz,.left_edge
-        ld de,240                       ; facing right: from the right edge
-        add hl,de
+        ld a,BAT_EVERY/2
+        ld (de),a
+        ld a,(facing)                   ; facing right (0): the right edge
+        call edge_away
         ld (ix+5),-1
-        jr .place
-.left_edge:
+        or a
+        jr z,.place
         ld (ix+5),1
 .place:
         ld (ix+1),l
         ld (ix+2),h
+        ld a,(frame_count)
+        and 3
+        ld e,a
+        ld d,0
+        ld hl,bat_heights
+        add hl,de
         ld a,(py)
         add a,8
+        add a,(hl)
         ld (ix+3),a
         ld (ix+9),a
         ld (ix+0),OBJ_BAT
@@ -1403,10 +1523,7 @@ bat_spawner:
         ld (ix+8),0xFF
         ld (ix+10),0
         jp bat_frame
-.flying:
-        xor a
-        ld (bat_spawn_t),a
-        ret
+bat_heights:    db -19, -11, -3, 1
 
 bat_update:
         inc (ix+4)
@@ -1565,131 +1682,62 @@ bat_wave:
 ; (Block 2's and block 3's enemies, Medusa: src/enemies2.asm, run from RAM)
 
 ; ---------------------------------------------------------------------------
-; Fishman (measured in the NES stage 2 waterway). While fewer than FISH_MAX
-; are about, one jumps out of the water every FISH_DELAY frames, from a
-; spawner on the screen at least FISH_AWAY px from Simon. +9 = state:
-;   0 in the air: starts at -86/16 px per frame up, gravity 2/16, it passes
-;     through platforms going up and lands on one coming down (or falls back
-;     into the water and is gone)
+; Fishman (NES 6:$8182, ai_fishman $F08D). Each spawner: 168 frames after it
+; comes on the screen, then every 510 frames, while fewer than FISH_MAX are
+; about and Simon is FISH_AWAY px or more from it, one leaps out. +9 = state:
+;   0 in the air: starts at -88/16 px per frame up, gravity 2/16, it passes
+;     through platforms going up and lands on one coming down (on a 16-px row)
+;     or falls back into the water and is gone
+;   3 stands 8 frames, then
 ;   1 walks towards Simon, 3 px every 4 frames, legs every 24 frames; falls
-;     off the end of a platform; after FISH_WALK frames it stops and
+;     off the end of a platform; after 79, 121, 93 or 144 frames (random,
+;     NES $F11D) it stops and
 ;   2 shoots: a fireball after 16 frames, walks again (towards Simon) after 32
 ; +10 = vertical speed (1/16 px), +11 = fraction.
 ; ---------------------------------------------------------------------------
 fish_spawner:
-        ld ix,obj_table                 ; fishmen about?
-        ld de,OBJ_SIZE
-        ld b,OBJ_MAX
-        ld c,0
-.count:
-        ld a,(ix+0)
-        cp OBJ_FISH
-        jr nz,.not_one
-        inc c
-.not_one:
-        add ix,de
-        djnz .count
-        ld hl,fish_spawn_t
-        ld a,c
-        cp FISH_MAX
-        jr c,.wait
-        ld (hl),0
+        ld a,(hl)                       ; on the screen: first 168 frames
+        cp 1
+        jr nz,.timer
+        ld a,84
+        ld (de),a
         ret
-.wait:
-        inc (hl)
-        ld a,(hl)
-        cp FISH_DELAY
-        ret c
-        ld (hl),0
-        ld a,(hurt_state)
+.timer:
+        ld a,(de)
         or a
         ret nz
-        ; try the spawners in turn, starting after the last one used
-        ld hl,(area_hdr+AH_ENEMIES)
-        ld b,(hl)                       ; B = count
-        ld c,b                          ; C = tries left
-.try:
-        ld a,(fish_pick)
-        inc a
-        cp b
-        jr c,.idx
-        xor a
-.idx:
-        ld (fish_pick),a
-        ld hl,(area_hdr+AH_ENEMIES)
-        inc hl
-        add a,a
-        add a,a
-        ld e,a
-        ld d,0
-        add hl,de                       ; HL = record (x, y, type)
+        push de
         push bc
-        call .candidate
-        pop bc
-        ret nc                          ; spawned
-        dec c
-        jr nz,.try
-        ret
-; HL = spawner record -> carry if it can't be used, else spawns (no carry)
-.candidate:
-        ld a,(hl)
-        ld (tmp_w),a
-        inc hl
-        ld a,(hl)
-        ld (tmp_w+1),a                  ; spawner x
-        inc hl
-        ld b,(hl)                       ; y
-        inc hl
-        ld a,(hl)
-        cp ENEMY_FISH
-        scf
-        ret nz
-        ld hl,(tmp_w)
-        ld de,(cam_x)
-        or a
-        sbc hl,de                       ; screen x
-        ld a,h
-        or a
-        scf
-        ret nz
-        ld a,l
-        cp 16
-        ret c
-        cp 240
-        ccf
-        ret c
-        ld hl,(tmp_w)                   ; far enough from Simon?
+        ld a,OBJ_FISH
+        call count_type
+        cp FISH_MAX
+        jr nc,.no
+        ld hl,(spawner_x)               ; not within 40 px of Simon
         ld de,(px)
         or a
         sbc hl,de
         ld de,-8
-        add hl,de                       ; spawner x - Simon centre
-        bit 7,h
-        jr z,.pos
-        ld a,l
-        neg
-        ld l,a
-        ld a,h
-        cpl
-        ld h,a
-.pos:
+        add hl,de                       ; spawner x - Simon's middle
+        call abs_hl
         ld a,h
         or a
         jr nz,.ok
         ld a,l
         cp FISH_AWAY
-        ret c
+        jr c,.no
 .ok:
-        push bc
         call obj_free_slot
+        jr c,.no
         pop bc
-        ret c
-        ld hl,(tmp_w)
+        pop de
+        ld a,255                        ; then 510 frames
+        ld (de),a
+        ld hl,(spawner_x)
         ld de,-8
         add hl,de
         ld (ix+1),l
         ld (ix+2),h
-        ld (ix+3),b
+        ld (ix+3),c
         ld (ix+0),OBJ_FISH
         ld (ix+4),0
         ld (ix+5),1
@@ -1701,8 +1749,10 @@ fish_spawner:
         ld (ix+10),FISH_VY0
         ld (ix+11),0
         call fish_face
-        call fish_frame
-        or a
+        jp fish_frame
+.no:
+        pop bc
+        pop de
         ret
 
 ; +5 = towards Simon
@@ -1757,12 +1807,10 @@ fish_update:
 .landing:
         call fish_feet_solid
         jr nc,.drawn
-        ld a,(ix+3)                     ; stand on the tile
-        add a,32
-        and 0xF8
-        sub 32
+        ld a,(ix+3)                     ; on the tile (a 16-px row, NES)
+        and 0xF0
         ld (ix+3),a
-        ld (ix+9),1
+        ld (ix+9),3                     ; stands 8 frames
         ld (ix+4),0
         call fish_face
         jr .drawn
@@ -1770,6 +1818,14 @@ fish_update:
 .on_ground:
         cp 2
         jr z,.shooting
+        cp 3
+        jr nz,.walking
+        ld a,(ix+4)                     ; standing after landing
+        cp 8
+        jr c,.drawn
+        call fish_walk_on
+        jr .drawn
+.walking:
         ld a,(ix+4)                     ; walk: 3 px in 4 frames
         and 3
         jr z,.walked
@@ -1792,7 +1848,7 @@ fish_update:
         jr .drawn
 .ground:
         ld a,(ix+4)
-        cp FISH_WALK
+        cp (ix+10)                      ; its walk's length
         jr c,.drawn
         ld (ix+9),2
         ld (ix+4),0
@@ -1804,43 +1860,49 @@ fish_update:
         ld a,(ix+4)
         cp 32
         jr c,.drawn
-        ld (ix+9),1
-        ld (ix+4),0
         call fish_face
+        call fish_walk_on
 .drawn:
         call fish_frame
 
-        ld l,(ix+1)                     ; off the screen: gone
-        ld h,(ix+2)
+        ld l,(ix+1)                     ; its middle off the screen: gone
+        ld h,(ix+2)                     ; (NES: outside x 8..$F8)
         ld de,(cam_x)
         or a
         sbc hl,de
-        ld de,16
-        add hl,de
-        bit 7,h
-        jp nz,.gone
-        ld de,256+16+1
+        ld a,h
         or a
-        sbc hl,de
+        jp nz,.gone
+        ld a,l
+        cp 241
         jp nc,.gone
 .hits:
         call weapon_hits
         jp nc,zombie_update.touch
-        ld a,SCORE_FISH
-        call add_score
-        ld a,SND_HIT                    ; (struck: candle or enemy)
-        call sfx_play
-        ld (ix+0),OBJ_BURST
-        ld (ix+4),0
-        ld (ix+6),OBJF_BURST
-        ld (ix+5),ITEM_NONE
         ld a,(ix+3)                     ; burst on its body
         add a,8
         ld (ix+3),a
-        ret
+        ld a,SCORE_FISH
+        ld c,1                          ; (a big heart)
+        jp enemy_killed
 .gone:
         ld (ix+0),OBJ_NONE
         ret
+
+; walk: towards its facing for 79, 121, 93 or 144 frames (NES $F11D)
+fish_walk_on:
+        ld (ix+9),1
+        ld (ix+4),0
+        ld a,(rng)
+        and 3
+        ld e,a
+        ld d,0
+        ld hl,fish_walks
+        add hl,de
+        ld a,(hl)
+        ld (ix+10),a
+        ret
+fish_walks:     db 79, 121, 93, 144
 
 ; carry if the tile under the fishman's feet (centre, y+32) is solid
 fish_feet_solid:
@@ -1892,9 +1954,7 @@ fish_shoot:
         jr c,.none
         ld (ix+1),l
         ld (ix+2),h
-        ld a,b
-        add a,8
-        ld (ix+3),a
+        ld (ix+3),b                     ; (its middle 8 px above the fishman's)
         ld (ix+5),c
         ld (ix+0),OBJ_FIREBALL
         ld (ix+4),0
@@ -1903,69 +1963,6 @@ fish_shoot:
         ld (ix+8),0xFF
         ld (ix+9),0                     ; straight across
         ld (ix+10),0                    ; 7 px every 4 frames
-.none:
-        pop ix
-        ret
-
-; While hovering far from Simon (BOSS_FIRE_FAR px or more), the boss spits a
-; slow fireball at him (seen in a video of the NES fight: 4 px every 3 frames,
-; aimed at him; never when he is close). From its mouth, across towards him,
-; and 1 px up or down every 2nd frame if he is above or below.
-boss_fire_if_far:
-        call boss_simon_dx
-        bit 7,h
-        jr z,.pos
-        ld a,l
-        neg
-        ld l,a
-        ld a,h
-        cpl
-        ld h,a
-.pos:
-        ld a,h
-        or a
-        jr nz,boss_shoot
-        ld a,l
-        cp BOSS_FIRE_FAR
-        ret c
-boss_shoot:
-        push ix
-        call boss_simon_dx
-        ld c,1
-        bit 7,h
-        jr z,.dir
-        ld c,-1
-.dir:
-        ld a,(py)                       ; his chest vs its mouth
-        add a,8
-        sub (ix+3)
-        sub 12
-        ld b,0
-        jr z,.dy
-        ld b,1
-        jp p,.dy
-        ld b,-1
-.dy:
-        ld l,(ix+1)
-        ld h,(ix+2)
-        ld de,16
-        add hl,de
-        ld a,(ix+3)
-        add a,8
-        ld e,a
-        call obj_free_slot
-        jr c,.none
-        ld (ix+1),l
-        ld (ix+2),h
-        ld (ix+3),e
-        ld (ix+5),c
-        ld (ix+9),b
-        ld (ix+10),1                    ; the boss's are slower
-        ld (ix+0),OBJ_FIREBALL
-        ld (ix+4),0
-        ld (ix+6),OBJF_FIREBALL
-        ld (ix+7),KIND_FIREBALL
-        ld (ix+8),0xFF
 .none:
         pop ix
         ret
@@ -1982,15 +1979,8 @@ fireball_update:
         ld e,2                          ; bone pillar: 2 px per frame
         jr .dx
 .boss_ball:
-        ld a,(ix+4)                     ; boss: 4 px every 3 frames
-.mod3:
-        sub 3
-        jr nc,.mod3
-        inc a                           ; 0 every 3rd frame: one more pixel
-        ld e,1
-        jr nz,.dx
-        ld e,2
-        jr .dx
+        call ball_step                  ; the boss's: aimed (vx +11, vy +9)
+        jp .no_dy
 .fish:
         ld a,(ix+4)                     ; fishman: 7 px every 4 frames
         and 3
@@ -2013,14 +2003,12 @@ fireball_update:
         add hl,de
         ld (ix+1),l
         ld (ix+2),h
-        bit 0,(ix+4)                    ; aimed up or down: 1 px every 2nd frame
-        jr z,.no_dy
+.no_dy:
         ld a,(ix+3)
-        add a,(ix+9)
-        ld (ix+3),a
         cp MT_ROWS*16
         jp nc,.gone                     ; left the playfield
-.no_dy:
+        ld l,(ix+1)
+        ld h,(ix+2)
 
         ld de,(cam_x)                   ; off the screen: gone
         or a
@@ -2036,10 +2024,7 @@ fireball_update:
 
         call weapon_hits
         jr nc,.touch
-        ld a,(ix+10)                    ; a pillar's: whipped, 100 points
-        cp 2
-        jr nz,.gone
-        ld a,SCORE_SNAKE
+        ld a,SCORE_SNAKE                ; whipped: 100 points (NES $E0A2)
         ld c,2
         jp enemy_killed
 .touch:                                 ; ball x+4..x+11 vs Simon px+3..px+12
@@ -2085,67 +2070,79 @@ fireball_update:
         ret c
 .hit:
         ld b,(ix+5)
-        call simon_hurt
-        ld a,(ix+10)                    ; a pillar's flies on (NES)
-        cp 2
-        ret z
+        jp simon_hurt                   ; it flies on (NES)
 .gone:
         ld (ix+0),OBJ_NONE
         ret
 
 
 ; ---------------------------------------------------------------------------
-; The stage 3 boss: a giant bat (measured on the NES). It hangs asleep (and
-; can't be hurt) until Simon reaches the middle of the last screen, then the
-; screen locks; it sinks a little, then repeats: hover for
-; BOSS_HOVER frames, swoop at where Simon is (2 px per frame across and down,
-; all the way to his height),
-; fly back to a new spot (3 px every 4 frames). A whip hit takes BOSS_DAMAGE
-; of its BOSS_HP health (then BOSS_INV frames without hits). At 0 it burns
-; for 60 frames and leaves an orb that drops to the floor; touching the orb
-; clears the stage. +9 = state: 0 asleep, 1 flying to (boss_tx, boss_ty),
-; 2 hovering, 3 swooping, 4 burning.
+; The stage 3 boss: a giant bat, from the NES code (bank 5 $80EF). It hangs
+; asleep until Simon reaches the last screen's middle; then the screen
+; locks, and after 120 more frames asleep (no hits, no harm):
+;  - spot: it flies in a straight line, 3/4 px a frame on the long axis, to
+;    Simon's middle +72 or -73 across (by the frame; the other side when that
+;    is off the screen's 16..239) and 41 px above him, until across it is
+;    within 4 px; then hovers 123, 32, 61 or 199 frames (by the frame);
+;  - every 16 frames of a hover, if Simon faces it within 88 px across and
+;    20 px of its height, it rises 2 1/2 px a frame for 7 frames (a dodge);
+;  - at the hover's (or dodge's) end: Simon's middle above its middle: a
+;    fireball at him (1 1/2 px a frame), 24 frames, a new spot; else a swoop:
+;    aimed at 25 px below Simon's middle (2 px a frame across, or 1 1/2 down),
+;    the downward speed falling 6/256 px a frame: a U through and past him,
+;    turning at screen x 16 / 240, until it rises above NES y 112: a new spot.
+; A hit takes the weapon's damage (6 leather, 8 chain/morning star) from its
+; BOSS_HP and stops it 8 frames. At 0 it burns 60 frames and the orb appears
+; at the screen's middle (orb_update). +9 = state: 0 asleep, 1 waking, 2 to
+; its spot, 3 hovering, 4 burning, 5 dodging, 6 swooping, 7 after a fireball.
+; Its middle is (x+24, y+7); speeds in boss_vx / boss_vy (8.8, vy signed).
 ; ---------------------------------------------------------------------------
 boss_update:
+        ld a,(boss_frz)                 ; stopped by a hit (no wings either)
+        or a
+        jr z,.go
+        dec a
+        ld (boss_frz),a
+        jp .hits
+.go:
+        ld a,(freeze_t)                 ; (the stopwatch holds it)
+        or a
+        jp nz,.hits
         inc (ix+4)
-        ld a,(ix+4)                     ; wings: open / up every 8 frames
-        rrca
-        rrca
-        rrca
+        ld a,(ix+4)                     ; wings: open / up every 9 frames
+        ld c,0
+.div9:
+        sub 9
+        jr c,.d9
+        inc c
+        jr .div9
+.d9:
+        ld a,c
         and 1
         add a,OBJF_BOSS
         ld (ix+6),a
-        ld a,(boss_inv)
-        or a
-        jr z,.no_inv
-        dec a
-        ld (boss_inv),a
-.no_inv:
         call in_holy_fire               ; in holy water's fire: it can't move,
-        jp c,.hits                      ; and the fire goes on hurting it (NES)
+        jp c,.hits                      ; and the fire goes on hurting it
         ld a,(ix+9)
         or a
         jr z,.asleep
         cp 4
         jp z,.burning
-        cp 2
+        dec a
+        jr z,.waking
+        dec a
+        jr z,.to_spot
+        dec a
         jp z,.hovering
-        cp 3
+        dec a
+        dec a
+        jp z,.dodging
+        dec a
         jp z,.swooping
-
-        ; 1: fly to the target, 3 px every 4 frames, y 1 px every 2nd frame
-        ld a,(ix+4)
-        and 3
-        jr z,.fly_y
-        call boss_step_x
-.fly_y:
-        ld a,(ix+4)
-        and 1
-        call z,boss_step_y
-        call boss_at_target
+        ld hl,boss_t                    ; 7: after a fireball
+        dec (hl)
         jp nz,.hits
-        ld (ix+9),2
-        ld (ix+4),0
+        call boss_spot
         jp .hits
 
 .asleep:                                ; asleep it can't be hurt; it wakes
@@ -2158,7 +2155,6 @@ boss_update:
         or a
         sbc hl,de
         ret c
-.wake:
         push ix                         ; the zombies go; the boss's patterns
         ld ix,obj_table                 ; take their place (swap window)
         ld de,OBJ_SIZE
@@ -2180,59 +2176,108 @@ boss_update:
         ld (cam_min),hl
         ld a,1
         ld (cam_lock),a
-        ld l,(ix+1)                     ; sink a little where it is
-        ld h,(ix+2)
-        ld (boss_tx),hl
-        ld a,(ix+3)
-        add a,22
-        ld (boss_ty),a
+        ld a,120                        ; 120 frames more asleep
+        ld (boss_t),a
+        xor a
+        ld (boss_frz),a
         ld (ix+9),1
+        ret
+.waking:
+        ld (ix+6),OBJF_BOSS_SLEEP
+        ld hl,boss_t
+        dec (hl)
+        ret nz
+        jp boss_spot
+
+.to_spot:
+        call boss_move
+        ld hl,(boss_tx)                 ; there when within 4 px across
+        call boss_dx_hl
+        call abs_hl
+        ld a,h
+        or a
+        jp nz,.hits
+        ld a,l
+        cp 4
+        jp nc,.hits
+        ld a,(frame_count)
+        and 3
+        ld e,a
+        ld d,0
+        ld hl,boss_hovers
+        add hl,de
+        ld a,(hl)
+        ld (boss_t),a
+        ld (ix+9),3
         jp .hits
 
 .hovering:
-        ld a,(ix+4)
-        cp BOSS_FIRE_AT
-        call z,boss_fire_if_far
-        ld a,(ix+4)
-        cp BOSS_HOVER
-        jp c,.hits
-        ld hl,(px)                      ; swoop at Simon: box centre on his
-        ld de,-16                       ; centre, wings at his chest
-        add hl,de
-        ld (boss_tx),hl
-        ld a,(py)
-        sub 4
-        ld (boss_ty),a
-        ld (ix+9),3
-        ld (ix+4),0
+        ld a,(frame_count)              ; the dodge test every 16 frames
+        and 15
+        call z,boss_dodge_test
+        ret c                           ; (dodging now)
+        ld hl,boss_t
+        dec (hl)
+        jp nz,.hits
+        call boss_attack
         jp .hits
 
-.swooping:                              ; 2 px per frame on both axes, all
-        call boss_step_x                ; the way down to where Simon was (on
-        call boss_step_x                ; the floor too, as on the NES)
-        call boss_step_y
-        call boss_step_y
-        ld a,(ix+4)
-        cp BOSS_SWOOP_MAX
-        jr nc,.swoop_done
-        call boss_at_target
-        jp nz,.hits
-.swoop_done:
-        ld a,r                          ; then back to a new spot up high
-        ld hl,frame_count
-        xor (hl)
-        and 127
-        add a,24
-        ld e,a
-        ld d,0
+.dodging:
+        ld hl,boss_t
+        dec (hl)
+        jr z,.dodge_end
+        call boss_move_y
+        jp .hits
+.dodge_end:
+        call boss_attack
+        jp .hits
+
+.swooping:
+        ld hl,(boss_vy)                 ; the downward speed falls 6/256
+        ld de,-6
+        add hl,de
+        ld (boss_vy),hl
+        bit 7,h
+        jr z,.dive
+        ld a,(ix+3)                     ; rising and above NES y 112: done
+        add a,7
+        cp 112-48
+        jr nc,.dive
+        call boss_spot
+        jp .hits
+.dive:
+        call boss_move
+        ld l,(ix+1)                     ; turn at screen x 16 / 240 (middle)
+        ld h,(ix+2)
+        ld de,24
+        add hl,de
+        ld de,(cam_x)
+        or a
+        sbc hl,de
+        ld de,16
+        bit 7,h
+        jr nz,.clamp
+        ld a,h
+        or a
+        jr nz,.right
+        ld a,l
+        cp 16
+        jr c,.clamp
+        cp 240
+        jr c,.hits
+.right:
+        ld de,240
+.clamp:
         ld hl,(cam_x)
         add hl,de
-        ld (boss_tx),hl
-        and 15
-        add a,BOSS_HIGH_Y
-        ld (boss_ty),a
-        ld (ix+9),1
-        jp .hits
+        ld de,-24
+        add hl,de
+        ld (ix+1),l
+        ld (ix+2),h
+        ld a,(ix+5)
+        neg
+        ld (ix+5),a
+        jr .hits
 
 .burning:                               ; burst frames on its body
         ld a,(ix+4)
@@ -2245,23 +2290,45 @@ boss_update:
         ld a,(ix+4)
         cp 60
         ret c
-        ld (ix+0),OBJ_ORB               ; the orb, where it burned
+        ld hl,(cam_x)                   ; the orb: at the screen's middle (NES
+        ld de,120                       ; $DD66: (128, 128)), hidden 60
+        add hl,de                       ; frames, flashing 32, then it falls
+        ld (ix+1),l
+        ld (ix+2),h
+        ld (ix+3),128-48-7
+        ld (ix+0),OBJ_ORB
         ld (ix+6),OBJF_ORB
         ld (ix+7),KIND_BAT
         ld (ix+4),0
+        ld (ix+9),0                     ; (hidden)
+        ld (ix+10),0
+        ld (ix+11),0
         ret
 
 .hits:
-        ld a,(boss_inv)
-        or a
-        jr nz,.touch
+        ld a,(ix+9)                     ; asleep or waking: no hits, no harm
+        cp 2
+        ret c
         call weapon_hits
-        jr nc,.touch
-        ld a,BOSS_INV
-        ld (boss_inv),a
+        jp nc,.touch
         ld a,1
         ld (hud_dirty),a
-        ld b,BOSS_DAMAGE
+        call hit_damage                 ; the weapon's damage (holy water's
+        rrca                            ; fire: 1 every 4 frames)
+        rrca
+        and 0x3F
+        ld b,a
+        ld a,(hit_src)
+        cp 3
+        jr nz,.dmg
+        ld b,0
+        ld a,(frame_count)
+        and 3
+        jr nz,.dmg
+        inc b
+.dmg:
+        ld a,BOSS_FREEZE
+        ld (boss_frz),a
         ld a,(boss_hp)
         sub b
         jr z,.dead
@@ -2286,10 +2353,7 @@ boss_update:
         ld (ix+3),a
         ld (ix+7),KIND_BAT
         ret
-.touch:                                 ; body x+8..x+39, y+0..y+23
-        ld a,(ix+9)
-        or a
-        ret z                           ; asleep: harmless
+.touch:                                 ; |dx| < 24, |dy| < 22 (middles)
         ld a,(invuln_t)
         or a
         ret nz
@@ -2297,23 +2361,23 @@ boss_update:
         or a
         ret nz
         call boss_simon_dx
-        ld de,22                        ; |dx| < 22 (16 + Simon's half body)
-        add hl,de
+        call abs_hl
         ld a,h
         or a
         ret nz
         ld a,l
-        cp 44
+        cp 24
         ret nc
         ld a,(py+1)
         or a
         ret nz
-        ld a,(ix+3)                     ; boss y..y+23 vs Simon py..py+31
-        add a,23
-        ld hl,py
-        sub (hl)
-        ret c
-        cp 32+23
+        ld a,(py)                       ; Simon's middle py+16, its y+7
+        add a,16-7
+        sub (ix+3)
+        jr nc,.dyp
+        neg
+.dyp:
+        cp 22
         ret nc
         call boss_simon_dx
         ld b,1
@@ -2333,54 +2397,388 @@ boss_simon_dx:
         add hl,de
         ret
 
-; one pixel across towards boss_tx (none if there)
-boss_step_x:
-        ld hl,(boss_tx)
+boss_hovers:    db 123, 32, 61, 199
+
+; HL = HL - the boss's middle x (x + 24)
+boss_dx_hl:
         ld e,(ix+1)
         ld d,(ix+2)
         or a
         sbc hl,de
+        ld de,-24
+        add hl,de
+        ret
+
+; a new spot: Simon's middle +72 or -73 across (the other side when off the
+; screen's 16..239), 41 px above him; 3/4 px a frame on the long axis
+boss_spot:
+        ld a,(frame_count)
+        and 1
+        call .side
+        jr nc,.ok
+        ld a,(frame_count)
+        and 1
+        xor 1
+        call .side
+.ok:
+        ld (boss_tx),hl
+        ld a,(py)                       ; Simon's middle - 41
+        add a,16-41
+        ld de,0x00C0
+        call boss_aim
+        ld (ix+9),2
+        ret
+.side:                                  ; HL = the target x; carry if off
+        ld hl,(px)
+        ld de,8+72
+        or a
+        jr z,.s
+        ld de,8-73
+.s:
+        add hl,de
+        push hl
+        ld de,(cam_x)
+        or a
+        sbc hl,de
+        ld a,h
+        or a
+        scf
+        jr nz,.out
+        ld a,l
+        cp 16
+        jr c,.out
+        cp 240
+        ccf
+.out:
+        pop hl
+        ret
+
+; aim at (HL = x, A = y) (middles): DE = the long axis's speed (8.8) ->
+; facing, boss_vx, boss_vy (signed: + down)
+boss_aim:
+        push de
+        push af
+        call boss_dx_hl
+        ld (ix+5),1
+        bit 7,h
+        jr z,.dxp
+        ld (ix+5),-1
+.dxp:
+        call abs_hl
+        ld a,h
+        or a
+        ld b,l
+        jr z,.bx
+        ld b,255
+.bx:
+        pop af
+        sub 7
+        sub (ix+3)                      ; dy = target - its middle
+        ld c,0                          ; C bit 0: up
+        jr nc,.dyp
+        neg
+        inc c
+.dyp:
+        pop de
+        push bc                         ; B = |dx|, C = up
+        ld l,a                          ; L = |dy|
+        cp b
+        jr nc,.y_long
+        ld (boss_vx),de                 ; x is the long axis
+        ld a,b
+        or a
+        jr z,.zero
+        ld a,l
+        ld l,b
+        call boss_muldiv
+        ld (boss_vy),hl
+        jr .sign
+.zero:
+        ld hl,0
+        ld (boss_vy),hl
+        jr .sign
+.y_long:
+        ld (boss_vy),de
+        ld a,l
+        or a
+        jr z,.zero_x
+        ld a,b
+        call boss_muldiv
+        ld (boss_vx),hl
+        jr .sign
+.zero_x:
+        ld hl,0
+        ld (boss_vx),hl
+.sign:
+        pop bc
+        bit 0,c
         ret z
-        ex de,hl
-        jr c,.left
-        inc hl
-        jr .set
-.left:
-        dec hl
-.set:
+        ld hl,(boss_vy)                 ; up: vy negative
+        xor a
+        sub l
+        ld l,a
+        sbc a,a
+        sub h
+        ld h,a
+        ld (boss_vy),hl
+        ret
+
+; HL = DE * A / L (L > 0)
+boss_muldiv:
+        ld c,l
+        push bc
+        ld hl,0
+        ld c,0
+        ld b,8
+.mul:
+        add hl,hl
+        rl c
+        rla
+        jr nc,.mn
+        add hl,de
+        jr nc,.mn
+        inc c
+.mn:
+        djnz .mul
+        pop de                          ; E = the divisor
+        ld d,e
+        ld e,c                          ; E:HL = the product
+        xor a
+        ld b,24
+.div:
+        add hl,hl
+        rl e
+        rla
+        jr c,.sub
+        cp d
+        jr c,.nx
+.sub:
+        sub d
+        inc l
+.nx:
+        djnz .div
+        ret
+
+; x += boss_vx along the facing, y += boss_vy (8.8 with fractions)
+boss_move:
+        ld a,(boss_xf)
+        ld hl,(boss_vx)
+        add a,l
+        ld (boss_xf),a
+        ld a,h
+        adc a,0
+        ld e,a
+        ld d,0
+        bit 7,(ix+5)
+        jr z,.xr
+        xor a
+        sub e
+        ld e,a
+        sbc a,a
+        ld d,a
+.xr:
+        ld l,(ix+1)
+        ld h,(ix+2)
+        add hl,de
         ld (ix+1),l
         ld (ix+2),h
+boss_move_y:
+        ld a,(boss_yf)
+        ld hl,(boss_vy)
+        add a,l
+        ld (boss_yf),a
+        ld a,(ix+3)
+        adc a,h
+        ld (ix+3),a
         ret
 
-; one pixel up or down towards boss_ty
-boss_step_y:
-        ld a,(boss_ty)
-        cp (ix+3)
-        ret z
-        jr c,.up
-        inc (ix+3)
-        ret
-.up:
-        dec (ix+3)
-        ret
-
-; Z if at (boss_tx, boss_ty)
-boss_at_target:
-        ld a,(boss_ty)
-        cp (ix+3)
-        ret nz
-; Z if at boss_tx
-boss_at_target_x:
-        ld hl,(boss_tx)
-        ld e,(ix+1)
-        ld d,(ix+2)
+; carry if Simon faces it within 88 px across and 20 px of its height: then
+; it dodges (rises 2 1/2 px a frame for 7 frames)
+boss_dodge_test:
+        ld a,(py+1)
         or a
-        sbc hl,de
+        ret nz
+        ld a,(py)
+        add a,16-7
+        sub (ix+3)
+        jr nc,.dy
+        neg
+.dy:
+        cp 20
+        ccf
+        ret c
+        call boss_simon_dx
+        ld c,0                          ; C = 1: Simon is left of it
+        bit 7,h
+        jr z,.r
+        inc c
+.r:
+        call abs_hl
+        ld a,h
+        or a
+        ret nz
+        ld a,l
+        cp 88
+        ccf
+        ret c
+        ld a,(facing)                   ; facing it: his facing differs from
+        cp c                            ; "he is left of it"
+        ret z
+        ld hl,-0x0280
+        ld (boss_vy),hl
+        ld a,8
+        ld (boss_t),a
+        ld (ix+9),5
+        or a
+        ret
+
+; the hover's end: Simon's middle above its middle: a fireball; else a swoop
+boss_attack:
+        ld a,(py)
+        add a,16-7
+        cp (ix+3)
+        jr nc,.swoop
+        ld a,(py+1)
+        or a
+        jr nz,.swoop
+        call boss_shoot
+        ld a,24
+        ld (boss_t),a
+        ld (ix+9),7
+        ret
+.swoop:
+        ld hl,(px)                      ; at 25 px below Simon's middle: 2 px
+        ld de,8                         ; across, or 1 1/2 down when the
+        add hl,de                       ; height is the long axis
+        ld a,(py)
+        add a,16+25
+        ld de,0x0200
+        call boss_aim
+        ld a,(boss_vy+1)                ; (y long: 1 1/2 px down)
+        cp 2
+        jr nz,.swooping
+        ld hl,0x0180
+        ld (boss_vy),hl
+.swooping:
+        ld (ix+9),6
+        ret
+
+; a fireball from its middle at Simon's middle, 1 1/2 px a frame on the
+; long axis (NES shoot_at_simon $EC94)
+boss_shoot:
+        ld hl,(px)
+        ld de,8
+        add hl,de
+        ld a,(py)
+        add a,16
+        ld de,0x0180
+        call boss_aim
+        push ix
+        ld l,(ix+1)
+        ld h,(ix+2)
+        ld de,16
+        add hl,de
+        ld a,(ix+3)
+        sub 1
+        ld b,a
+        ld c,(ix+5)
+        call obj_free_slot
+        jr c,.none
+        ld (ix+1),l
+        ld (ix+2),h
+        ld (ix+3),b
+        ld (ix+5),c
+        ld (ix+0),OBJ_FIREBALL
+        ld (ix+4),0
+        ld (ix+6),OBJF_FIREBALL
+        ld (ix+7),KIND_FIREBALL
+        ld (ix+8),0xFF
+        ld (ix+10),1                    ; (the boss's: aimed)
+        ld hl,(boss_vx)                 ; speeds in 1/128 px (up to 1 1/2)
+        add hl,hl
+        ld (ix+11),h
+        ld hl,(boss_vy)
+        add hl,hl
+        ld (ix+9),h
+        call obj_ext_of
+        ld (hl),0
+        inc hl
+        ld (hl),0
+.none:
+        pop ix
+        ret
+
+; the boss's fireball: x += vx (+11, 1/128 px) along its facing, y += vy (+9,
+; signed 1/128 px), fractions in obj_ext
+ball_step:
+        call obj_ext_of
+        push hl
+        ld a,(hl)
+        add a,(ix+11)
+        ld c,0
+        jr nc,.xn
+        inc c
+.xn:
+        ld b,a                          ; C:B = fraction + vx
+        and 127
+        ld (hl),a
+        ld a,b
+        rla
+        ld a,c
+        rla                             ; A = whole px (0-3)
+        bit 7,(ix+5)
+        jr z,.xr
+        neg
+.xr:
+        ld e,a
+        rla
+        sbc a,a
+        ld d,a
+        ld l,(ix+1)
+        ld h,(ix+2)
+        add hl,de
+        ld (ix+1),l
+        ld (ix+2),h
+        pop hl
+        inc hl
+        ld a,(ix+9)                     ; y: signed
+        ld e,a
+        rla
+        sbc a,a
+        ld d,a                          ; DE = vy (1/128)
+        ld a,(hl)
+        add a,e
+        ld c,a
+        ld a,d
+        adc a,0
+        ld b,a                          ; B:C = fraction + vy (signed)
+        ld a,c
+        and 127
+        ld (hl),a
+        sla c
+        rl b                            ; B = whole px (signed)
+        ld a,(ix+3)
+        add a,b
+        ld (ix+3),a
         ret
 
 ; The orb: falls 2 px per frame to the floor. Touching it clears the stage.
 orb_update:
         inc (ix+4)
+        ld a,(ix+4)                     ; hidden 60 frames, flashing 32
+        cp 60
+        jr nc,.shown
+        ld (ix+9),0
+        ret
+.shown:
+        cp 92
+        jr nc,.fall
+        and 1
+        ld (ix+9),a
+        ret
+.fall:
+        ld (ix+4),92
+        ld (ix+9),1
         ld l,(ix+1)                     ; on the ground? (bottom of its 16x16)
         ld h,(ix+2)
         ld de,8
@@ -2391,10 +2789,17 @@ orb_update:
         ld d,0
         call solid_at
         jr c,.landed
-        ld a,(ix+3)
-        add a,2
-        ld (ix+3),a
+        ld a,4                          ; falling: 1/4 px a frame faster each
+        call fall_step                  ; frame (vy in +10, 1/16 px)
+        jr c,.out
+        jr .touch
 .landed:
+        ld a,(ix+3)                     ; on the tile
+        add a,16
+        and 0xF8
+        sub 16
+        ld (ix+3),a
+.touch:
         ld hl,(px)                      ; Simon's box over it?
         ld de,12
         add hl,de
@@ -2428,6 +2833,9 @@ orb_update:
         ld (clear_phase),a
         ld a,SND_CLEAR
         jp music_restart
+.out:
+        ld (ix+3),MT_ROWS*16-16         ; (fell out: on the playfield's floor)
+        ret
 
 ; ---------------------------------------------------------------------------
 ; The dagger (sub-weapon): flies DAGGER_SPEED px per frame the way it was
@@ -2960,6 +3368,8 @@ objects_draw:
         or a
         jp z,.next_obj
         cp OBJ_GHOST                    ; (a ghost not out yet: nothing)
+        jr z,.hidden
+        cp OBJ_ORB                      ; (an orb not shown yet / flashing)
         jr z,.hidden
         cp OBJ_MEDUSA                   ; asleep, Medusa is the statue in the
         jr nz,.drawn                    ; map: no sprites
