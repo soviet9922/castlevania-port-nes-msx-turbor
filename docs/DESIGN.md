@@ -215,9 +215,11 @@ enemy bar. Its swoops aim at where Simon is on both axes, so it reaches him on t
 floor too. While hovering far from Simon (`BOSS_FIRE_FAR`, 128 px) it spits a slow
 fireball at him, as in a video of the NES fight (the FCEUX recordings never had
 Simon that far away). When it wakes, the camera locks: it can still move right but never back
-left, so the fight stays on one screen as on the NES. When it dies it leaves an orb, and taking the orb clears the stage: for
-now the game then starts again from the courtyard, because the next block isn't
-converted yet.
+left, so the fight stays on one screen as on the NES. When it dies it leaves an orb, and taking the orb clears the stage
+(`clear_tick`, as measured on the NES): the jingle, the timer runs down into the
+score (10 points a step), then the hearts (100 points each), and the area named by
+the boss area's `AH_NEXT` loads with 5 hearts and its stage's timer. The castle
+map the NES shows between blocks is left out.
 
 With more than 8 sprites on a line, the VDP drops the extras. The order of
 objects in the sprite list rotates every frame (Simon always comes first), so
@@ -239,7 +241,8 @@ health bars, hearts and lives. The timer counts down in BCD, one step every 64
 frames as on the NES. Kills add points (zombie 100 and panther 200 as measured on
 the NES; bat, fishman and boss values are estimates). When health or time runs out,
 Simon plays the 97-frame death animation and loses a life: he restarts at the start
-of the section with full health, 5 hearts and a full timer. A fall into a pit costs
+of the section with full health, 5 hearts and the timer of his stage (the NES's
+table: 300, 200, 100 for stages 1-3, 400, 300, 200 for 4-6). A fall into a pit costs
 the life without the animation. With no lives left it's game over: the HUD says so
 for 3 seconds and a new game starts.
 

@@ -109,6 +109,8 @@ new_game:
         call hud_draw
         ei
         call restart_section_vars
+        ld hl,TIME_START                ; (area_hdr is still the old game's)
+        ld (time_bcd),hl
         xor a
         jp load_area
 
@@ -120,11 +122,144 @@ restart_section_vars:
         ld (hp),a
         ld a,5
         ld (hearts),a
-        ld hl,TIME_START
+        call set_stage_time
+        ld a,1
+        ld (hud_dirty),a
+        ret
+
+; The timer for the current area's stage, from the NES's table at $C9F6:
+; a death or a new block restarts it there (between stages it carries on).
+set_stage_time:
+        ld a,(area_hdr+AH_STAGE)        ; BCD 1-9
+        add a,a
+        ld e,a
+        ld d,0
+        ld hl,stage_times
+        add hl,de
+        ld a,(hl)
+        inc hl
+        ld h,(hl)
+        ld l,a
         ld (time_bcd),hl
         xor a
         ld (time_t),a
-        inc a
+        ret
+stage_times:                            ; BCD, stage 0 (not used) to 9
+        dw 0x0300, 0x0300, 0x0200, 0x0100, 0x0400, 0x0300, 0x0200, 0x0500, 0x0400, 0x0300
+
+; ---------------------------------------------------------------------------
+; Stage clear (NES game mode $0C, measured after the stage 3 boss): the
+; jingle, then the timer runs down one step a frame (10 points each, a tick
+; every 8 frames), a pause, the hearts go one every 8 frames (100 points
+; each), a pause, and the next block starts with 5 hearts and its stage's
+; timer. Health was refilled when the orb was taken; the whip and the
+; sub-weapon carry on.
+; ---------------------------------------------------------------------------
+clear_tick:
+        ld a,(clear_phase)
+        cp 2
+        jr z,.timer
+        ld hl,clear_t
+        dec (hl)
+        ret nz
+        cp 1
+        jr z,.to_timer
+        cp 3
+        jr z,.heart
+        jp clear_done                   ; phase 4: the pause is over
+.to_timer:
+        ld a,2
+        ld (clear_phase),a
+        ret
+.timer:
+        ld hl,(time_bcd)
+        ld a,h
+        or l
+        jr z,.to_hearts
+        ld a,l
+        sub 1
+        daa
+        ld l,a
+        ld a,h
+        sbc a,0
+        daa
+        ld h,a
+        ld (time_bcd),hl
+        ld hl,score                     ; + 10 points
+        ld a,(hl)
+        add a,0x10
+        daa
+        ld (hl),a
+        call c,score_carry
+        ld hl,hud_parts                 ; score and time (not the bars)
+        set 1,(hl)
+        ld hl,clear_t
+        inc (hl)
+        ld a,(hl)
+        and 7
+        cp 5
+        ret nz
+        ld a,SND_TICK
+        jp sfx_play
+.to_hearts:
+        ld a,3
+        ld (clear_phase),a
+        ld a,CLEAR_HEART_WAIT
+        ld (clear_t),a
+        ret
+.heart:
+        ld a,(hearts)
+        or a
+        jr z,.to_outro
+        dec a
+        ld (hearts),a
+        ld hl,score+1                   ; + 100 points
+        ld a,(hl)
+        add a,1
+        daa
+        ld (hl),a
+        call c,score_carry
+        ld hl,hud_parts                 ; score; hearts
+        ld a,(hl)
+        or 6
+        ld (hl),a
+        ld a,CLEAR_HEART_STEP
+        ld (clear_t),a
+        ld a,SND_TALLY
+        jp sfx_play
+.to_outro:
+        ld a,4
+        ld (clear_phase),a
+        ld a,CLEAR_OUTRO
+        ld (clear_t),a
+        ret
+
+; HL = a score byte that overflowed: carry 1 into the bytes above it
+score_carry:
+        inc hl
+        ld a,l
+        cp low (score+3)
+        ret z
+        ld a,(hl)
+        add a,1
+        daa
+        ld (hl),a
+        jr c,score_carry
+        ret
+
+clear_done:
+        xor a
+        ld (clear_phase),a
+        ld a,BOSS_HP
+        ld (boss_hp),a
+        ld a,(area_hdr+AH_NEXT)         ; the next block's first area
+        call load_area
+        ld a,HP_MAX
+        ld (hp),a
+        ld a,5
+        ld (hearts),a
+        call set_stage_time
+        ld a,1
         ld (hud_dirty),a
         ret
 

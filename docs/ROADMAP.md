@@ -29,7 +29,8 @@
 - [x] Sections joined by stairs: stage 2's stairs down to the waterway and back up
 - [x] Stage 2: the rest of the route and its exit door, into stage 3
 - [x] Stage 3's boss: wake, hover, swoop, health in the HUD, burns, orb, stage clear
-- [ ] Stage clear sequence (timer and hearts to score), block 2 (stages 4-6)
+- [x] Stage clear sequence (timer and hearts to score), per-stage timer after a death
+- [ ] Block 2 (stages 4-6); the castle map between blocks
 - [ ] Palette selection table, stages 2 and up
 
 ## Milestone 2: Simon (in progress)

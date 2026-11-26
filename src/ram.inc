@@ -103,8 +103,10 @@ boss_hp         equ fish_pick+1         ; 1  shown in the HUD's enemy bar
 boss_inv        equ boss_hp+1           ; 1  frames until it can be hit again
 boss_tx         equ boss_inv+1          ; 2  where it is flying to
 boss_ty         equ boss_tx+2           ; 1
-clear_t         equ boss_ty+1           ; 1  stage clear countdown (0 = playing)
-cam_lock        equ clear_t+1           ; 1  camera can't go back left (boss)
+clear_t         equ boss_ty+1           ; 1  frames left in this stage clear phase
+clear_phase     equ clear_t+1           ; 1  stage clear: 0 playing, 1 jingle, 2 timer,
+                                        ;    3 hearts, 4 outro
+cam_lock        equ clear_phase+1       ; 1  camera can't go back left (boss)
 cam_min         equ cam_lock+1          ; 2  leftmost camera x while locked
 score           equ cam_min+2           ; 3  BCD, low byte first (always 00)
 time_bcd        equ score+3             ; 2  BCD, 0x0300 at the start

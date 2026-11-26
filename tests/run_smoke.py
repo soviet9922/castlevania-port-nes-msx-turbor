@@ -252,6 +252,9 @@ def tcl_script(syms, result_file):
                        poke {syms["boss_hp"]} 1 }}
     after time 80.3 {{ boss_place 0 0 }}
     after time 86.1 {{ set ::boss_hunt 0; {dump('28_boss_dead')}
+                       # a known tally: 12 timer steps and 3 hearts
+                       poke {syms["time_bcd"]} 0x12; poke {syms["time_bcd"] + 1} 0; poke {syms["time_t"]} 0
+                       poke {syms["hearts"]} 3; rules "before_orb"
                        # walk onto the orb
                        for {{set i 0}} {{$i < 8}} {{incr i}} {{
                            set b [expr {{{objt} + $i*{obj_size}}}]
@@ -263,24 +266,26 @@ def tcl_script(syms, result_file):
                        }} }}
     after time 86.6 {{ {dump('29_stage_clear')}
                        set f [open "{result_file}" a]; puts $f "orb $::orb_seen [peek {syms["clear_t"]}] $::boss_fire $::boss_near_fire"; close $f }}
-    after time 90.6 {{ {dump('30_restart')}; rules "after_clear"
+    after time 90.5 {{ rules "tally_time" }}
+    after time 92 {{ rules "tally_hearts" }}
+    after time 94.6 {{ {dump('30_restart')}; rules "after_clear"
                        # time runs out: death animation, then a life is lost
                        poke {syms["time_bcd"]} 1; poke {syms["time_bcd"] + 1} 0; poke {syms["time_t"]} 60 }}
-    after time 91.3 {{ rules "dying"; {dump('31_dying')} }}
-    after time 93.6 {{ rules "after_death"
+    after time 95.3 {{ rules "dying"; {dump('31_dying')} }}
+    after time 97.6 {{ rules "after_death"
                        # the last life: game over, then a new game
                        poke {syms["lives"]} 0
                        poke {syms["time_bcd"]} 1; poke {syms["time_bcd"] + 1} 0; poke {syms["time_t"]} 60 }}
-    after time 95.7 {{ rules "game_over" }}
-    after time 99.6 {{ rules "new_game"
+    after time 99.7 {{ rules "game_over" }}
+    after time 103.6 {{ rules "new_game"
                        # the chain whip
                        poke {syms["whip_level"]} 1; poke {fa} 0; set ::wpn_tag chain; set ::wpn_on 1
                        keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
-    after time 100.4 {{ wpn_report
+    after time 104.4 {{ wpn_report
                        # the morning star
                        poke {syms["whip_level"]} 2; set ::wpn_tag star; set ::wpn_on 1
                        keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
-    after time 101.2 {{ wpn_report
+    after time 105.2 {{ wpn_report
                        # the dagger: 60 px left of the first brazier, UP + whip
                        set bx [expr {{[peek {obj + 1}] + 256*[peek {obj + 2}] - 60}}]
                        poke {px_a} [expr {{$bx & 255}}]; poke {px_a + 1} [expr {{$bx >> 8}}]
@@ -288,13 +293,13 @@ def tcl_script(syms, result_file):
                        set ::wpn_tag dagger; set ::wpn_on 1; set ::dagger_xs {{}}
                        keymatrixdown 8 0x20; keymatrixdown 4 0x04
                        after time 0.05 {{ keymatrixup 4 0x04 }}; after time 0.3 {{ keymatrixup 8 0x20 }} }}
-    after time 102.4 {{ wpn_report
+    after time 106.4 {{ wpn_report
                        # the axe: standing still, UP + whip
                        poke {syms["subweapon"]} 2; poke {syms["hearts"]} 10; poke {fa} 0
                        set ::wpn_tag axe; set ::wpn_on 1; set ::sub_track {{}}
                        keymatrixdown 8 0x20; keymatrixdown 4 0x04
                        after time 0.05 {{ keymatrixup 4 0x04 }}; after time 0.3 {{ keymatrixup 8 0x20 }} }}
-    after time 104.1 {{ wpn_report
+    after time 108.1 {{ wpn_report
                        # holy water, 40 px left of the second brazier
                        set bx [expr {{[peek {obj + 1 + obj_size}] + 256*[peek {obj + 2 + obj_size}] - 40}}]
                        poke {px_a} [expr {{$bx & 255}}]; poke {px_a + 1} [expr {{$bx >> 8}}]
@@ -302,11 +307,11 @@ def tcl_script(syms, result_file):
                        set ::wpn_tag holy; set ::wpn_on 1; set ::sub_track {{}}; set ::brazier_x [peek {obj + 1 + obj_size}]
                        keymatrixdown 8 0x20; keymatrixdown 4 0x04
                        after time 0.05 {{ keymatrixup 4 0x04 }}; after time 0.3 {{ keymatrixup 8 0x20 }} }}
-    after time 106.1 {{ wpn_report
+    after time 110.1 {{ wpn_report
                        # the stopwatch: on the hall's floor with zombies about
                        poke {syms["subweapon"]} 4; poke {syms["hearts"]} 10 }}
-    after time 106.2 {{ sub_report "watch_hud" }}
-    after time 106.3 {{ # a zombie in front of Simon, enemies on; UP + whip
+    after time 110.2 {{ sub_report "watch_hud" }}
+    after time 110.3 {{ # a zombie in front of Simon, enemies on; UP + whip
                        poke {eoff} 2
                        for {{set i 0}} {{$i < 8}} {{incr i}} {{
                            set b [expr {{{objt} + $i*{obj_size}}}]
@@ -321,15 +326,15 @@ def tcl_script(syms, result_file):
                        }}
                        keymatrixdown 8 0x20; keymatrixdown 4 0x04
                        after time 0.05 {{ keymatrixup 4 0x04 }}; after time 0.2 {{ keymatrixup 8 0x20 }} }}
-    after time 106.5 {{ sub_report "watch_start" }}
-    after time 108.1 {{ sub_report "watch_frozen"; poke {eoff} 3; {dump('35_stopwatch')} }}
-    after time 110.1 {{ sub_report "watch_end"
+    after time 110.5 {{ sub_report "watch_start" }}
+    after time 112.1 {{ sub_report "watch_frozen"; poke {eoff} 3; {dump('35_stopwatch')} }}
+    after time 114.1 {{ sub_report "watch_end"
                        # the drop rule: an axe item while Simon holds the axe -> a heart
                        poke {syms["subweapon"]} 2
                        set b [expr {{{objt} + 7*{obj_size}}}]
                        poke [expr {{$b+1}}] 100; poke [expr {{$b+2}}] 0; poke [expr {{$b+3}}] 60
                        poke [expr {{$b+4}}] 0; poke [expr {{$b+5}}] 4; poke [expr {{$b+6}}] 2; poke $b 2 }}
-    after time 110.7 {{ sub_report "drop_rule"
+    after time 114.7 {{ sub_report "drop_rule"
                        # an item from a candle above the playfield's top (y -8, as the
                        # hall's holy water candle): it must fall into view, not vanish
                        set b [expr {{{objt} + 6*{obj_size}}}]
@@ -337,9 +342,9 @@ def tcl_script(syms, result_file):
                        poke [expr {{$b+1}}] [expr {{$x & 255}}]; poke [expr {{$b+2}}] [expr {{$x >> 8}}]
                        poke [expr {{$b+3}}] 248; poke [expr {{$b+4}}] 10; poke [expr {{$b+5}}] 5
                        poke [expr {{$b+6}}] 50; poke [expr {{$b+9}}] 0; poke $b 3 }}
-    after time 111.5 {{ set b [expr {{{objt} + 6*{obj_size}}}]
+    after time 115.5 {{ set b [expr {{{objt} + 6*{obj_size}}}]
                        set f [open "{result_file}" a]; puts $f "high_item [peek $b] [peek [expr {{$b+3}}]]"; close $f }}
-    after time 111.7 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}] $::vbl_worst_fc"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
+    after time 115.7 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}] $::vbl_worst_fc"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
 """ if areas > 1 else f"""
     after time 9 {{ snd_report; set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
@@ -521,7 +526,7 @@ debug set_watchpoint write_mem {fc} {{}} boss_watch
 # the game-rules state, as one result line
 proc rules {{tag}} {{
     set f [open "{result_file}" a]
-    puts $f "rules $tag time=[format %02x%02x [peek {syms["time_bcd"] + 1}] [peek {syms["time_bcd"]}]] score=[format %02x%02x%02x [peek {syms["score"] + 2}] [peek {syms["score"] + 1}] [peek {syms["score"]}]] lives=[peek {syms["lives"]}] dying=[peek {syms["dying_t"]}] over=[peek {syms["game_over_t"]}] pose=[peek {pf}] hp=[peek {syms["hp"]}] area=[peek {cur}] hud=[string map {{" " _}} [format %c%c%c%c%c%c [vpeek {0x1800 + 7}] [vpeek {0x1800 + 8}] [vpeek {0x1800 + 9}] [vpeek {0x1800 + 10}] [vpeek {0x1800 + 11}] [vpeek {0x1800 + 12}]]]"
+    puts $f "rules $tag time=[format %02x%02x [peek {syms["time_bcd"] + 1}] [peek {syms["time_bcd"]}]] score=[format %02x%02x%02x [peek {syms["score"] + 2}] [peek {syms["score"] + 1}] [peek {syms["score"]}]] lives=[peek {syms["lives"]}] dying=[peek {syms["dying_t"]}] over=[peek {syms["game_over_t"]}] pose=[peek {pf}] hp=[peek {syms["hp"]}] area=[peek {cur}] hearts=[peek {syms["hearts"]}] phase=[peek {syms["clear_phase"]}] hud=[string map {{" " _}} [format %c%c%c%c%c%c [vpeek {0x1800 + 7}] [vpeek {0x1800 + 8}] [vpeek {0x1800 + 9}] [vpeek {0x1800 + 10}] [vpeek {0x1800 + 11}] [vpeek {0x1800 + 12}]]]"
     close $f
 }}
 # weapons: poses shown, whip reach, dagger positions, while ::wpn_on
@@ -688,7 +693,7 @@ proc wait_game {{}} {{
     }}
 }}
 after time 0.1 wait_game
-after time 145 {{ exit }}
+after time 149 {{ exit }}
 """
 
 
@@ -1021,7 +1026,15 @@ def run():
            ("close to him, it doesn't", boss_near_fire == 0),
            ("beaten, it leaves an orb; taking it clears the stage", orb_seen == 1 and clear_t > 0
             and snaps["29_stage_clear"]["hp"] == 64),
-           ("after the stage clear the game starts again", snaps["30_restart"]["cur_area"] == 0)]
+           ("the tally: the timer runs down to 0, 10 points a step (NES)",
+            rules["tally_time"]["time"] == "0000" and rules["tally_time"]["phase"] == "3"
+            and int(rules["tally_time"]["score"]) == int(rules["before_orb"]["score"]) + 120),
+           ("then the hearts, 100 points each (NES)",
+            rules["tally_hearts"]["hearts"] == "0" and rules["tally_hearts"]["phase"] == "4"
+            and int(rules["tally_hearts"]["score"]) == int(rules["before_orb"]["score"]) + 420),
+           ("after the stage clear the next block starts: 5 hearts, the stage's timer",
+            snaps["30_restart"]["cur_area"] == 0 and snaps["30_restart"]["hearts"] == 5
+            and rules["after_clear"]["phase"] == "0" and 290 < int(rules["after_clear"]["time"]) <= 300)]
           if boss_hp is not None and "30_restart" in snaps else []),
         *([("kills score points, shown in the HUD",
             int(rules["after_clear"]["score"]) > 0

@@ -247,6 +247,26 @@ a jump). The way out only opens after the boss.
   (object `$2F`, tiles `5C` mirrored), which appears after about 110 frames and
   drops to the floor.
 
+## Stage clear and the timer
+
+Recorded with a local probe that starts a game at stage 3 (writing `$28` = 3 while
+the game mode `$18` is 4, before the stage loads), climbs to the boss, sets its
+health to 0 and walks onto the orb.
+
+- Taking the orb: game mode `$18` = `$0C`, sound `$48`, health back to 64 at once.
+- `$19` = 1: 223 frames (the jingle).
+- `$19` = 2: the timer runs down one step a frame, 10 points a step (sound `$03`
+  every 8 frames).
+- `$19` = 3: 56 frames, then one heart every 8 frames, 100 points each (sound `$04`).
+- `$19` = 4: 8 frames after the last heart, 115 frames; then (`$19` 5-8, `$28` = 20)
+  the castle map, about 415 frames, with sound `$06` every 16 frames.
+- The next stage starts with 5 hearts and the timer from the table below; whip
+  and sub-weapon carry on.
+- **Timer table** at `$C9F6`, by internal stage (`$C9EA` loads it): hundreds
+  3 3 2 1 4 3 2 5 4 3 ... It is loaded when a game starts, after a death (a death
+  in stage 2 restarts at 200) and at the start of a block; between stages of a
+  block the timer carries on.
+
 ## Exit sequences
 
 Recorded with a variant of `record_exit.lua` that also dumps the PPU nametables.
@@ -457,5 +477,10 @@ PROBE_OUT=$PWD/build/nes/probe xvfb-run -a fceux --no-config 1 --sound 0 --loadl
 - Logged while playing (a hook on `$C1A7`): `$0A` whip, `$08` dagger thrown,
   `$14` whip strikes something, `$18` heart collected, `$1A` stopwatch.
   From the code around the requests: `$17` with the whip level going up,
-  `$25` with an extra life, `$48` death. The others in
+  `$25` with an extra life. Logged later: `$48` is the stage-clear jingle (247
+  frames, requested when the orb is taken), `$4E` the death tune (98 frames, with
+  `$59` and `$00`), `$27` the game-start tune, `$55` stops the music, `$03` and
+  `$04` tick through the stage-clear tally, `$06` steps the castle map, `$22` warns
+  that time is short. Stage music: the table at `$FB56` by `$28` (`$2A` for stages
+  0-3, `$2D` for 4-6, `$30` for 7-9). The others in
   `tools/convert_sound.py` (`NES_SOUNDS`) are guesses still to be checked by ear.

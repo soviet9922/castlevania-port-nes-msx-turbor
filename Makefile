@@ -27,6 +27,9 @@ SJASM_FLAGS = --nologo --msg=war --fullpath --inc=src
 
 .PHONY: all nes run run-cbios run-nes test test-nes clean
 
+# a failed assembly must not leave a ROM behind that looks up to date
+.DELETE_ON_ERROR:
+
 # Default: original placeholder art only (no ROM needed)
 all: $(ROM)
 

@@ -95,6 +95,10 @@ def sfx_kill():
     return [frame(b=period(70 - 2 * i), vb=12 - i, noise=6 + i, vc=13 - i) for i in range(12)]
 
 
+def sfx_tally():
+    return [frame(b=period(88 - i), vb=12 - i) for i in range(6)] + [frame()]
+
+
 def sfx_tick():
     return [frame(b=period(100), vb=11)] * 3 + [frame()]
 
@@ -165,7 +169,7 @@ SOUNDS = [("STAGE", stage_tune), ("BOSS", boss_tune), ("CLEAR", clear_tune),
           ("WHIP", sfx_whip), ("HIT", sfx_hit), ("HEART", sfx_heart), ("ITEM", sfx_item),
           ("HURT", sfx_hurt), ("THROW", sfx_throw), ("HOLY", sfx_holy),
           ("STOPWATCH", sfx_stopwatch), ("SPLASH", sfx_splash), ("DOOR", sfx_door),
-          ("KILL", sfx_kill), ("TICK", sfx_tick)]
+          ("KILL", sfx_kill), ("TICK", sfx_tick), ("TALLY", sfx_tally)]
 
 
 def channel_mask(frames):

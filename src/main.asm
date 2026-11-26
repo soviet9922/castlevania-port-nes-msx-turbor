@@ -93,21 +93,11 @@ vblank_done:                            ; (tests measure VBLANK work up to here)
         call seq_tick
         jr .frozen
 .no_seq:
-        ld a,(clear_t)                  ; stage clear: everything waits, then
-        or a                            ; the game starts again (the next
-        jr z,.playing                   ; block is not converted yet)
-        dec a
-        ld (clear_t),a
-        jr nz,.cleared
-        ld a,BOSS_HP
-        ld (boss_hp),a
-        call restart_section_vars       ; full health, 5 hearts, timer 300
-        xor a
-        call load_area
-.cleared:
-        call build_sat
-        call write_player_sprites
-        jp main_loop
+        ld a,(clear_phase)              ; stage clear: the tally, then the
+        or a                            ; next block
+        jr z,.playing
+        call clear_tick
+        jr .frozen
 .playing:
         call timer_tick
         call read_input

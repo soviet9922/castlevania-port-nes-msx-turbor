@@ -130,7 +130,8 @@ STOPWATCH_COST  equ 5                   ; hearts (NES)
 STOPWATCH_FRAMES equ 178                ; enemies stand still (NES)
 
 ; Game rules (measured on the NES: RAM $42/$43 timer, $7FC score, $2A lives)
-TIME_START      equ 0x0300              ; BCD; restarts at a death or stage clear
+TIME_START      equ 0x0300              ; BCD, a new game (stage 1); a death or a new
+                                        ; block restarts at stage_time (NES $C9F6)
 TIME_TICK       equ 64                  ; frames per timer step
 LIVES_START     equ 3                   ; shown as P-3
 DEATH_FRAMES    equ 97                  ; death animation (NES: 97 frames)
@@ -161,7 +162,11 @@ BOSS_HIGH_Y     equ 26
 BOSS_FIRE_AT    equ 80                  ; hover frame when it may spit a fireball
 BOSS_FIRE_FAR   equ 80                  ; ... if Simon is at least this far away (x)
                                         ; (NES video: fireballs only from afar)                  ; box top of the spots it flies back to
-STAGE_CLEAR_FRAMES equ 180              ; after the orb, then the game restarts                  ; top of crouching Simon, for fireballs
+; Stage clear after the orb (NES game mode $0C, measured)
+CLEAR_JINGLE    equ 223                 ; frames of the jingle before the tally
+CLEAR_HEART_WAIT equ 56                ; then the timer (1 a frame, 10 points each),
+CLEAR_HEART_STEP equ 8                 ; a pause, the hearts (one per 8 frames, 100 each)
+CLEAR_OUTRO     equ 115                 ; and a pause before the next block
 ENEMY_FISH      equ 0x03
 FISH_MAX        equ 2                   ; fishmen about at once
 FISH_DELAY      equ 32                  ; frames before the next one jumps out

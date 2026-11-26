@@ -2260,8 +2260,10 @@ orb_update:
         ld (hp),a
         ld a,1
         ld (hud_dirty),a
-        ld a,STAGE_CLEAR_FRAMES
+        ld a,CLEAR_JINGLE
         ld (clear_t),a
+        ld a,1
+        ld (clear_phase),a
         ld a,SND_CLEAR
         jp music_restart
 
