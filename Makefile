@@ -29,7 +29,7 @@ CV_TOOLS  := $(PH_TOOLS) tools/convert_stage.py tools/cv_rom.py tools/convert_si
 
 SJASM_FLAGS = --nologo --msg=war --fullpath --inc=src -DDEBUG_MENU=$(DEBUG)
 
-.PHONY: all nes run run-cbios run-nes test test-nes clean
+.PHONY: all nes run run-cbios run-nes test test-nes disasm clean
 
 # a failed assembly must not leave a ROM behind that looks up to date
 .DELETE_ON_ERROR:
@@ -92,6 +92,11 @@ test: $(ROM)
 
 test-nes: $(NES_OUT)
 	$(PYTHON) tests/run_smoke.py $<
+
+# Annotated listings of your own NES ROM, in build/disasm (never commit them).
+# The coverage files come from tools/nes_probe/trace_code.lua runs (optional).
+disasm: $(NES_ROM)
+	$(PYTHON) tools/nes_disasm.py $(NES_ROM) $(BUILD)/disasm $(wildcard $(BUILD)/nes/trace/cov_*.txt)
 
 clean:
 	rm -rf $(BUILD)/gen $(BUILD)/test $(BUILD)/*.rom $(BUILD)/*.sym $(BUILD)/*.lst

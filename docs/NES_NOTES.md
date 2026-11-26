@@ -575,6 +575,13 @@ Recorded in the entrance hall (`tools/nes_probe/record_hall.lua`):
 | `tools/nes_probe/record_hall.lua` | FCEUX script: walk through the gate into the entrance hall |
 | `tools/nes_probe/record_upper.lua` | FCEUX script: climb to the hall's upper floor (bats/panthers) |
 | `tools/nes_probe/record_stairs.lua` | FCEUX script: walk to the hall's first staircase and climb it |
+| `tools/nes_disasm.py` | the full disassembly: annotated listings of every bank (`make disasm`) |
+| `tools/nes_labels.txt` | names and comments for RAM, routines and tables in the listings |
+| `tools/nes_probe/trace_code.lua` | FCEUX script: a bot plays and logs every executed address (coverage) |
+| `tools/nes_probe/cov_battery.sh` | runs `trace_code.lua` over many stages and savestates |
+
+The disassembly goes to `build/disasm/` (from your ROM: never commit it). What
+the object engine does, read from it, is in [NES_ENGINE.md](NES_ENGINE.md).
 
 To run the probe (needs FCEUX; writes to `build/nes/probe`):
 

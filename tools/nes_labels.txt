@@ -1,0 +1,156 @@
+# Names for the disassembly (tools/nes_disasm.py): addresses only, from what
+# docs/NES_NOTES.md records. Lines: "ram ADDR name [comment]" for RAM,
+# "code BANK ADDR name [comment]" for code ("7" = the fixed bank at $C000),
+# "data BANK ADDR name [comment]" for tables, "inline BANK ADDR name" for a
+# routine whose call is followed by a table of words (a jump table).
+
+ram 0018 game_mode         game mode: 4 title/start, 5 playing, 8 door, 0A gate, 0C stage clear
+ram 0019 game_submode
+ram 0028 stage             internal stage: 0 courtyard, 1 hall, 2-18; 20 castle map
+ram 002A lives
+ram 002B quest             second quest flag (Medusa heads from type $05)
+ram 002E cam_x_lo
+ram 002F cam_x_hi
+ram 003D simon_stairs      non-zero while on stairs
+ram 003F simon_y           feet line
+ram 0040 simon_x_lo        world x
+ram 0041 simon_x_hi
+ram 0042 timer_lo          BCD
+ram 0043 timer_hi
+ram 0045 simon_health      64 at the start
+ram 0046 section
+ram 0070 whip_level
+ram 0071 hearts
+ram 015B subweapon
+ram 0160 spawn_flags       6 spawner slots, parallel arrays $0160-$018F
+ram 0166 spawn_type
+ram 016C spawn_state
+ram 0172 spawn_x
+ram 017E spawn_y
+ram 0184 spawn_timer
+ram 01A9 boss_health
+ram 0200 oam               sprite buffer, DMA'd to the PPU
+ram 0354 obj_y             object arrays, indexed by slot (0 = Simon)
+ram 038C obj_x             screen x
+ram 0434 obj_id
+ram 031C obj_frame         sprite frame shown
+ram 0488 obj_anim_delay    frames to the next animation step ($80+: stopped)
+ram 04A4 obj_anim_step
+ram 0450 obj_facing
+ram 046C obj_state         per-object AI state (Simon's: 8 = crushed)
+ram 04C0 obj_anim          animation: index of a 3-byte entry at anim_table (count, first frame, delay)
+ram 04DC obj_ydir          aim_at: 1 = moving up; wave_y: the centre y
+ram 04F8 obj_dir2          a second direction (0 right, 1 left); a shift count for the wave
+ram 0584 obj_item
+ram 07FC score             BCD, low byte first, 3 bytes
+
+code 7 C008 nmi
+code 7 C052 reset
+code 7 C0BF irq
+code 7 C1A7 play_sound     A = sound number (bank 0, guarded)
+code 7 C1D6 switch_bank    Y = the PRG bank to map at $8000
+code 7 C1D4 restore_bank   maps the usual bank (6) again
+code 7 E8FC objects_update (bank 5 mapped)
+code 7 C232 mode_playing
+code 7 CED0 frame_playing  one frame of play
+inline 7 CA6D jump_table   the call is followed by the table of addresses, indexed by A
+code 7 C9EA stage_timer    loads the timer from timer_table by stage
+data 7 C9F6 timer_table    hundreds of the timer, by stage
+code 7 C9B1 stage_start_pos
+data 7 CA0C start_table    2 bytes per stage: y | camera page, screen x | section
+data 7 CDE9 sprite_palette_str
+data 7 CE28 palette_block1
+data 7 CE3B palette_block2
+data 7 CE4E palette_block3
+code 7 CFF9 stage_map_ptr  map pointer for $28 / $46 from map_ptrs
+code 7 D132 place_candles
+data 7 D29B candle_tables  per stage, per section: 2 bytes per 64-px chunk
+data 7 D6D1 group_ptrs_lo  enemy / candle group records
+data 7 D7D1 group_ptrs_hi
+code 7 EB8A candle_item
+data 7 EC16 item_types
+code 7 EF10 set_anim       A = animation (obj_anim), restarts it, clears obj_attr
+code 7 F1E7 animate        steps an object's animation (obj_anim -> obj_frame)
+data 7 F244 anim_table_ptrs
+code 7 F382 spawners_update
+data 7 FA01 block_tables   4x4 tile-block table by stage
+data 7 FB2A map_ptrs       section map pointers by stage
+data 7 FB56 stage_music
+data 7 FBF3 stair_ptrs     stair lists by stage (bank 6)
+code 7 FD2A chr_load       A = CHR set
+code 7 FD85 chr_copy
+data 7 FDC2 chr_sets
+code 0 8187 sound_start
+code 0 838A sound_update
+data 0 8185 sound_table_ptr
+data 4 8000 stage_maps     maps and tile blocks of all blocks
+data 6 9B90 jump_arc
+data 6 9BA8 knockback_arc
+code 6 9CBD stairs_check
+data 6 9D47 stair_x_adjust
+code 6 8425 spawn_medusa
+code 6 8431 spawn_medusa_heads_q2
+code 6 8435 spawn_medusa_heads
+code 6 849A spawn_hanging_bat
+code 6 84B9 spawn_spear_knight
+code 6 84E7 spawn_type_0D_stage6
+
+# object engine (fixed bank; read from the code)
+ram 0014 probe_solid       result of the tile probe (non-zero: solid)
+ram 004B obj_tmp
+ram 004C probe_dx          tile probe: x offset (by facing)
+ram 004D probe_y           tile probe: y
+ram 004E obj_saved_x       the object slot, saved over a call
+ram 007C scroll_frac       added to every walking object's x fraction
+ram 0300 obj_xpage         bit 0: the object is a screen page beyond the camera
+ram 0338 obj_attr          sprite attribute bits (palette)
+ram 0370 obj_y_frac
+ram 03A8 obj_x_frac
+ram 03C4 obj_vy            y speed, whole px (sub_vy: y -= vy, so + is up)
+ram 03E0 obj_vy_frac
+ram 03FC obj_vx            x speed, whole px (along the facing)
+ram 0418 obj_vx_frac
+ram 0530 obj_spawner       the spawner slot that made the object
+ram 054C obj_timer
+ram 0568 obj_freeze        frames left frozen (after a hit)
+code 7 E9F2 obj_cull       removes objects off the screen (y 8-$F7, x by type)
+code 7 EA7E obj_to_burst   turns the object into the burst ($32)
+code 7 EAB5 turn_around    facing ^= 1
+code 7 EAC9 obj_release    frees the spawner (spawn_state bit 7) and bursts
+code 7 EAD7 scroll_obj_x   x += the camera's step ($52.$53)
+code 7 EC26 probe_dir2     tile probe at x +/- probe_dx (by obj_dir2), y probe_y
+code 7 EC2D probe_ahead    tile probe at x +/- probe_dx (by the facing), y probe_y -> probe_solid
+code 7 EC5C gravity        vy -= 1/8 px, then y -= vy
+code 7 EC6C obj_delete
+code 7 EC7E set_vx         A = whole px, Y = fraction
+code 7 EC94 shoot_at_simon spawns object $20 in slot 12/13 aimed at Simon
+code 7 ECF6 set_vy         A = whole px, Y = fraction (+ = up)
+code 7 ED40 set_state_timer A = obj_timer, Y = obj_state
+code 7 ED55 pillar_fire    stage 6: 5:82CA, stage 15: 5:8E85, else 5:8754
+code 7 ED8E spawn_child    $16 = object id, A = animation; at the object's place and facing
+code 7 EDC7 ai_ghost       object $0D: re-aims at Simon every 32 frames
+code 7 EE28 move_x_dir2
+code 7 EE2E x_minus_vx
+code 7 EE41 x_plus_vx
+code 7 EE54 move_x         x +/- vx by the facing (plus scroll_frac)
+code 7 EE7B move_x_dir2_page
+code 7 EE81 move_x_page    move_x keeping obj_xpage
+code 7 EEA0 hit_and_cull   collision with Simon and the whip, then culls
+code 7 EEB3 obj_frozen     returns from the caller while obj_freeze runs
+code 7 EEC7 aim_at         $00 = y, $01 = x: sets facing, obj_ydir and the speed ratio ($01.$02, $09 = y is the long axis)
+code 7 EDB1 times_3_4      $01.$02 *= 3/4
+code 7 EF1F wave_y         vy -= (y - obj_ydir) >> obj_dir2, then y += vy
+code 7 EF4F y_plus_vy
+code 7 EF62 y_minus_vy
+code 7 EF75 face_simon_page
+code 7 EF88 face_simon
+code 7 EF90 dist_x_simon   A = |Simon x - x|, Y = 1 when Simon is to the left
+code 7 EF9E ai_medusa_head object $06
+code 7 EFA4 probe_feet8    probe at y + 8 under the object
+code 7 EFA8 probe_feet     probe at y + 16 under the object
+code 7 EFBB snap_y8        y &= $F8
+code 7 EFC4 ai_fleaman     object $0C (states: jump table EFCA)
+code 7 F087 ai_bat         object $02: wave_y + move_x
+code 7 F08D ai_fishman     object $03 (states: jump table F093)
+code 7 F178 ai_bone_pillar object $0E
+code 7 F1DE clear_vy
