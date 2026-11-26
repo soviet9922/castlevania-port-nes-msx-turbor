@@ -10,6 +10,10 @@ NES_ROM   ?= build/nes/castlevania.nes
 # tools/convert_sound.py; the result stays in build/, never committed)
 SOUND     ?= placeholder
 
+# The debug menu at power-up (start stage, infinite health and time, sound
+# test): DEBUG=0 builds the game without it
+DEBUG     ?= 1
+
 BUILD     := build
 PH_GEN    := $(BUILD)/gen/placeholder
 CV_GEN    := $(BUILD)/gen/converted
@@ -23,7 +27,7 @@ CV_TOOLS  := $(PH_TOOLS) tools/convert_stage.py tools/cv_rom.py tools/convert_si
              tools/sprite_edit.py $(wildcard art_overrides/*.bmp) \
              tools/convert_sound.py tools/nes_sound.py tools/cpu6502.py
 
-SJASM_FLAGS = --nologo --msg=war --fullpath --inc=src
+SJASM_FLAGS = --nologo --msg=war --fullpath --inc=src -DDEBUG_MENU=$(DEBUG)
 
 .PHONY: all nes run run-cbios run-nes test test-nes clean
 
@@ -56,12 +60,18 @@ $(BUILD)/.sound-$(SOUND):
 	@rm -f $(BUILD)/.sound-*
 	@touch $@
 
-$(ROM): $(ASM_SRC) $(PH_GEN)/.stamp
+# rebuild the ROMs when DEBUG changes
+$(BUILD)/.debug-$(DEBUG):
+	@mkdir -p $(BUILD)
+	@rm -f $(BUILD)/.debug-*
+	@touch $@
+
+$(ROM): $(ASM_SRC) $(PH_GEN)/.stamp $(BUILD)/.debug-$(DEBUG)
 	$(SJASMPLUS) $(SJASM_FLAGS) --inc=$(PH_GEN) \
 		--raw=$@ --sym=$(@:.rom=.sym) --lst=$(@:.rom=.lst) src/main.asm
 	@echo "built $@"
 
-$(NES_OUT): $(ASM_SRC) $(CV_GEN)/.stamp
+$(NES_OUT): $(ASM_SRC) $(CV_GEN)/.stamp $(BUILD)/.debug-$(DEBUG)
 	$(SJASMPLUS) $(SJASM_FLAGS) --inc=$(CV_GEN) \
 		--raw=$@ --sym=$(@:.rom=.sym) --lst=$(@:.rom=.lst) src/main.asm
 	@echo "built $@"

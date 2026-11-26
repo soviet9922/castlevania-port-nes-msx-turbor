@@ -157,7 +157,16 @@ med_col         equ med_erase+1         ; 2  the statue's first tile column
 med_row         equ med_col+2           ; 1  ... and playfield row
 obj_hits        equ med_row+1           ; OBJ_MAX  block 3's tough enemies: hits taken
                                         ;    (bits 5-7) and frames of flash (0-4)
-RAM_END         equ obj_hits+8
+dbg_active      equ obj_hits+8          ; 1  the debug menu is up
+dbg_go          equ dbg_active+1        ; 1  (tests: leave the menu, as START)
+dbg_sel         equ dbg_go+1            ; 1  menu line chosen
+dbg_stage       equ dbg_sel+1           ; 1  start stage (1-9)
+dbg_hp          equ dbg_stage+1         ; 1  infinite health
+dbg_time        equ dbg_hp+1            ; 1  infinite time
+dbg_music       equ dbg_time+1          ; 1  sound test: music number (SND_)
+dbg_sfx         equ dbg_music+1         ; 1  ... effect number
+dbg_stick       equ dbg_sfx+1           ; 1  stick last frame (one step a press)
+RAM_END         equ dbg_stick+1
         ASSERT RAM_END < 0xF380
         ASSERT RAM_END <= RAMCODE
 RAMCODE         equ 0xD000              ; code copied from ROM (src/ramcode.asm)

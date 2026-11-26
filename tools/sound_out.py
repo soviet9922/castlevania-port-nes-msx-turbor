@@ -65,6 +65,9 @@ NAMES = ["STAGE", "STAGE2", "STAGE3", "BOSS", "CLEAR", "DEATH", "GAME_OVER",
          "SPLASH", "DOOR", "KILL", "TICK", "TALLY"]
 
 
+MUSIC = {"STAGE", "STAGE2", "STAGE3", "BOSS", "CLEAR", "DEATH", "GAME_OVER"}
+
+
 def write(out_dir, sounds):
     """sounds: list of (name, data bytes, loop offset or None, channel mask)."""
     blob = bytearray()
@@ -96,6 +99,15 @@ def write(out_dir, sounds):
         inc.append("        db 0")
     with open(os.path.join(out_dir, "sound.inc"), "w") as f:
         f.write("\n".join(inc) + "\n")
+
+    # names and kinds for the debug menu's sound test (src/debugmenu.asm)
+    names = ["; generated sound names - do not edit", "snd_names:"]
+    for name, *_rest in table:
+        names.append(f'        db "{name.replace("_", " ")[:10]:<10}"')
+    names.append("snd_is_music:")
+    names.append("        db " + ", ".join("1" if n in MUSIC else "0" for n, *_r in table) if table else "        db 0")
+    with open(os.path.join(out_dir, "sound_names.inc"), "w") as f:
+        f.write("\n".join(names) + "\n")
 
     asm = ["; generated: sound banks - do not edit"]
     for k in range(MAX_BANKS):

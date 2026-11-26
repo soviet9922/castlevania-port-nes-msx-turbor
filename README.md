@@ -58,6 +58,19 @@ and sound effects, converted to the MSX PSG on your machine:
 make nes SOUND=rom
 ```
 
+### Debug menu
+
+The ROM starts with a debug menu (and comes back to it after a game over): the
+start stage (1-9, as far as the build has them), infinite health, infinite time, and
+a sound test for the music and the effects of the sound set it was built with.
+Cursor keys or joystick: up/down choose a line, left/right change it; SPACE or the
+whip (M, X, joystick button B) plays the music or effect shown, or starts the game.
+SPACE straight away starts a normal game. To build without the menu:
+
+```bash
+make nes SOUND=rom DEBUG=0
+```
+
 ## Running
 
 On the free C-BIOS MSX2+ machine (V9958 with a 3.58 MHz Z80, no system ROMs needed):

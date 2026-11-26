@@ -56,7 +56,7 @@ init:
         call load_graphics
         call install_irq
         call sound_init
-        call new_game                   ; score 0, 3 lives, area 0: the courtyard
+        call start_game                 ; (the debug menu first, if built in)
 
 ; ---------------------------------------------------------------------------
 ; Main loop: one iteration per video frame
@@ -87,7 +87,7 @@ vblank_done:                            ; (tests measure VBLANK work up to here)
         dec a
         ld (game_over_t),a
         jr nz,.frozen
-        call new_game
+        call start_game
         jr .frozen
 .not_over:
         ld a,(dying_t)                  ; dying: only the death animation
@@ -111,6 +111,9 @@ vblank_done:                            ; (tests measure VBLANK work up to here)
         call clear_tick
         jr .frozen
 .playing:
+        IF DEBUG_MENU
+        call debug_tick                 ; infinite health / time
+        ENDIF
         call timer_tick
         call read_input
         call player_update
@@ -133,6 +136,14 @@ vblank_done:                            ; (tests measure VBLANK work up to here)
 ; is tested with interrupts off, and EI comes right before HALT (interrupts
 ; are taken only after the instruction that follows EI), so no VBLANK can
 ; slip in between the test and the HALT.
+; A new game: the debug menu (it starts the game when it is left), or at once
+start_game:
+        IF DEBUG_MENU
+        jp debug_menu
+        ELSE
+        jp new_game
+        ENDIF
+
 wait_frame:
         di
         ld a,(frame_ready)

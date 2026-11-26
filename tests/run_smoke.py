@@ -827,6 +827,18 @@ proc wait_game {{}} {{
         play
     }}
 }}
+# the debug menu (when built in): leave it as START would, whenever it is up
+proc menu_watch {{}} {{
+    if {{{1 if "debug_menu" in syms else 0} && [peek {syms.get("dbg_active", 0)}] == 1}} {{
+        if {{![info exists ::menu_seen]}} {{
+            set ::menu_seen 1
+            set f [open "{result_file}" a]; puts $f "debug_menu 1"; close $f
+        }}
+        poke {syms.get("dbg_go", 0)} 1
+    }}
+    after time 0.05 menu_watch
+}}
+menu_watch
 after time 0.1 wait_game
 after time 200 {{ exit }}
 """
@@ -935,6 +947,7 @@ def run():
     whip_reach = 43                     # WHIP_HIT_X2 in src/config.inc (leather whip)
     orb_seen = clear_t = None
     block2_enemies = {}
+    menu_seen = False
     panther_dead = 0
     stair = None
     with open(result_file) as f:
@@ -990,6 +1003,9 @@ def run():
                 continue
             if tag == "fish":
                 fish_seen = int(kv[0])
+                continue
+            if tag == "debug_menu":
+                menu_seen = True
                 continue
             if tag in ("medusa", "s4enemies", "hbat", "knight1", "knight2", "crush",
                        "medusa_wake", "medusa_dead", "b3ghost", "b3pillar", "mummies",
@@ -1054,6 +1070,7 @@ def run():
     block2 = n_areas > 5
     stage4, stage4_time = (5, 400) if block2 else (0, 300)    # after the stage 3 boss
     checks = [
+        *([("the debug menu comes up at power-up", menu_seen)] if "debug_menu" in syms else []),
         ("the music plays on the PSG and the whip has a sound effect",
          sound is not None and sound[0] > 0 and sound[1] == 1 and sound[2] == 1),
         # 3 s of emulated time between boot and walk_right snapshots

@@ -15,6 +15,7 @@ CHGCPU          equ 0x0180      ; turbo R only: A=0x80|mode (0 Z80, 1 R800 ROM, 
 ; System variables
 RG0SAV          equ 0xF3DF      ; BIOS shadow of VDP R#0
 RG1SAV          equ 0xF3E0      ; BIOS shadow of VDP R#1
+RG8SAV          equ 0xFFE7      ; BIOS shadow of VDP R#8 (MSX2)
 EXPTBL          equ 0xFCC1      ; slot expanded flags, 4 bytes
 SLTTBL          equ 0xFCC5      ; secondary slot register shadows, 4 bytes
 H_KEYI          equ 0xFD9A      ; hook: every interrupt (before VBLANK check)
