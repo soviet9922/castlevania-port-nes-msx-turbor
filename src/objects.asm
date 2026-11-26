@@ -2694,12 +2694,18 @@ boss_shoot:
         ld (ix+7),KIND_FIREBALL
         ld (ix+8),0xFF
         ld (ix+10),1                    ; (the boss's: aimed)
-        ld hl,(boss_vx)                 ; speeds in 1/128 px (up to 1 1/2)
-        add hl,hl
-        ld (ix+11),h
+        ld hl,(boss_vx)                 ; speeds in 1/64 px (up to 1 1/2:
+        sra h                           ; 96; signed for vy)
+        rr l
+        sra h
+        rr l
+        ld (ix+11),l
         ld hl,(boss_vy)
-        add hl,hl
-        ld (ix+9),h
+        sra h
+        rr l
+        sra h
+        rr l
+        ld (ix+9),l
         call obj_ext_of
         ld (hl),0
         inc hl
@@ -2708,24 +2714,20 @@ boss_shoot:
         pop ix
         ret
 
-; the boss's fireball: x += vx (+11, 1/128 px) along its facing, y += vy (+9,
-; signed 1/128 px), fractions in obj_ext
+; the boss's fireball: x += vx (+11, 1/64 px) along its facing, y += vy (+9,
+; signed 1/64 px), fractions (0-63) in obj_ext
 ball_step:
         call obj_ext_of
         push hl
         ld a,(hl)
-        add a,(ix+11)
-        ld c,0
-        jr nc,.xn
-        inc c
-.xn:
-        ld b,a                          ; C:B = fraction + vx
-        and 127
+        add a,(ix+11)                   ; (at most 63 + 96)
+        ld c,a
+        and 63
         ld (hl),a
-        ld a,b
-        rla
         ld a,c
-        rla                             ; A = whole px (0-3)
+        rlca
+        rlca
+        and 3                           ; whole px
         bit 7,(ix+5)
         jr z,.xr
         neg
@@ -2745,7 +2747,7 @@ ball_step:
         ld e,a
         rla
         sbc a,a
-        ld d,a                          ; DE = vy (1/128)
+        ld d,a                          ; DE = vy
         ld a,(hl)
         add a,e
         ld c,a
@@ -2753,10 +2755,18 @@ ball_step:
         adc a,0
         ld b,a                          ; B:C = fraction + vy (signed)
         ld a,c
-        and 127
+        and 63
         ld (hl),a
-        sla c
-        rl b                            ; B = whole px (signed)
+        ld a,c                          ; whole = B:C >> 6 (signed)
+        rlca
+        rlca
+        and 3
+        ld c,a
+        ld a,b
+        add a,a
+        add a,a
+        or c
+        ld b,a
         ld a,(ix+3)
         add a,b
         ld (ix+3),a
