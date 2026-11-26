@@ -410,7 +410,10 @@ def tcl_script(syms, result_file):
                        poke {syms["boss_hp"]} 3; poke {syms["invuln_t"]} 250; poke {fa} 0; medusa_pin 80 }}
     after time 143.9 {{ keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
     after time 146 {{ set f [open "{result_file}" a]; puts $f "medusa_dead [peek {syms["boss_hp"]}] [count_type 11]"; close $f }}
-    after time 146.2 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}] $::vbl_worst_fc"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
+    # block 3: stage 7 starts at its right end, facing left (NES: x 720, camera 512)
+    after time 146.1 {{ if {{{areas} > 11}} {{ poke {syms["area_hdr"] + 44} 11; poke {syms["clear_t"]} 1; poke {syms["clear_phase"]} 4 }} }}
+    after time 146.7 {{ {dump('50_stage7')} }}
+    after time 146.9 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}] $::vbl_worst_fc"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
 """ if areas > 1 else f"""
     after time 9 {{ snd_report; set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
@@ -1181,6 +1184,10 @@ def run():
            ("beaten, Medusa burns and leaves the orb",
             block2_enemies["medusa_dead"] == ["0", "1"])]
           if block2 and "medusa_dead" in block2_enemies else []),
+        *([("stage 7 starts at its right end, facing left (NES: x 720, camera 512)",
+            snaps["50_stage7"]["cur_area"] == 11 and snaps["50_stage7"]["px"] == 712
+            and snaps["50_stage7"]["cam_x"] == 512 and snaps["50_stage7"]["facing"] == 1)]
+          if n_areas > 11 and "50_stage7" in snaps else []),
         *([("the chain whip has its own poses, the same reach as the leather whip",
             any(16 <= int(p) < 24 for p in weapons["chain"]["poses"].split(","))
             and int(weapons["chain"]["reach"]) == whip_reach),

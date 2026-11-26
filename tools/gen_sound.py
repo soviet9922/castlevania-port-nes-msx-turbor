@@ -152,6 +152,18 @@ def stage2_tune():
     return tune(bars, 8)
 
 
+def stage3_tune():
+    """block 3: an original loop over Em - C - G - B"""
+    chords = [(52, True), (48, False), (55, False), (59, False)]
+    mel = [[76, 79, 83, 81, 79, 78, 76, 78], [76, 79, 84, 83, 81, 79, 81, 79],
+           [74, 79, 83, 86, 83, 81, 79, 78], [75, 78, 83, 81, 78, 75, 78, 83]]
+    bars = []
+    for (root, minor), m in zip(chords, mel):
+        bars.append((m, arp(root + 12, minor), [root - 12, None, root - 12, None,
+                                                root - 5, None, root - 12, None]))
+    return tune(bars, 7)
+
+
 def boss_tune():
     bars = []
     for root in (50, 50, 46, 48):
@@ -176,7 +188,7 @@ def game_over_tune():
                   [50, None, 46, None, 45, None, 45, None])], 14, loop=False)
 
 
-SOUNDS = [("STAGE", stage_tune), ("STAGE2", stage2_tune), ("BOSS", boss_tune), ("CLEAR", clear_tune),
+SOUNDS = [("STAGE", stage_tune), ("STAGE2", stage2_tune), ("STAGE3", stage3_tune), ("BOSS", boss_tune), ("CLEAR", clear_tune),
           ("DEATH", death_tune), ("GAME_OVER", game_over_tune),
           ("WHIP", sfx_whip), ("HIT", sfx_hit), ("HEART", sfx_heart), ("ITEM", sfx_item),
           ("HURT", sfx_hurt), ("THROW", sfx_throw), ("HOLY", sfx_holy),

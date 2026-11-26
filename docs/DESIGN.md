@@ -363,7 +363,12 @@ room at the area's left end: the boss music starts, the camera locks (its least 
 greatest x both set to where it is), and `medusa_vram` blanks the statue's 4x3 tiles
 in the next vertical blank. She flies with the bat's wave, stops now and then and drops
 a snake, which falls to the floor and slides at Simon. Taking her orb clears the
-stage; block 3 is not converted, so the game then goes back to the courtyard.
+stage, and block 3 starts.
+
+Block 3 (stages 7-9) uses the same machinery: stage 7 starts at its right end facing
+left, and its doors are on the right, followed in the ROM by the next stage's first
+columns as in block 1, so its areas need no x offset. Its enemies and its boss are not
+converted yet; Medusa heads already come from their spawners.
 
 `load_area` turns the display off, loads the palette, tiles and object
 patterns, resets objects and the player, redraws the screen and turns

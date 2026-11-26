@@ -340,6 +340,27 @@ boss and the tally), and by reading the tables below.
     frames. Health 64 (`$01A9`), 3 a leather-whip hit; beaten, she burns (`$31`) and
     leaves the orb (`$2F`), 3000 points. The camera stayed at 0 in her room.
 
+## Block 3 (stages 7-9)
+
+A savestate at the start of stage 7 was made by forcing the stage-clear mode (`$18` =
+`$0C`) in Medusa's room.
+
+- Graphics: CHR sets 3 and 5 (set 5 is loaded when the block starts); exact match with
+  the PPU. Palette `$CE4E`. Tile-block table `$9156`. Music `$30`. Timer 500, 400, 300.
+- Maps (word at `$FB2A + 2*stage`): stage 7 sections `$8DAE`, `$8E3E`; stage 8 `$8ECE`,
+  `$8F2E`; stage 9 `$901E` (one section). Stage 8's section 0 runs 768 px, on into the
+  first 256 px of section 1's map; section 1 is played from about x 480.
+- Starts (`$CA0C`): stage 7 x 720, y 176, camera 512, facing left; stage 8 x 48, y 144;
+  stage 9 x 48, y 112.
+- Stage 7 runs left along section 0, up a staircase at x 159 into section 1 (its top at
+  (66, 176) there), and right to a door at map column 94. Stage 8 runs right, up the
+  staircase at x 639 into section 1 (top at (546, 144)), and right to a door at column
+  158. Both doors are followed in the ROM by the next stage's first columns, as in block 1.
+- Stage 9 is a bridge to a tower room at the right end, where the boss records (`$5A`,
+  two of them) are.
+- Enemy records: `$4C`, `$4E`, `$4F`, `$50`, `$0D`/`$8D`, Medusa heads (`$05`, `$06`).
+  Not identified yet.
+
 ## Exit sequences
 
 Recorded with a variant of `record_exit.lua` that also dumps the PPU nametables.

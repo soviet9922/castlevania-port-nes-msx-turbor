@@ -37,9 +37,9 @@ SOLID_TILES = range(0x60, 0x6C)
 # Each block has its own 4x4 tile-block table (word per stage at $FA01) and
 # graphics (cv_rom.BLOCK_CHR_SETS) and background palette.
 MAP_BANK, BLOCKS = 4, 0x830A
-BLOCK_TABLES = {1: 0x830A, 2: 0x8B25}
-BLOCK_PALETTES = {1: "1-courtyard", 2: "2-castle"}
-BLOCK_MUSIC = {1: "STAGE", 2: "STAGE2"}         # NES $2A, $2D (table at $FB56)
+BLOCK_TABLES = {1: 0x830A, 2: 0x8B25, 3: 0x9156}
+BLOCK_PALETTES = {1: "1-courtyard", 2: "2-castle", 3: "3-castle"}
+BLOCK_MUSIC = {1: "STAGE", 2: "STAGE2", 3: "STAGE3"}   # NES $2A, $2D, $30 (table at $FB56)
 
 # Block 2 runs right to left: its doors are at the left end of a section, and
 # the 8 map columns before a section's world column 0 are the last 8 columns of
@@ -184,6 +184,67 @@ AREAS = [
         "start_x": 600 + BLOCK2_X_OFF,  # (not used: entered by the stairs)
         "below": 9,
         "respawn": 9,
+        "exit_x": None,
+        "next_area": 11,                # after Medusa and the stage clear
+    },
+    # ---- block 3 (stages 7-9): NES x as they are ----
+    {
+        "name": "7-lower",
+        "block": 3,
+        "map": (0x8DC6, 0x8E56),        # stage 7, section 0 (768 px)
+        "stage": 7, "section": 0,
+        "start_x": 712,                 # NES $CA0C: x 720 (centre), y 176,
+        "start_y": 176 - 64,            # facing left
+        "start_face": 1,
+        "exit_x": None,
+        "above": 12,                    # its staircase at x 159 leads up
+    },
+    {
+        "name": "7-upper",
+        "block": 3,
+        "map": (0x8E56, 0x8EE6 + 48),   # stage 7, section 1 (768 px), plus 8
+        "play_px": 768,                 # columns of stage 8 seen through its door
+        "stage": 7, "section": 1,
+        "start_x": 80,                  # (not used: entered by the stairs)
+        "below": 11,
+        "respawn": 11,
+        "exit_x": 724, "exit_y": 88,    # the door at the right end
+        "exit_kind": 2, "door_col": 94, "door_row": 8,
+        "max_cam": 512, "door_cam": 640,
+        "next_area": 13,
+    },
+    {
+        "name": "8-lower",
+        "block": 3,
+        "map": (0x8EE6, 0x8F46 + 48),   # stage 8, section 0: 512 px, then on
+        "stage": 8, "section": 0,       # into the next map's first 256 px
+        "start_x": 40,                  # NES $CA0C: x 48 (centre), y 144
+        "start_y": 144 - 64,
+        "exit_x": None,
+        "above": 14,
+    },
+    {
+        "name": "8-upper",
+        "block": 3,
+        "map": (0x8F46, 0x9036 + 48),   # stage 8, section 1 (1280 px; its first
+        "play_px": 1280,                # 480 are section 0's), plus 8 columns
+        "stage": 8, "section": 1,       # of stage 9 seen through its door
+        "start_x": 600,                 # (not used: entered by the stairs)
+        "min_cam": 480,
+        "below": 13,
+        "respawn": 13,
+        "exit_x": 1236, "exit_y": 56,   # the door at the right end
+        "exit_kind": 2, "door_col": 158, "door_row": 4,
+        "max_cam": 1024, "door_cam": 1152,
+        "next_area": 15,
+    },
+    {
+        "name": "9-bridge",
+        "block": 3,
+        "map": (0x9036, 0x9156),        # stage 9 (1536 px): the bridge and the
+        "stage": 9, "section": 0,       # tower room of the boss
+        "start_x": 40,                  # NES $CA0C: x 48 (centre), y 112
+        "start_y": 112 - 64,
         "exit_x": None,
     },
 ]

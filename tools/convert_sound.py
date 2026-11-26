@@ -37,7 +37,7 @@ NOISE_BOOST = 0                 # PSG volume steps added to noise
 
 # the engine's sound names -> the NES game's sound numbers (found by logging
 # its sound requests while playing; the uncertain ones are marked ?)
-NES_SOUNDS = {"STAGE": 0x2A, "STAGE2": 0x2D, "BOSS": 0x42, "CLEAR": 0x48, "DEATH": 0x4E,
+NES_SOUNDS = {"STAGE": 0x2A, "STAGE2": 0x2D, "STAGE3": 0x30, "BOSS": 0x42, "CLEAR": 0x48, "DEATH": 0x4E,
               "GAME_OVER": 0x51, "WHIP": 0x0A, "HIT": 0x14, "HEART": 0x18,
               "ITEM": 0x17, "HURT": 0x16, "THROW": 0x08, "HOLY": 0x1E,
               "STOPWATCH": 0x1A, "SPLASH": 0x0F, "DOOR": 0x1D, "KILL": 0x10,

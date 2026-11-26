@@ -22,12 +22,13 @@ STAGE_LAYOUTS = {
 STAGE_PALETTES = {
     "1-courtyard": 0xCE28,
     "2-castle": 0xCE3B,         # block 2 (stages 4-6), read from the PPU
+    "3-castle": 0xCE4E,         # block 3 (stages 7-9), read from the PPU
 }
 
 GAMEPLAY_CHR_SET = 3            # loaded when a game starts
 # Block 2 (stages 4-6) loads set 4 over set 3 when it starts: replaying both
 # reproduces stage 4's pattern tables exactly (checked against the PPU)
-BLOCK_CHR_SETS = {1: (3,), 2: (3, 4)}
+BLOCK_CHR_SETS = {1: (3,), 2: (3, 4), 3: (3, 5)}
 BG_PATTERN_TABLE = 0x1000
 
 
