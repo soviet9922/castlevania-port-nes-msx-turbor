@@ -235,4 +235,5 @@ RAMCODE_TOP     equ 0xEF80              ; (then the platforms; the stack is abov
 PLAT_MAX        equ 4
 plat_table      equ 0xEF80              ; PLAT_MAX*OBJ_SIZE  moving platforms (src/platforms.asm)
 plat_ride       equ plat_table+PLAT_MAX*12 ; 1  the platform Simon stands on (index + 1, 0 none)
+hit_nomark      equ plat_ride+1         ; 1  weapon_hits: don't mark the axe / cross (Dracula's body)
         ASSERT plat_ride < 0xF000

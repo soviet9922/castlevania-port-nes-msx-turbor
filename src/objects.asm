@@ -3561,7 +3561,8 @@ cross_update:
         cp 16
         jr c,.speed
         ld (ix+11),4                    ; (2 px again: state 4; it can hit
-        ld (ix+8),0xFF                  ; what it hit on the way out again)
+        ld (ix+7),0xFF                  ; what it hit on the way out again)
+        ld (ix+8),0xFF
         ld a,16
 .speed:
         ld (ix+9),a
@@ -3604,6 +3605,7 @@ cross_update:
         ld (ix+5),a
         ld (ix+9),16
         ld (ix+11),4
+        ld (ix+7),0xFF
         ld (ix+8),0xFF
         jr .anim
 .back:
@@ -3923,6 +3925,9 @@ weapon_hits:
         pop hl
         ld a,l
         cp (iy+8)
+        jr nz,.any
+        ld a,h
+        cp (iy+7)
         jr z,.next
 .any:
         push bc
@@ -3945,9 +3950,14 @@ weapon_hits:
         jr nz,.counted
         dec (hl)                        ; (it stays at 255)
 .counted:
-        push ix                         ; (the axe's and the cross's: this
-        pop hl                          ; object)
+        ld a,(hit_nomark)               ; (the axe's and the cross's: this
+        or a                            ; object; not Dracula's body, NES
+        jr nz,.marked                   ; $E684)
+        push ix
+        pop hl
+        ld (iy+7),h
         ld (iy+8),l
+.marked:
         ld a,(hit_src)
         dec a
         jr nz,.pierce
@@ -3959,7 +3969,7 @@ weapon_hits:
 
 ; A = the damage of the hit weapon_hits found, in the NES's units x 4
 ; ($E5E5: the whip 6 at level 0, 8 at levels 1-2; the dagger 6, the axe 8,
-; the holy water's fire 2 a frame)
+; the holy water's fire 1/4 a frame)
 hit_damage:
         ld a,(hit_src)
         or a
@@ -3976,8 +3986,8 @@ hit_damage:
         ret z
         ld a,(hit_src)
         cp 3
-        ld a,8                          ; holy water 2 a frame
-        ret z
+        ld a,1                          ; holy water's fire 1/4 a frame (NES
+        ret z                           ; $E6BD; bosses take it their own way)
         ld a,32                         ; the axe, the cross 8
         ret
 

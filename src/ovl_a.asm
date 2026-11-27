@@ -252,15 +252,8 @@ knight_update:
 .frame:
         call knight_frame
 .hits:
-        call weapon_hits
-        jr nc,.touch
-        ld a,(ix+11)                    ; frozen: only the whip hits again
-        and 0x1F
-        jr z,.hit
-        ld a,(hit_src)
-        or a
-        jr nz,.touch
-.hit:
+        call weapon_hits                ; (frozen too: every hit counts, NES
+        jr nc,.touch                    ; $E1B6)
         ld a,SND_HIT
         call sfx_play
         call hit_damage
@@ -532,12 +525,25 @@ medusa_flights:
 medusa_hits:
         call weapon_hits
         jr nc,.touch
-        call hit_damage                 ; half the weapon's damage
-        rrca
+        call hit_damage                 ; half the weapon's damage; holy
+        rrca                            ; water's fire 1 every 8 frames
         rrca
         rrca
         and 31
         ld b,a
+        ld a,(hit_src)
+        cp 3
+        jr nz,.sound                    ; (the hit sound: not for the fire)
+        ld b,0
+        ld a,(frame_count)
+        and 7
+        jr nz,.dmg
+        inc b
+        jr .dmg
+.sound:
+        ld a,SND_HIT
+        call sfx_play
+.dmg:
         ld a,1
         ld (hud_dirty),a
         ld a,(boss_hp)
@@ -2396,11 +2402,20 @@ mummy_update:
         jr nc,.touch
         ld a,SND_HIT
         call sfx_play
-        call hit_damage                 ; the weapon's damage / 4 (in 1/4s)
-        rrca
+        call hit_damage                 ; the weapon's damage / 4 (in 1/4s);
+        rrca                            ; holy water's fire 1/4 every 4 frames
         rrca
         and 0x3F
         ld b,a
+        ld a,(hit_src)
+        cp 3
+        jr nz,.sub
+        ld b,0
+        ld a,(frame_count)
+        and 3
+        jr nz,.sub
+        inc b
+.sub:
         ld a,(ix+10)
         sub b
         jr nc,.hp
@@ -2408,9 +2423,9 @@ mummy_update:
 .hp:
         ld (ix+10),a
         call mummy_bar
-        ld a,(ix+10)
-        or a
-        jr z,.dead
+        ld a,(ix+10)                    ; dead when the whole part is 0 (NES
+        cp 4                            ; $E2FD)
+        jr c,.dead
         ld (ix+11),MUMMY_FREEZE
 .touch:
         ld a,24

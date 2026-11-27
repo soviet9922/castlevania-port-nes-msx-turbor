@@ -1152,7 +1152,7 @@ throw_dagger:
         ld (ix+5),a
         ld (ix+0),OBJ_DAGGER
         ld (ix+4),0
-        ld (ix+7),KIND_BAT              ; (16x16; never hit by the whip)
+        ld (ix+7),0xFF                  ; (+7/+8: the object it hit last)
         ld (ix+8),0xFF
 .none:
         pop ix
@@ -1191,7 +1191,7 @@ throw_dagger:
 .d:
         ld (ix+5),a
         ld (ix+4),0
-        ld (ix+7),KIND_BAT
+        ld (ix+7),0xFF
         ld (ix+8),0xFF
         ld (ix+10),0
         ld (ix+11),0
@@ -1217,7 +1217,7 @@ throw_dagger:
         ld (ix+5),a
         ld (ix+4),64
         ld (ix+6),OBJF_CROSS
-        ld (ix+7),KIND_BAT
+        ld (ix+7),0xFF
         ld (ix+8),0xFF
         ld (ix+9),16
         ld (ix+10),0

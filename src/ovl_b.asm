@@ -2396,7 +2396,11 @@ drac_hits:
         cp 23
         ret c
 .body:
+        ld a,1                          ; (the axe / cross keep the head's mark)
+        ld (hit_nomark),a
         call weapon_hits
+        ld a,0
+        ld (hit_nomark),a
         jr nc,.btouch
         ld a,(drac_form)                ; holy water burns the monster's
         or a                            ; body (1 every 32 frames)

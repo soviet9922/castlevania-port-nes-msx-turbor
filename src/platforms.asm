@@ -19,7 +19,8 @@
 ; area load: the area's platforms at their starting points
 platforms_load:
         ld hl,plat_table
-        ld b,PLAT_MAX*OBJ_SIZE+1        ; (and plat_ride)
+        ld b,PLAT_MAX*OBJ_SIZE+2        ; (and plat_ride, hit_nomark: this RAM
+                                        ; isn't cleared at start-up)
         xor a
 .clear:
         ld (hl),a
