@@ -156,6 +156,7 @@ OBJF_CROSS      equ 179                 ; the flying cross: 3 spin frames
 OBJF_TREASURE   equ 182                 ; hidden treasures: type * 4 + palette
 OBJF_POP1000    equ 198
 OBJF_POP2000    equ 199
+OBJF_PLAT       equ 200
 
 ; items: the NES's obj_item codes ($EC16; a money bag's value in bits 4-5)
 ITEM_SMALLHEART equ 0x00                ; (as a candle's code: candle_item decides)
@@ -175,6 +176,7 @@ ITEM_NONE       equ 0xFF                ; burst of an enemy: nothing drops
 OBJ_POPUP       equ 40                  ; a money bag's score (32 frames)
 OBJ_CROSS       equ 41                  ; the flying cross (sub-weapon 5)
 OBJ_TREASURE    equ 42                  ; a hidden treasure (src/treasure.asm)
+OBJ_PLATFORM    equ 43                  ; (plat_table only: src/platforms.asm)
 
 SPAWN_LEFT      equ 16                  ; spawn when -16 <= box x - camera <= 272
 SPAWN_RIGHT     equ 272
@@ -4198,6 +4200,15 @@ objects_draw:
         add ix,de
         pop bc
         djnz .part
+        ld ix,plat_table                ; and the moving platforms
+        ld b,PLAT_MAX
+.plat:
+        push bc
+        call draw_obj
+        ld de,OBJ_SIZE
+        add ix,de
+        pop bc
+        djnz .plat
         ld iy,(spr_sat_ptr)
         ret
 

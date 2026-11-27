@@ -118,6 +118,7 @@ vblank_done:                            ; (tests measure VBLANK work up to here)
         call player_update
         call walls_update
         call treasures_update
+        call platforms_update
         call check_area_exit
         call objects_spawn
         call rng_step

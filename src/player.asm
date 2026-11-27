@@ -694,6 +694,8 @@ player_update:
         ld a,(on_ground)
         or a
         jr z,.airborne
+        call plat_check                 ; on a moving platform (NES $AC70)
+        jp c,player_animate
         ld c,32                         ; anything under the feet?
         call foot_probe
         jp c,player_animate
@@ -781,7 +783,11 @@ player_update:
 
         ld c,32                         ; feet on something solid?
         call foot_probe
+        jr c,.tile_land
+        call plat_check                 ; or on a moving platform: on its top
         jr nc,.check_pit
+        jr .on_floor
+.tile_land:
         ld a,(py)                       ; land: y on the 16-px grid (8 with
         ld b,0xF0                       ; a whip going on, and in stage 10)
         ld hl,whip_t
@@ -797,6 +803,7 @@ player_update:
 .grid:
         and b
         ld (py),a
+.on_floor:
         ld a,1
         ld (on_ground),a
         xor a

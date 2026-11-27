@@ -76,6 +76,10 @@
       pushing against a wall or just being at a spot makes a money bag (1000),
       a 1-up or a 2000 treasure rise; palettes cycling, popups, sound $23/$25
       (the rise isn't masked as on the NES: the MSX has no sprite mask)
+- [x] Moving platforms (NES $D052, stages 4, 5 and 10): spring-driven swings
+      from the ROM's records, Simon stands on them and is carried while no
+      direction is held (stage 5's pair, which the NES never loads in normal
+      play, is created when its section loads)
 - [ ] The wall's debris (4 pieces)
 - [ ] Morning star flashing
 - [x] Wall candles and small hearts; candles spawn by camera position like the NES

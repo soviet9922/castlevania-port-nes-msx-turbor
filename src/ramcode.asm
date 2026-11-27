@@ -5,6 +5,7 @@ ramcode_src:
 ramcode_start:
         INCLUDE "enemies2.asm"
         INCLUDE "player2.asm"
+        INCLUDE "platforms.asm"
         IF DEBUG_MENU
         INCLUDE "debugmenu.asm"
         ENDIF

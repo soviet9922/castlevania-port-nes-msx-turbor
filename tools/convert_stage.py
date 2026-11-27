@@ -629,10 +629,14 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
         print("  treasures:", ", ".join(f"spot {sx},{sy} trigger {g} -> {tx},{ty} type {k}"
                                         for sx, sy, g, tx, ty, k in tr))
     convert_objects.write_treasures(os.path.join(out_dir, "treasures.bin"), tr)
+    pl = convert_objects.platforms(rom, area["stage"], area["section"])
+    if pl:
+        print("  platforms:", ", ".join(f"x {c + x_off} y {y - 48}" for _, _, c, y, _ in pl))
+    convert_objects.write_platforms(os.path.join(out_dir, "platforms.bin"), pl, x_off)
     objs = convert_objects.object_sprites(
         rom, slot_for_nes, convert_objects.needed_frames(
             cl, en, carried, convert_objects.DROP_LISTS[convert_objects.drop_group(area["stage"])],
-            {t[5] for t in tr}),
+            {t[5] for t in tr}, bool(pl)),
         carried)
     write_object_sprites(out_dir, index, objs)
     n_obj_patterns = objs.n_main

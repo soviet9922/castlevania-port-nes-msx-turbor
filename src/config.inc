@@ -85,7 +85,8 @@ AH_SUB5_SPT     equ 104                 ; the cross's window patterns (sub-weapo
 AH_SUB5_SZ      equ 106
 AH_WALLS        equ 108                 ; breakable walls: count, then (column, row, item)
 AH_TREASURES    equ 110                 ; hidden treasures: count, then 8 bytes each
-AH_SIZE         equ 112
+AH_PLATS        equ 112                 ; moving platforms: count, then 8 bytes each
+AH_SIZE         equ 114
 CRUSH_FIRST_ROW equ 8                   ; playfield rows the crushers rewrite (NES
 CRUSH_ROWS      equ 8                   ; nametable rows 14-21)
 CRUSH_MAX       equ 4

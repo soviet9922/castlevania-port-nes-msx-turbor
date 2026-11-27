@@ -22,6 +22,7 @@ load_area:
         ldir
         call walls_load
         call treasures_load
+        call platforms_load
 
         di
         call load_overlay

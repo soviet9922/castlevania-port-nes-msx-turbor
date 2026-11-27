@@ -71,6 +71,7 @@ OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
 # NES cycles them every 2 frames), by type; and the 1000 / 2000 popups
 TREASURE_TILES = [(0x60, 0x62), (0xB1, 0xB3), (0xA0, 0xA2), (0xA4, 0xA6)]   # bag, 1-up, $DF, $E0
 OBJ_FRAMES += [f"tr{t}_{p}" for t in range(4) for p in range(4)] + ["pop1000", "pop2000"]
+OBJ_FRAMES += ["plat"]              # a moving platform: a 32x8 bar
 
 # Black panther: 32x16, palette 3, art faces left (recorded in the hall).
 # Run cycle run1 -> run2 -> run3, 7 frames each; the leap shows run2.
@@ -149,6 +150,8 @@ FRAME_SPRITES = {
     "pop100": [(0xC9, 0, 8, 2, 0), (0xC5, 8, 8, 2, 0)],
     "pop1000": [(0xC9, 0, 8, 2, 0), (0xC7, 8, 8, 2, 0)],     # (NES frames $63, $AD)
     "pop2000": [(0xCB, 0, 8, 2, 0), (0xC7, 8, 8, 2, 0)],
+    # (NES frame $C9: tile $72 four times, palette 0, 1 px below its y)
+    "plat": [(0x72, 0, 1, 0, 0), (0x72, 8, 1, 0, 0), (0x72, 16, 1, 0, 0), (0x72, 24, 1, 0, 0)],
 # the flying cross (NES frames $27, $28, $29: a 9-frame spin, 3 frames
     # each; facing left shows $28 and $29 the other way round)
     "cross1": [(0x4A, 0, 0, 2, 0), (0x4A, 8, 0, 2, 1)],
@@ -461,6 +464,39 @@ def write_treasures(path, records):
         f.write(data)
 
 
+# Moving platforms (NES $D052, bank 7): 8-byte records by stage: velocity
+# V (8.8), offset P from the centre (8.8), centre world x C, y | section bit,
+# shift k. Stage 5's pair is loaded by the NES only on a restart in section 1,
+# which never happens (its restarts are in section 0); the port creates it
+# when the area loads, so its gaps can be crossed.
+PLATFORM_RECORDS = {4: (0xD0D6, 1), 5: (0xD0DE, 2), 10: (0xD0EE, 4)}
+
+
+def platforms(rom, stage, section):
+    """-> list of (V, P, C, y, n): the stage section's platforms (V, P as
+    16-bit 8.8 values; y: the feet line of one standing on it, NES screen
+    y; n = k + 1)"""
+    addr, count = PLATFORM_RECORDS.get(stage, (0, 0))
+    out = []
+    for i in range(count):
+        b = [rom.fixed(addr + 8 * i + k) for k in range(8)]
+        if b[6] & 1 != section:
+            continue
+        out.append((b[0] | b[1] << 8, b[2] | b[3] << 8, b[4] | b[5] << 8, b[6] & 0xF8, b[7] + 1))
+    return out
+
+
+def write_platforms(path, plats, x_off):
+    """count, then per platform: P (2), V (2), C (2: the port's x of its
+    middle), n, y (the playfield y of its top: NES y - 48)"""
+    data = bytearray([len(plats)])
+    for v, p, c, y, n in plats:
+        c += x_off
+        data += bytes([p & 0xFF, p >> 8, v & 0xFF, v >> 8, c & 0xFF, c >> 8, n, y - 48])
+    with open(path, "wb") as f:
+        f.write(data)
+
+
 def write_walls(path, wall_list):
     """count, then per wall: tile column (2 bytes), tile row, item code"""
     data = bytearray([len(wall_list)])
@@ -660,7 +696,7 @@ SUB_FRAMES = {ITEM_DAGGER: {"dagger_fly_r", "dagger_fly_l"},
               ITEM_CROSS: {"cross1", "cross2", "cross3"}}
 
 
-def needed_frames(candle_list, spawners, carried=(), drops=(), treasure_types=()):
+def needed_frames(candle_list, spawners, carried=(), drops=(), treasure_types=(), platforms=False):
     """-> set of frame names an area can show (others are left empty).
     carried: the sub-weapon items Simon can have picked up by now; drops: the
     stage group's random enemy drops."""
@@ -718,6 +754,8 @@ def needed_frames(candle_list, spawners, carried=(), drops=(), treasure_types=()
             need |= item_frames(item, thrown)
     # (the flying sub-weapons' frames are not here: only the one Simon holds
     # needs patterns, and it gets a window of its own, see object_sprites)
+    if platforms:
+        need.add("plat")
     for t in treasure_types:
         if t < 4:
             need |= {f"tr{t}_{p}" for p in range(4)}

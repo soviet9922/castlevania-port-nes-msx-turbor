@@ -482,7 +482,23 @@ def tcl_script(syms, result_file):
                         set f [open "{result_file}" a]
                         puts $f "treasure $::tr0 [peek {syms["tr_done"]}] [count_type 42] [expr {{$b >= 0 ? [peek [expr {{$b+1}}]] + 256*[peek [expr {{$b+2}}]] : -1}}] [expr {{$b >= 0 ? [peek [expr {{$b+3}}]] : -1}}]"
                         close $f }}
-    after time 166.2 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}] $::vbl_worst_fc"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
+    # a moving platform (NES $D052): in the cave, Simon set on the first one
+    # stands on it and is carried along as it swings
+    after time 166.2 {{ poke {eoff} 3; poke {syms["area_hdr"] + 44} 16; poke {syms["keep_player"]} 1
+                       set x 200; poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
+                       poke {py} 80; poke {py + 1} 0; poke {syms["lives"]} 5
+                       poke {syms["clear_t"]} 1; poke {syms["clear_phase"]} 4 }}
+    after time 167.8 {{ poke {eoff} 3; set p {syms["plat_table"]}
+                        set x [expr {{[peek [expr {{$p+1}}]] + 256*[peek [expr {{$p+2}}]] + 9}}]
+                        poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
+                        poke {py} [expr {{[peek [expr {{$p+3}}]] - 32}}]; poke {py + 1} 0 }}
+    after time 168.0 {{ set p {syms["plat_table"]}
+                        set ::plat0 "[expr {{[peek [expr {{$p+1}}]] + 256*[peek [expr {{$p+2}}]]}}] [expr {{[peek {px_a}] + 256*[peek {px_a + 1}]}}]" }}
+    after time 169.0 {{ set p {syms["plat_table"]}
+                        set f [open "{result_file}" a]
+                        puts $f "platform $::plat0 [expr {{[peek [expr {{$p+1}}]] + 256*[peek [expr {{$p+2}}]]}}] [expr {{[peek {px_a}] + 256*[peek {px_a + 1}]}}] [peek {syms["plat_ride"]}] [peek {syms["on_ground"]}] [peek {syms["cur_area"]}]"
+                        close $f }}
+    after time 169.1 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}] $::vbl_worst_fc"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
 """ if areas > 1 else f"""
     after time 9 {{ snd_report; set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
@@ -1070,7 +1086,7 @@ def run():
                 continue
             if tag in ("medusa", "s4enemies", "hbat", "knight1", "knight2", "crush",
                        "medusa_wake", "medusa_dead", "b3ghost", "b3pillar", "mummies",
-                       "mummies_dead", "wall", "treasure"):
+                       "mummies_dead", "wall", "treasure", "platform"):
                 block2_enemies[tag] = kv
                 continue
             if tag == "bat":
@@ -1336,6 +1352,10 @@ def run():
             "16 px on the ledge",
             block2_enemies["treasure"] == ["0", "0", "1", "1", "344", "65"])]
           if "treasure" in block2_enemies else []),
+        *([("a moving platform (NES $D052) swings and carries Simon standing on it",
+            (lambda p: p[0] != p[2] and p[1] - p[0] == 9 and p[3] - p[2] in (8, 9, 10)
+             and p[4:] == [1, 1, 16])([int(v) for v in block2_enemies["platform"]]))]
+          if "platform" in block2_enemies else []),
         *([("the chain whip has its own poses and reaches 4 px further (NES $E40B)",
             any(16 <= int(p) < 24 for p in weapons["chain"]["poses"].split(","))
             and int(weapons["chain"]["reach"]) == whip_reach + 4),

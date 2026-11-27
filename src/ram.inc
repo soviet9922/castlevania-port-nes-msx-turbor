@@ -231,4 +231,8 @@ RAM_END         equ tr_px+2
         ASSERT RAM_END < 0xF380
         ASSERT RAM_END <= RAMCODE
 RAMCODE         equ 0xC400              ; code copied from ROM (src/ramcode.asm)
-RAMCODE_TOP     equ 0xF000              ; (the stack is above, from about 0xF370 down: 880 bytes)
+RAMCODE_TOP     equ 0xEF80              ; (then the platforms; the stack is above, from about 0xF370 down)
+PLAT_MAX        equ 4
+plat_table      equ 0xEF80              ; PLAT_MAX*OBJ_SIZE  moving platforms (src/platforms.asm)
+plat_ride       equ plat_table+PLAT_MAX*12 ; 1  the platform Simon stands on (index + 1, 0 none)
+        ASSERT plat_ride < 0xF000
