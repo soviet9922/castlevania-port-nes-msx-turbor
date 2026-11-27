@@ -164,6 +164,64 @@ is (px+8, py+16), and port y = NES y - 48.
   frames. Frank takes half the weapon's damage; beaten, he gives 5000 points
   and leaves the orb.
 
+## Blocks 5-7 (stages 13-18)
+
+- **Stages:** see NES_NOTES.md, "Blocks 5-7". The stages reuse the fleaman,
+  the skeleton, the red skeleton, the bone pillar, the eagle and the Medusa
+  heads (stage 15's generator `6:$8A44` does what block 2's does: one head
+  every 64 ticks, at most 3, from the edge Simon faces).
+- **Axe knight** (`$0A`, record `$4A` `6:$89F5`, AI `5:$90D2`, hits `$E214`):
+  at most two. It always faces Simon and walks in cycles of 9/11/10/12 legs
+  (16 frames at 5/8 px, then 4 still): towards Simon when he is 80 px or
+  more away, else away; a wall 12 px ahead at its waist or no floor 4 px
+  ahead turns it at once. After the last leg it stands 16 frames and throws
+  an axe (`$27`, `5:$8DEE`) at its head or knee height (random), 1 1/4 px a
+  frame for 87 frames; the axe slows by 1/8 px a frame, turns, and flies back
+  until the knight catches it. A page away from the camera the knight stands.
+  Its guard: a whip hit face to face, or a sub-weapon from the front, only
+  adds to the guard (a clink) until 224; after that hits count, 64 kill it
+  (500 points, always a big heart). A hit freezes it 16 frames (a sub-weapon
+  8 first).
+- **Giant bat** (`$1E`, record `$5E` `6:$8AED`, AI `5:$9386`, hits `$E1AE`):
+  at most three, on stage 16's bridge. It waits 60 frames, flies straight at
+  a point 48 px right of and 16 px above Simon (screen x wrapping: from the
+  right of the screen it goes left) at 3/4 px on the long axis for
+  61/37/32/69 frames, hovers 123/32/61/199 frames (jumping 2 1/2 px up for 7
+  frames if Simon swings near it), then fires a fireball when Simon is above
+  it, far below or 72 px or more across, else swoops at his feet (curving
+  back up). Off the screen it flies straight across. 192 damage, 3000 points.
+- **Death** (`$18`, record `$58` `6:$8AA9`, AI `5:$8EE0`, hits `$E282`):
+  made when the camera comes within 216 px of his room (every other enemy
+  goes). 120 frames after the camera locks he appears at the top right and
+  floats down (2 1/2 px, slowing 5/256 a frame). At every landing he throws
+  3 sickles (`$0B`, `5:$8FF8`) placed from Simon's position (+160/-80,
+  +48/+24, +4/-48, wrapping on the screen); they flicker 40 frames, then aim
+  at Simon (7/8 px on the long axis), fly 119 frames, stop 32, and aim again.
+  He then stands 144/95/185/84 frames: every 32 frames, if Simon is within
+  72 px, he leaps at him (1 1/4 px across, 2 px up); else when the time is up
+  he hops 1 or 2 px up, 3/4 px across to a random side. In the air gravity is
+  6/256 a frame and he bounces off screen x 16 and 240; his feet probe the
+  floor every frame, rising too (a low hop lands at once, 8 px higher). Half
+  the weapon's damage off the boss bar, 8 frames frozen a hit; 7000 points
+  and the orb. The sickles fly on after he is beaten.
+- **Dracula** (`$1D`, record `$5D` `6:$8B3B`, AI `5:$950E`, hits `$E327` on
+  the body, `$E34B` on an invisible head box `$04`): made like Death. The
+  stage music goes on (no boss music). 120 frames after the lock his head
+  shows at the floor, rises 1/2 px a frame to y 168 and he flickers in. Then
+  a loop: stand 36/16/50/24 frames, open the cape 16, fire 3 fireballs (at
+  Simon's middle and 16 px below and above it, 2 px a frame), 32 more,
+  vanish (32 + 79 frames away) and reappear by Simon (his screen x + 16, -8,
+  +128, +96, +48, -40, +96 or -88, kept within 20..235). Only the head box
+  takes damage (half the weapon's), and only while he stands, opens the
+  cape or fires; the body clinks. At 0 the head flies off, the body stands
+  120 frames, crumbles into 6 pieces, and the monster appears with a full
+  bar: it stands 33 frames, waits 85 or 123 (crouching at once if Simon faces
+  it swinging), crouches 16, jumps at Simon (6 or 4 1/2 px up, gravity 3/16,
+  3/4 px across, turning at screen x 24/232), lands, and when 48 px or more
+  away (3 times in 4) opens its mouth and fires 3 from its head. A quarter of
+  the weapon's damage on its head box, 8 frames frozen a hit; holy water also
+  burns its body slowly. 50000 points and the orb.
+
 ## Frames
 
 `tools/nes_frames.py ROM FRAME [FACING]` runs the NES's own sprite builder

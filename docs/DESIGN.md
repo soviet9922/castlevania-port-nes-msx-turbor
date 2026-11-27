@@ -383,10 +383,28 @@ courtyard).
 
 ### Code in RAM
 
-Bank 0, the code page, is full. The enemies of blocks 2 and 3 and Medusa
-(`src/enemies2.asm`) are stored in Simon's bank and copied at start-up to `RAMCODE`
-(0xC600), where they run (`src/ramcode.asm`, sjasmplus `DISP`). They call the engine in
-bank 0 and read the current area's bank at 0x8000 like the rest of the object code.
+Bank 0, the code page, is full. The enemies of blocks 2-7 run from RAM
+(`src/ramcode.asm`, sjasmplus `DISP`). The resident part (`src/enemies2.asm`: the
+shared helpers and the enemies several blocks use) is stored in Simon's bank and
+copied at start-up to `RAMCODE` (0xC600). After it, at `OVL_BASE`, one overlay at a
+time (`src/overlays.asm`): overlay A (`src/ovl_a.asm`, blocks 2-4's own enemies and
+bosses) or overlay B (`src/ovl_b.asm`, blocks 5-7's), stored in a bank of their own
+(`OVL_BANK`) and copied by `load_area` when the stage needs the other one. Resident
+code calls an overlay's routines only for objects of the blocks that load it. All of
+it calls the engine in bank 0 and reads the current area's bank at 0x8000 like the
+rest of the object code.
+
+### Swap sets
+
+An area's object patterns are the main set (always in video memory), the window of
+the sub-weapon Simon holds, and a swap window: sets that are never on the screen
+together (stage 3's zombies, then the bat boss; the corridor's enemies, then
+Frankenstein or Death; each of Dracula's pictures). `load_swap_patterns` copies a set
+into the window; the area header points to a table of the sets (`AH_SWAP_TAB`), and
+an area whose sets are big keeps them in a bank of their own (`AH_SWAP_BANK`, mapped
+while they are copied). Dracula loads the set of the picture he shows whenever it
+changes. A frame may use up to 16 hardware sprites; one that would need more gets a
+single sprite for the cells whose second colour has the fewest pixels.
 
 ### Late frames
 
