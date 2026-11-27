@@ -72,7 +72,10 @@
 - [x] Breakable walls (NES $FC78): the whip breaks them (the NES's reach,
       around Simon's feet), the block goes from the map and the collision,
       its item drops the first time; broken until a restart
-- [ ] Hidden treasures (NES $FC3F: standing, crouching or pushing at a spot)
+- [x] Hidden treasures (NES $FC3F, first quest): standing still, crouching,
+      pushing against a wall or just being at a spot makes a money bag (1000),
+      a 1-up or a 2000 treasure rise; palettes cycling, popups, sound $23/$25
+      (the rise isn't masked as on the NES: the MSX has no sprite mask)
 - [ ] The wall's debris (4 pieces)
 - [ ] Morning star flashing
 - [x] Wall candles and small hearts; candles spawn by camera position like the NES

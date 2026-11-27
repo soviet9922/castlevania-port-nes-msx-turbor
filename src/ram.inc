@@ -223,7 +223,11 @@ walls_now       equ wall_bits+WALL_BYTES ; 1  ... of the current area
 probe_col       equ walls_now+1         ; 2  solid_at's tile column
 probe_row       equ probe_col+2         ; 1  ... and row
 wall_row        equ probe_row+1         ; 1  wall_redraw
-RAM_END         equ wall_row+1
+tr_done         equ wall_row+1          ; 1  hidden treasures given in this area (bits)
+tr_t            equ tr_done+1           ; 1  ... frames standing still / pushing
+tr_on           equ tr_t+1              ; 1  ... Simon on a spot this frame
+tr_px           equ tr_on+1             ; 2  ... his x last frame
+RAM_END         equ tr_px+2
         ASSERT RAM_END < 0xF380
         ASSERT RAM_END <= RAMCODE
 RAMCODE         equ 0xC400              ; code copied from ROM (src/ramcode.asm)

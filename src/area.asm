@@ -21,6 +21,7 @@ load_area:
         ld bc,AH_SIZE
         ldir
         call walls_load
+        call treasures_load
 
         di
         call load_overlay

@@ -616,9 +616,23 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
     cl = [c for c in cl if c[0] + 16 > area.get("min_cam", x_off)]
     en = [(x + x_off, y, t) for x, y, t in
           convert_objects.enemy_spawners(rom, area["stage"], area["section"], play_px)]
+    # hidden treasures: port coordinates (x + x_off; y: the playfield is
+    # the NES screen's y - 48); the spot by Simon's middle and feet, the
+    # treasure by its sprite's left and top when it starts to rise
+    tr = [(sx + x_off, sy - 48, trig, tx + x_off - 8, ty - 7 - 48, kind)
+          for sx, sy, trig, tx, ty, kind in convert_objects.treasures(rom, area["stage"],
+                                                                      area["section"])
+          if kind < 4]
+    tr = [t for t in tr if 0 <= t[0] < play_px + x_off]
+    assert len(tr) <= 8, "the engine keeps 8 treasure bits per area"
+    if tr:
+        print("  treasures:", ", ".join(f"spot {sx},{sy} trigger {g} -> {tx},{ty} type {k}"
+                                        for sx, sy, g, tx, ty, k in tr))
+    convert_objects.write_treasures(os.path.join(out_dir, "treasures.bin"), tr)
     objs = convert_objects.object_sprites(
         rom, slot_for_nes, convert_objects.needed_frames(
-            cl, en, carried, convert_objects.DROP_LISTS[convert_objects.drop_group(area["stage"])]),
+            cl, en, carried, convert_objects.DROP_LISTS[convert_objects.drop_group(area["stage"])],
+            {t[5] for t in tr}),
         carried)
     write_object_sprites(out_dir, index, objs)
     n_obj_patterns = objs.n_main

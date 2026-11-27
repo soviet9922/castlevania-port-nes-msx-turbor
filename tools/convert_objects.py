@@ -67,6 +67,10 @@ OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
               "mon_land_r", "mon_fire_r", "debris",
               "bag100", "bag400", "bag700", "pork", "cross_item", "rosary", "potion",
               "shot2", "shot3", "pop100", "pop400", "pop700", "cross1", "cross2", "cross3"]
+# hidden treasures (NES $FC3F): their pictures in the 4 sprite palettes (the
+# NES cycles them every 2 frames), by type; and the 1000 / 2000 popups
+TREASURE_TILES = [(0x60, 0x62), (0xB1, 0xB3), (0xA0, 0xA2), (0xA4, 0xA6)]   # bag, 1-up, $DF, $E0
+OBJ_FRAMES += [f"tr{t}_{p}" for t in range(4) for p in range(4)] + ["pop1000", "pop2000"]
 
 # Black panther: 32x16, palette 3, art faces left (recorded in the hall).
 # Run cycle run1 -> run2 -> run3, 7 frames each; the leap shows run2.
@@ -143,7 +147,9 @@ FRAME_SPRITES = {
     "shot2": [(0xA5, 0, 8, 2, 0), (0xA7, 8, 8, 2, 0)],
     "shot3": [(0xA9, 0, 8, 3, 0), (0xAB, 8, 8, 3, 0)],
     "pop100": [(0xC9, 0, 8, 2, 0), (0xC5, 8, 8, 2, 0)],
-    # the flying cross (NES frames $27, $28, $29: a 9-frame spin, 3 frames
+    "pop1000": [(0xC9, 0, 8, 2, 0), (0xC7, 8, 8, 2, 0)],     # (NES frames $63, $AD)
+    "pop2000": [(0xCB, 0, 8, 2, 0), (0xC7, 8, 8, 2, 0)],
+# the flying cross (NES frames $27, $28, $29: a 9-frame spin, 3 frames
     # each; facing left shows $28 and $29 the other way round)
     "cross1": [(0x4A, 0, 0, 2, 0), (0x4A, 8, 0, 2, 1)],
     "cross2": [(0x52, 0, 0, 2, 0), (0x54, 8, 0, 2, 0)],
@@ -199,6 +205,9 @@ FRAME_SPRITES["axe2"] = [(0xB9, 0, 0, 1, 1), (0xB7, 8, 0, 1, 1)]
 FRAME_SPRITES["axe3"] = [(0xB9, 0, 0, 1, 3), (0xB7, 8, 0, 1, 3)]
 FRAME_SPRITES["axe4"] = [(0xB7, 0, 0, 1, 2), (0xB9, 8, 0, 1, 2)]
 FRAME_SPRITES["axe_item"] = FRAME_SPRITES["axe1"]
+# the hidden treasures, drawn from their object's y (TREASURE_TILES)
+FRAME_SPRITES.update({f"tr{_t}_{_p}": [(_a, 0, 0, _p, 0), (_b, 8, 0, _p, 0)]
+                      for _t, (_a, _b) in enumerate(TREASURE_TILES) for _p in range(4)})
 # holy water (recorded): the bottle (palette 2, also its pickup) and the fire
 # it leaves on the floor (palette 3)
 FRAME_SPRITES["bottle"] = [(0x76, 4, 0, 2, 0)]
@@ -415,6 +424,43 @@ def walls(rom, stage, section):
     return out
 
 
+# Hidden treasures (NES 6:$A63A): a pointer per stage at $FC3F to 4-byte
+# records in bank 6, $FF = end. b0: y = b0 & $F0, section = bit 0, trigger =
+# bits 1-2 (0 stand still 128 frames, 1 hold DOWN, 2 push against a wall 128
+# frames, 3 just be there), bit 3 = second quest only; b1: x = (b1 & 7) * 256
+# + (b1 & $F8); b2: the treasure's offset, dy = signed((b2 & $F0) + 8), dx =
+# signed(low nibble * 16); b3: type (0 bag 1000, 1 1-up, 2 / 3 2000, 4 4000).
+# The spot: Simon's feet line within 22 px of y, his middle within 14 of x.
+TREASURE_TABLE = 0xFC3F
+
+
+def treasures(rom, stage, section):
+    """-> list of (spot x, spot y, trigger, treasure x, treasure y, type), NES
+    coordinates (the treasure's: its middle), first quest"""
+    def signed(v):
+        return v - 256 if v & 0x80 else v
+    p = rom.rd16(7, TREASURE_TABLE + 2 * stage)
+    out = []
+    while rom.rd(6, p) != 0xFF:
+        b0, b1, b2, b3 = (rom.rd(6, p + k) for k in range(4))
+        p += 4
+        if b0 & 8 or b0 & 1 != section:
+            continue
+        x, y = (b1 & 7) * 256 + (b1 & 0xF8), b0 & 0xF0
+        dy, dx = signed(((b2 & 0xF0) + 8) & 0xFF), signed((b2 & 0x0F) * 16)
+        out.append((x, y, (b0 >> 1) & 3, x + dx, y + dy, b3))
+    return out
+
+
+def write_treasures(path, records):
+    """count, then per spot: x (2), y, trigger, treasure x (2), y, type"""
+    data = bytearray([len(records)])
+    for sx, sy, trig, tx, ty, kind in records:
+        data += bytes([sx & 0xFF, sx >> 8, sy, trig, tx & 0xFF, tx >> 8, ty & 0xFF, kind])
+    with open(path, "wb") as f:
+        f.write(data)
+
+
 def write_walls(path, wall_list):
     """count, then per wall: tile column (2 bytes), tile row, item code"""
     data = bytearray([len(wall_list)])
@@ -614,7 +660,7 @@ SUB_FRAMES = {ITEM_DAGGER: {"dagger_fly_r", "dagger_fly_l"},
               ITEM_CROSS: {"cross1", "cross2", "cross3"}}
 
 
-def needed_frames(candle_list, spawners, carried=(), drops=()):
+def needed_frames(candle_list, spawners, carried=(), drops=(), treasure_types=()):
     """-> set of frame names an area can show (others are left empty).
     carried: the sub-weapon items Simon can have picked up by now; drops: the
     stage group's random enemy drops."""
@@ -672,6 +718,10 @@ def needed_frames(candle_list, spawners, carried=(), drops=()):
             need |= item_frames(item, thrown)
     # (the flying sub-weapons' frames are not here: only the one Simon holds
     # needs patterns, and it gets a window of its own, see object_sprites)
+    for t in treasure_types:
+        if t < 4:
+            need |= {f"tr{t}_{p}" for p in range(4)}
+            need.add("pop2000" if t >= 2 else "pop1000")
     kinds = {k for _, _, k in spawners}
     if ENEMY_ZOMBIE in kinds:
         need |= {n for n in OBJ_FRAMES if n.startswith("zombie")}

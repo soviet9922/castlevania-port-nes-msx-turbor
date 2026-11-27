@@ -469,7 +469,20 @@ def tcl_script(syms, result_file):
     after time 162.4 {{ keymatrixup 8 0x80
                         set f [open "{result_file}" a]
                         puts $f "wall $::wall0 $::wall1 $::bag [peek {py}] [peek {syms["cur_area"]}]"; close $f }}
-    after time 162.5 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}] $::vbl_worst_fc"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
+    # a hidden treasure (NES $FC3F): crouching on stage 2's spot makes a
+    # money bag rise on the ledge to the left
+    after time 162.5 {{ poke {eoff} 3; poke {syms["area_hdr"] + 44} 3; poke {syms["keep_player"]} 1
+                       set x 456; poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
+                       poke {py} 90; poke {py + 1} 0
+                       poke {syms["clear_t"]} 1; poke {syms["clear_phase"]} 4 }}
+    after time 163.9 {{ poke {eoff} 3; set ::tr0 "[peek {syms["tr_done"]}] [count_type 42]"
+                        keymatrixdown 8 0x40; after time 0.3 {{ keymatrixup 8 0x40 }} }}
+    after time 165.6 {{ set b -1
+                        for {{set i 0}} {{$i < 8}} {{incr i}} {{ if {{[peek [expr {{{objt} + $i*{obj_size}}}]] == 42}} {{ set b [expr {{{objt} + $i*{obj_size}}}] }} }}
+                        set f [open "{result_file}" a]
+                        puts $f "treasure $::tr0 [peek {syms["tr_done"]}] [count_type 42] [expr {{$b >= 0 ? [peek [expr {{$b+1}}]] + 256*[peek [expr {{$b+2}}]] : -1}}] [expr {{$b >= 0 ? [peek [expr {{$b+3}}]] : -1}}]"
+                        close $f }}
+    after time 165.7 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}] $::vbl_worst_fc"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
 """ if areas > 1 else f"""
     after time 9 {{ snd_report; set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
@@ -1057,7 +1070,7 @@ def run():
                 continue
             if tag in ("medusa", "s4enemies", "hbat", "knight1", "knight2", "crush",
                        "medusa_wake", "medusa_dead", "b3ghost", "b3pillar", "mummies",
-                       "mummies_dead", "wall"):
+                       "mummies_dead", "wall", "treasure"):
                 block2_enemies[tag] = kv
                 continue
             if tag == "bat":
@@ -1287,7 +1300,8 @@ def run():
             block2_enemies["hbat"][0] == "0" and int(block2_enemies["hbat"][1]) < 64),
            ("a spear knight takes two whip hits, then gives 400 points",
             block2_enemies["knight1"][0] == "1" and block2_enemies["knight2"][0] == "0"
-            and int(block2_enemies["knight2"][2]) - int(block2_enemies["knight2"][1]) == 4)]
+            # (+ 100 when its drop, by the NES's rule, is a money bag he walks into)
+            and int(block2_enemies["knight2"][2]) - int(block2_enemies["knight2"][1]) in (4, 5))]
           if block2 and "knight2" in block2_enemies else []),
         *([("stage 6's ceiling crushers crush Simon standing under one",
             block2_enemies["crush"] == ["9", "1"])]
@@ -1318,6 +1332,10 @@ def run():
             block2_enemies["wall"][:3] == ["0", "1", "1"] and block2_enemies["wall"][3] == "128"
             and block2_enemies["wall"][4] == "1")]
           if "wall" in block2_enemies else []),
+        *([("crouching on a hidden treasure's spot (NES $FC3F) makes its money bag rise "
+            "16 px on the ledge",
+            block2_enemies["treasure"] == ["0", "0", "1", "1", "344", "65"])]
+          if "treasure" in block2_enemies else []),
         *([("the chain whip has its own poses and reaches 4 px further (NES $E40B)",
             any(16 <= int(p) < 24 for p in weapons["chain"]["poses"].split(","))
             and int(weapons["chain"]["reach"]) == whip_reach + 4),

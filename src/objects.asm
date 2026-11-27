@@ -153,6 +153,9 @@ OBJF_POTION     equ 173
 OBJF_SHOT       equ 174                 ; II, III
 OBJF_POP        equ 176                 ; score popups 100, 400, 700
 OBJF_CROSS      equ 179                 ; the flying cross: 3 spin frames
+OBJF_TREASURE   equ 182                 ; hidden treasures: type * 4 + palette
+OBJF_POP1000    equ 198
+OBJF_POP2000    equ 199
 
 ; items: the NES's obj_item codes ($EC16; a money bag's value in bits 4-5)
 ITEM_SMALLHEART equ 0x00                ; (as a candle's code: candle_item decides)
@@ -171,6 +174,7 @@ ITEM_STOPWATCH  equ 0x0F
 ITEM_NONE       equ 0xFF                ; burst of an enemy: nothing drops
 OBJ_POPUP       equ 40                  ; a money bag's score (32 frames)
 OBJ_CROSS       equ 41                  ; the flying cross (sub-weapon 5)
+OBJ_TREASURE    equ 42                  ; a hidden treasure (src/treasure.asm)
 
 SPAWN_LEFT      equ 16                  ; spawn when -16 <= box x - camera <= 272
 SPAWN_RIGHT     equ 272
@@ -593,6 +597,11 @@ objects_update:
         call cross_update
         jp .next
 .not_cross:
+        cp OBJ_TREASURE
+        jr nz,.not_treasure
+        call treasure_update
+        jp .next
+.not_treasure:
         cp OBJ_POPUP
         jr nz,.not_popup
         call popup_update

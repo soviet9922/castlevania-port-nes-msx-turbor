@@ -76,7 +76,7 @@ def write(gen_dir, areas):
         n_frames = open(inc).read().count("dw ") if os.path.exists(inc) else 0
         near = (sum(size(n) for n in ("palette.bin", "level_tiles.bin", "level_coll.bin",
                                       "candles.bin", "stairs.bin", "enemies.bin", "crushers.bin",
-                                      "walls.bin",
+                                      "walls.bin", "treasures.bin",
                                       f"a{i}_obj_spt.bin", f"a{i}_obj_sct.bin",
                                       f"a{i}_obj_frames.bin"))
                 + sum(size(f"bg_{t}_b{b}.bin") for t in ("pgt", "ct") for b in range(3))
@@ -126,6 +126,7 @@ def write(gen_dir, areas):
             f"        db {a.get('item_slot', 0)}",
             f"        dw {p}sub5_spt, {p}sub5_end-{p}sub5_spt" if 5 in a.get("subs", []) else "        dw 0, 0",
             f"        dw {p}walls",
+            f"        dw {p}treasures",
             f'{p}palette: INCBIN "{d}/palette.bin"',
         ]
         for b in range(3):
@@ -140,6 +141,8 @@ def write(gen_dir, areas):
             f'{p}crushers: INCBIN "{d}/crushers.bin"' if a.get('crush_vcol') else f"{p}crushers: db 0",
             (f'{p}walls: INCBIN "{d}/walls.bin"' if os.path.exists(os.path.join(gen_dir, d, "walls.bin"))
              else f"{p}walls: db 0"),
+            (f'{p}treasures: INCBIN "{d}/treasures.bin"'
+             if os.path.exists(os.path.join(gen_dir, d, "treasures.bin")) else f"{p}treasures: db 0"),
             f'{p}obj_spt: INCBIN "{d}/{p}obj_spt.bin"',
             *([] if i in swap_far else window_lines(i, a)),
             f"{p}item_tab:                   ; (code, ptr, size) per power-up picture, 0xFF ends",
