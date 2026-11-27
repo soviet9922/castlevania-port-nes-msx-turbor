@@ -679,7 +679,9 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
     print(f"area {index} {area['name']}: {width} px, tiles per band {params['tiles']}, "
           f"{params['lossy_rows']}/{params['total_rows']} tile rows reduced, "
           f"start ({sx},{sy}), {len(st)} stairs, {len(en)} enemy spawners {en}, {len(cl)} candles "
-          f"({', '.join(f'{kinds[k]}@{x + 8}' for x, _, _, k in cl[:6])}{', ...' if len(cl) > 6 else ''})")
+          f"({', '.join(f'{kinds[k]}@{x + 8}' for x, _, _, k in cl[:6])}{', ...' if len(cl) > 6 else ''})"
+          + (f", enemies: {', '.join(f'{kinds[k]}@{x + 8}' for x, _, _, k in cl if k > 1)}"
+             if any(k > 1 for *_, k in cl) else ""))
     return params
 
 

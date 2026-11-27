@@ -385,6 +385,43 @@ A savestate at the start of stage 7 was made by forcing the stage-clear mode (`$
   64, 1-3 a whip hit. Each is worth 3000; the first dies with the bar at 3, the second at
   0, and the second burns (`$31`) and leaves the orb (`$2F`).
 
+## Blocks 5-7 (stages 13-18): layout
+
+- **Camera limits per section** (`$D015`, `$D025`, from the scroll code `6:$985F` and
+  `6:$9889`): `$FBB7 + stage` is the camera's last page (high nibble section 0, low
+  nibble section 1); `$FBCA + stage` the least page minus 1 (`$F`: none, the camera
+  stops at 0). Stage 14 section 1 also keeps the camera at page 4 or more while Simon
+  is low (y `$60` or more) at page 4 (`$D037`). `$FC65 + stage` is the boss room
+  (section, page) where the camera locks.
+- **Start x** (`$CA0C` byte 1): bits 7-1 are the screen x, and bit 7 also sets the
+  facing; stages 15-18 start at screen x 208 or 224, facing left.
+- **Stages and sections** (camera range; start; exit at `$FC19`):
+  - 13: section 0 camera 0 to 256 (start x 48, y 176), section 1 camera 0 to 1024 (exit
+    x 1256, y 176, at the camera's end); a staircase at the left joins them. Timer 500,
+    music `$36` (all of block 5).
+  - 14: section 0 is one screen at camera 1024 (start x 1072, y 176), section 1 camera 0
+    to 1024, run left to the exit at x 28, y 176. Timer 400.
+  - 15: section 0 camera 512 to 768 (start x 976, y 176, facing left), section 1 camera
+    0 to 768; Death's room is at camera 0 of section 1. Timer 300.
+  - 16 (block 6, music `$33`, timer 700): one section, camera 0 to 1280, run left
+    (start x 1504, y 176) along a bridge to a door at its left end (frame at x 32-56,
+    on the bridge at y 112). Its map follows stage 17 section 0's in the ROM, so the
+    8 columns before it are stage 17's.
+  - 17: section 0 camera 0 to 512 (start x 720, y 112, facing left), section 1 camera 0
+    to 512, exit at x 16, y 112 (left end). Timer 600.
+  - 18 (music `$3C`, timer 500): section 0 camera 256 to 512 (start x 720, y 112,
+    facing left), up a staircase to section 1 (camera 0 to 512): Dracula's room at
+    camera 0.
+- **Graphics:** CHR sets 3 and 7 (block 5), 3 and 8 (block 6), 3 and 9 (stage 18);
+  palettes `$CE74`, `$CE87`, `$CE9A`; tile-block tables `$9ED1`, `$A537`, `$A9F4`.
+- **Enemy records** (type = `$40` + object id for single enemies): new here are `$4A`
+  (object `$0A`), `$58` (object `$18`, Death, at x 224 in his room), `$5E` (object
+  `$1E`, a red flying creature on stage 16's bridge) and `$5D` (object `$1D`, Dracula,
+  x 224 in his room). Records past a section's camera range are never reached (the
+  record lists of neighbouring stages overlap).
+- The red skeleton (`$53`, object `$13`) in stage 15 section 0: the port's path matched
+  the NES's within 2 px for 440 frames (it then turns at random).
+
 ## Exit sequences
 
 Recorded with a variant of `record_exit.lua` that also dumps the PPU nametables.
