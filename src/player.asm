@@ -985,9 +985,8 @@ player_animate:
         add a,3
         jr .sw_set
 .stair_whip:
-        ld a,(whip_level)               ; + whip*8 + down*4 + phase
-        add a,a
-        add a,a
+        ld a,(whip_level)               ; + whip*8 + down*4 + phase:
+        add a,a                         ; (whip*2 + down) * 4 + phase
         add a,e
         add a,a
         add a,a

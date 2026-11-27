@@ -516,7 +516,20 @@ def tcl_script(syms, result_file):
                             poke [expr {{$d+4}}] 0; poke [expr {{$d+5}}] 0; poke [expr {{$d+9}}] 0; poke [expr {{$d+10}}] 0
                             poke [expr {{$d+11}}] 0; poke [expr {{$d+8}}] 255; poke [expr {{$d+7}}] 3; poke $d 13 }} }}
     after time 171.8 {{ set f [open "{result_file}" a]; puts $f "axe_boss [expr {{$::bb >= 0}}] [peek {syms["boss_hp"]}]"; close $f }}
-    after time 171.9 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}] $::vbl_worst_fc"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
+    # the morning star swung on the stairs going down (facing left): its
+    # poses are within Simon's 70 (a wrong formula ran past them: a crash)
+    after time 171.9 {{ poke {eoff} 3; poke {syms["area_hdr"] + 44} 1; poke {syms["keep_player"]} 1
+                       set x 686; poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
+                       poke {py} 32; poke {py + 1} 0; poke {syms["lives"]} 5
+                       poke {syms["clear_t"]} 1; poke {syms["clear_phase"]} 4 }}
+    after time 173.3 {{ poke {eoff} 3; poke {syms["whip_level"]} 2; keymatrixdown 8 0x40 }}
+    after time 173.8 {{ keymatrixup 8 0x40; set ::sw_max 0; set ::sw_log "" }}
+    after time 174.1 {{ keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
+    after time 174.15 {{ set v [peek {syms["pframe"]}]; if {{$v > $::sw_max}} {{ set ::sw_max $v }}; append ::sw_log " $v/[peek {syms["whip_t"]}]" }}
+    after time 174.25 {{ set v [peek {syms["pframe"]}]; if {{$v > $::sw_max}} {{ set ::sw_max $v }}; append ::sw_log " $v/[peek {syms["whip_t"]}]" }}
+    after time 174.4 {{ set v [peek {syms["pframe"]}]; if {{$v > $::sw_max}} {{ set ::sw_max $v }}; append ::sw_log " $v/[peek {syms["whip_t"]}]" }}
+    after time 174.6 {{ set f [open "{result_file}" a]; puts $f "stair_ms [peek {syms["stair_state"]}] $::sw_max [peek {syms["facing"]}] [peek {syms["cur_area"]}] [peek {px_a}] [peek {py}]$::sw_log"; close $f }}
+    after time 174.7 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}] $::vbl_worst_fc"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
 """ if areas > 1 else f"""
     after time 9 {{ snd_report; set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
@@ -1104,7 +1117,7 @@ def run():
                 continue
             if tag in ("medusa", "s4enemies", "hbat", "knight1", "knight2", "crush",
                        "medusa_wake", "medusa_dead", "b3ghost", "b3pillar", "mummies",
-                       "mummies_dead", "wall", "treasure", "platform", "axe_boss"):
+                       "mummies_dead", "wall", "treasure", "platform", "axe_boss", "stair_ms"):
                 block2_enemies[tag] = kv
                 continue
             if tag == "bat":
@@ -1377,6 +1390,10 @@ def run():
         *([("an axe through the bat boss hits it once: 8 of its 64 (not every frame)",
             block2_enemies["axe_boss"] == ["1", "56"])]
           if "axe_boss" in block2_enemies else []),
+        *([("the morning star on the stairs (going down) uses its own poses, within "
+            "Simon's 70",
+            block2_enemies["stair_ms"][0] == "2" and 60 <= int(block2_enemies["stair_ms"][1]) <= 63)]
+          if "stair_ms" in block2_enemies else []),
         *([("the chain whip has its own poses and reaches 4 px further (NES $E40B)",
             any(16 <= int(p) < 24 for p in weapons["chain"]["poses"].split(","))
             and int(weapons["chain"]["reach"]) == whip_reach + 4),
