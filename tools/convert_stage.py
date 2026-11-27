@@ -42,7 +42,7 @@ BLOCK_PALETTES = {1: "1-courtyard", 2: "2-castle", 3: "3-castle", 4: "4-castle",
                   5: "5-castle", 6: "6-castle", 7: "7-dracula"}
 # NES $2A, $2D, $30 (table at $FB56 by stage); stage 10 has its own ($39),
 # 11-12 play block 2's ($2D): an area's "music" overrides
-BLOCK_MUSIC = {1: "STAGE", 2: "STAGE2", 3: "STAGE3", 4: "STAGE2"}
+BLOCK_MUSIC = {1: "STAGE", 2: "STAGE2", 3: "STAGE3", 4: "STAGE2", 5: "STAGE5", 6: "STAGE6", 7: "STAGE7"}
 
 # Block 2 runs right to left: its doors are at the left end of a section, and
 # the 8 map columns before a section's world column 0 are the last 8 columns of
@@ -284,6 +284,153 @@ AREAS = [
         "stage": 12, "section": 0,      # Frankenstein's room at its end
         "start_x": 48 - 8,              # NES: x 48, y 176
         "start_y": 176 - 64,
+        "exit_x": None,
+        "next_area": 19,                # after Frankenstein and the stage clear
+    },
+    # Blocks 5-7 (stages 13-18). A section's camera runs between the pages in
+    # the NES tables $FBCA (least page - 1, $F: none) and $FBB7 (last page):
+    # high nibble section 0, low nibble section 1.
+    # ---- block 5 (stages 13-15; tile blocks $9ED1, palette $CE74, sets 3 and 7)
+    {
+        "name": "13-lower",
+        "block": 5,
+        "map": (0x9B41, 0x9BA1),        # stage 13, section 0 (512 px)
+        "stage": 13, "section": 0,
+        "music": "STAGE5",              # (NES $36)
+        "start_x": 48 - 8,              # NES $CA0C: x 48, y 176
+        "start_y": 176 - 64,
+        "exit_x": None,
+        "above": 20,
+    },
+    {
+        "name": "13-upper",
+        "block": 5,
+        "map": (0x9BA1, 0x9C91),        # stage 13, section 1 (1280 px)
+        "stage": 13, "section": 1,
+        "music": "STAGE5",
+        "start_x": 80,                  # (not used: entered by the stairs)
+        "below": 19,
+        "respawn": 19,
+        "exit_x": 1024 + 0xE8 - 8,      # NES $FC19: section 1, x $E8, y $B0
+        "exit_y": 0xB0 - 64,            # at the camera's end
+        "next_area": 21,
+    },
+    {
+        "name": "14-lower",
+        "block": 5,
+        "map": (0x9BD1, 0x9CC1),        # stage 14, section 0: one screen at
+        "stage": 14, "section": 0,      # 1024 (the camera stays there)
+        "music": "STAGE5",
+        "min_cam": 1024,
+        "start_x": 1024 + 48 - 8,       # NES: camera 1024, x 48, y 176
+        "start_y": 176 - 64,
+        "exit_x": None,
+        "above": 22,
+    },
+    {
+        "name": "14-upper",
+        "block": 5,
+        "map": (0x9D21, 0x9E11),        # stage 14, section 1 (1280 px): left
+        "stage": 14, "section": 1,
+        "music": "STAGE5",
+        "start_x": 1100,                # (not used: entered by the stairs)
+        "below": 21,
+        "respawn": 21,
+        "exit_x": 0x1C - 4,             # NES $FC19: section 1, x $1C, y $B0 (the
+                                        # wall stops Simon at 21)
+        "exit_y": 0xB0 - 64, "exit_left": True,
+        "next_area": 23,
+    },
+    {
+        "name": "15-lower",
+        "block": 5,
+        "map": (0x9C61, 0x9D21),        # stage 15, section 0 (camera 512-768)
+        "stage": 15, "section": 0,
+        "music": "STAGE5",
+        "min_cam": 512,
+        "start_x": 768 + 208 - 8,       # NES: camera 768, x 208, y 176, facing
+        "start_y": 176 - 64,            # left
+        "start_face": 1,
+        "exit_x": None,
+        "above": 24,
+    },
+    {
+        "name": "15-upper",
+        "block": 5,
+        "map": (0x9E11, 0x9ED1),        # stage 15, section 1 (1024 px): Death's
+        "stage": 15, "section": 1,      # room at its left end
+        "music": "STAGE5",
+        "start_x": 900,                 # (not used: entered by the stairs)
+        "below": 23,
+        "respawn": 23,
+        "exit_x": None,
+        "next_area": 25,                # after Death and the stage clear
+    },
+    # ---- block 6 (stages 16-17; tile blocks $A537, palette $CE87, sets 3 and 8)
+    {
+        "name": "16-bridge",
+        "block": 6,
+        "map": (0xA297 - 48, 0xA3B7),   # stage 16 (1536 px), after the last 8
+        "stage": 16, "section": 0,      # columns of stage 17's section 0: runs
+        "music": "STAGE6",              # left (NES $33) to a door
+        "x_off": BLOCK2_X_OFF,
+        "start_x": 1280 + 224 - 8 + BLOCK2_X_OFF,  # NES: camera 1280, x 224,
+        "start_y": 176 - 64,            # y 176, facing left
+        "start_face": 1,
+        "min_cam": BLOCK2_X_OFF,
+        "exit_x": 324, "exit_y": 48,    # the door at the left end, on the bridge
+        "exit_left": True, "exit_kind": 2,  # (its frame at NES x 32-56: 40 px
+        "door_col": 38, "door_row": 3, "door_cam": 168,     # right of block 2's)
+        "next_area": 26,
+    },
+    {
+        "name": "17-lower",
+        "block": 6,
+        "map": (0xA207, 0xA297),        # stage 17, section 0 (768 px)
+        "stage": 17, "section": 0,
+        "music": "STAGE6",
+        "start_x": 512 + 208 - 8,       # NES: camera 512, x 208, y 112, facing
+        "start_y": 112 - 64,            # left
+        "start_face": 1,
+        "exit_x": None,
+        "above": 27,
+    },
+    {
+        "name": "17-upper",
+        "block": 6,
+        "map": (0xA417, 0xA4A7),        # stage 17, section 1 (768 px)
+        "stage": 17, "section": 1,
+        "music": "STAGE6",
+        "start_x": 600,                 # (not used: entered by the stairs)
+        "below": 26,
+        "respawn": 26,
+        "exit_x": 0x10 - 8,             # NES $FC19: section 1, x $10, y $70
+        "exit_y": 0x70 - 64, "exit_left": True,
+        "next_area": 28,
+    },
+    # ---- stage 18 (tile blocks $A9F4, palette $CE9A, sets 3 and 9)
+    {
+        "name": "18-lower",
+        "block": 7,
+        "map": (0xA8D4, 0xA964),        # stage 18, section 0 (camera 256-512)
+        "stage": 18, "section": 0,
+        "music": "STAGE7",              # (NES $3C)
+        "min_cam": 256,
+        "start_x": 512 + 208 - 8,       # NES: camera 512, x 208, y 112, facing
+        "start_y": 112 - 64,            # left
+        "start_face": 1,
+        "exit_x": None,
+        "above": 29,
+    },
+    {
+        "name": "18-upper",
+        "block": 7,
+        "map": (0xA964, 0xA9F4),        # stage 18, section 1 (768 px): Dracula's
+        "stage": 18, "section": 1,      # room at its left end
+        "music": "STAGE7",
+        "start_x": 600,                 # (not used: entered by the stairs)
+        "below": 28,
+        "respawn": 28,
         "exit_x": None,
     },
 ]

@@ -430,7 +430,7 @@ debug_tick:
 ; the first area of stages 1-18 (255: not in the port yet)
 dbg_stage_area:
         db 0, 2, 4, 5, 7, 9, 11, 13, 15, 16, 17, 18
-        db 255, 255, 255, 255, 255, 255
+        db 19, 21, 23, 25, 26, 28
 
 dbg_title:      db "CASTLEVANIA MSX  DEBUG MENU", 0
 dbg_help1:      db "UP DOWN CHOOSE, LEFT RIGHT SET", 0

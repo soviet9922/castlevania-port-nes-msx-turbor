@@ -2,7 +2,7 @@
 
 ## Milestone 0: engine skeleton ✅ (this commit)
 
-- [x] Build system: sjasmplus + Python, ASCII16 MegaROM (512 KB with block 2)
+- [x] Build system: sjasmplus + Python, ASCII16 MegaROM (512 KB with block 2, 1 MB with stages 13-18)
 - [x] Boot, R800 switch on turbo R, page 2 slot select, mapper banking
 - [x] Screen 4 setup, palette, BIOS font, HUD
 - [x] V9958 hardware horizontal scroll with fixed HUD (line-interrupt split)

@@ -62,10 +62,10 @@ MAX_BANKS = 8                   # ROM: 16 banks in all (256 KB)
 # names the engine uses (src/sound.asm callers); a set may leave some out
 NAMES = ["STAGE", "STAGE2", "STAGE3", "STAGE4", "BOSS", "CLEAR", "DEATH", "GAME_OVER",
          "WHIP", "HIT", "HEART", "ITEM", "HURT", "THROW", "HOLY", "STOPWATCH",
-         "SPLASH", "DOOR", "KILL", "TICK", "TALLY"]
+         "SPLASH", "DOOR", "KILL", "TICK", "TALLY", "STAGE5", "STAGE6", "STAGE7"]
 
 
-MUSIC = {"STAGE", "STAGE2", "STAGE3", "STAGE4", "BOSS", "CLEAR", "DEATH", "GAME_OVER"}
+MUSIC = {"STAGE", "STAGE2", "STAGE3", "STAGE4", "STAGE5", "STAGE6", "STAGE7", "BOSS", "CLEAR", "DEATH", "GAME_OVER"}
 
 
 def write(out_dir, sounds):

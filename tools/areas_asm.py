@@ -31,7 +31,7 @@ The engine maps an area's bank at 0x8000 and copies its header to RAM
   cycle each), +96 the first of their hidden tile columns
 
 Banks: 0 code, 1-6 areas 0-5, 7 Simon's sprites, 8-15 sound, then areas 6 and
-up from bank 16 (the ROM grows to 512 KB). src/area.asm (area_bank) must match.
+up from bank 16 (the ROM grows to 1 MB). src/area.asm (area_bank) must match.
 """
 
 import os
@@ -39,6 +39,7 @@ import os
 ROM_BANKS = 8
 LOW_AREAS = ROM_BANKS - 2       # areas in banks 1..6
 HIGH_FIRST_BANK = 16            # areas 6 and up, after the sound banks
+TOTAL_BANKS = 64                # 1 MB (ASCII16 maps up to 256 banks)
 
 
 def write(gen_dir, areas):
@@ -112,8 +113,8 @@ def write(gen_dir, areas):
         high, out = out, low
     pad = max(0, LOW_AREAS - len(areas))   # bank 0: code, bank 7: Simon's sprites
     n_high = max(0, len(areas) - LOW_AREAS)
-    if HIGH_FIRST_BANK + n_high > 32:
-        raise SystemExit("too many areas for a 512 KB ROM")
+    if HIGH_FIRST_BANK + n_high > TOTAL_BANKS:
+        raise SystemExit("too many areas for a 1 MB ROM")
     out += ["", "; ---- unused banks ----"]
     for _ in range(pad):
         out += ["        ORG 0x8000", "        ds 0x4000, 0xFF"]
@@ -130,8 +131,8 @@ def write(gen_dir, areas):
             '        INCLUDE "sound_banks.asm"       ; banks 8-15 (tools/sound_out.py)']
     if n_high:
         out += high
-        out += ["", "; ---- unused banks up to 512 KB ----"]
-        for _ in range(32 - HIGH_FIRST_BANK - n_high):
+        out += ["", "; ---- unused banks up to 1 MB ----"]
+        for _ in range(TOTAL_BANKS - HIGH_FIRST_BANK - n_high):
             out += ["        ORG 0x8000", "        ds 0x4000, 0xFF"]
     with open(os.path.join(gen_dir, "areas.asm"), "w") as f:
         f.write("\n".join(out) + "\n")

@@ -41,7 +41,8 @@ NES_SOUNDS = {"STAGE": 0x2A, "STAGE2": 0x2D, "STAGE3": 0x30, "STAGE4": 0x39, "BO
               "GAME_OVER": 0x51, "WHIP": 0x0A, "HIT": 0x14, "HEART": 0x18,
               "ITEM": 0x17, "HURT": 0x16, "THROW": 0x08, "HOLY": 0x1E,
               "STOPWATCH": 0x1A, "SPLASH": 0x0F, "DOOR": 0x1D, "KILL": 0x10,
-              "TICK": 0x03, "TALLY": 0x04}
+              "TICK": 0x03, "TALLY": 0x04,
+              "STAGE5": 0x36, "STAGE6": 0x33, "STAGE7": 0x3C}
 # CLEAR (at the orb), DEATH, TICK (timer tally) and TALLY (hearts tally) were
 # logged on the NES; uncertain: HURT, SPLASH, DOOR, KILL, HOLY
 
