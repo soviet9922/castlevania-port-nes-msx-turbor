@@ -623,6 +623,15 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
     write_object_sprites(out_dir, index, objs)
     n_obj_patterns = objs.n_main
     convert_objects.write_candles(os.path.join(out_dir, "candles.bin"), cl)
+    # breakable walls: the 16x16 block's tile column and row (the records'
+    # y counts from the top of the screen, the HUD's 48 lines included)
+    wl = [((x + x_off) // 8, (y - 48) // 8, it)
+          for x, y, it in convert_objects.walls(rom, area["stage"], area["section"])]
+    wl = [w for w in wl if 0 <= w[0] * 8 < play_px + x_off and 0 <= w[1] < 21]
+    assert len(wl) <= 2, "the engine keeps 2 wall bits per area"
+    if wl:
+        print("  breakable walls:", ", ".join(f"col {c} row {r} item {i:#x}" for c, r, i in wl))
+    convert_objects.write_walls(os.path.join(out_dir, "walls.bin"), wl)
     convert_objects.write_enemies(os.path.join(out_dir, "enemies.bin"), en)
 
     st = [(fx + x_off, fy, tx + x_off, ty, d)

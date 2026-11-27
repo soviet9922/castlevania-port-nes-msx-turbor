@@ -43,7 +43,7 @@ NES_SOUNDS = {"STAGE": 0x2A, "STAGE2": 0x2D, "STAGE3": 0x30, "STAGE4": 0x39, "BO
               "STOPWATCH": 0x1A, "SPLASH": 0x0F, "DOOR": 0x1D, "KILL": 0x10,
               "TICK": 0x03, "TALLY": 0x04,
               "STAGE5": 0x36, "STAGE6": 0x33, "STAGE7": 0x3C, "MONEY": 0x17,
-              "CROSS": 0x07, "AXE": 0x09}
+              "CROSS": 0x07, "AXE": 0x09, "BREAK": 0x15}
 # (from the code, $E76E: $16 is the hearts' pickup, $18 the sub-weapons',
 # whip's and pork chop's, $17 the money bags'; Simon's hurt sound is a DMC
 # sample the port doesn't play: it keeps $16)

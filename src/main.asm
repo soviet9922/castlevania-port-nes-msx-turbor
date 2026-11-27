@@ -117,6 +117,7 @@ vblank_done:                            ; (tests measure VBLANK work up to here)
         call timer_tick
         call read_input
         call player_update
+        call walls_update
         call check_area_exit
         call objects_spawn
         call rng_step
@@ -222,6 +223,7 @@ enable_page2:
         INCLUDE "player.asm"
         INCLUDE "objects.asm"
         INCLUDE "area.asm"
+        INCLUDE "walls.asm"
         INCLUDE "sound.asm"
         INCLUDE "sound.inc"             ; generated: the sound table, SND_ numbers
 

@@ -386,6 +386,44 @@ ENEMY_EAGLE = 0x12              # block 4: an eagle carrying a fleaman (object $
 SPAWNER_TYPES = (ENEMY_ZOMBIE, ENEMY_BAT, ENEMY_FISH, ENEMY_MEDUSA, ENEMY_EAGLE)
 
 
+# Breakable walls (NES 6:$A825): a pointer per stage at $FC78 to 2-byte
+# records in bank 6, 0 = end. b0: y = (b0 & $F0) + 8, section = bit 3, item =
+# bits 0-2; b1: x = (b1 & 7) * 256 + (b1 & $F0) + 8, bit 3 = second quest only
+# (on the first quest such a record ends the list). The wall is the 16x16
+# block around (x, y). Its item ($AA4F), the first time it breaks:
+WALL_TABLE = 0xFC78
+WALL_ITEMS = {1: ITEM_HEART, 2: ITEM_PORK, 3: ITEM_BAG | 0x10, 4: ITEM_SHOT,
+              6: ITEM_POTION, 7: ITEM_POTION}          # (5: an unused code; 0: none)
+
+
+def walls(rom, stage, section):
+    """-> list of (NES x, NES y of the block's top left, item code) of the
+    first quest's breakable walls in a stage section"""
+    p = rom.rd16(7, WALL_TABLE + 2 * stage)
+    out = []
+    while True:
+        b0 = rom.rd(6, p)
+        if b0 == 0:
+            break
+        b1 = rom.rd(6, p + 1)
+        p += 2
+        if b1 & 8:
+            break
+        if (b0 >> 3) & 1 != section:
+            continue
+        out.append(((b1 & 7) * 256 + (b1 & 0xF0), b0 & 0xF0, WALL_ITEMS.get(b0 & 7, ITEM_NONE)))
+    return out
+
+
+def write_walls(path, wall_list):
+    """count, then per wall: tile column (2 bytes), tile row, item code"""
+    data = bytearray([len(wall_list)])
+    for col, row, item in wall_list:
+        data += bytes([col & 0xFF, col >> 8, row, item])
+    with open(path, "wb") as f:
+        f.write(data)
+
+
 def candles(rom, stage, section, level_px):
     """-> list of (box x, box y, item id, kind) for the area's candles.
     Box: x = centre - 8; y = NES y - 64 (brazier box top / candle box top - 8)."""

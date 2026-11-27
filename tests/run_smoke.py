@@ -456,7 +456,20 @@ def tcl_script(syms, result_file):
     after time 155.6 {{ keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
     after time 156.6 {{ keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
     after time 159.5 {{ set f [open "{result_file}" a]; puts $f "mummies_dead [peek {syms["boss_hp"]}] [count_type 26] [count_type 11]"; close $f }}
-    after time 159.7 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}] $::vbl_worst_fc"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
+    # a breakable wall (NES $FC78): the end block of the hall's upper ledge
+    # breaks to the whip, drops its 400 bag and lets Simon fall through
+    after time 159.6 {{ poke {eoff} 3; poke {syms["area_hdr"] + 44} 1; poke {syms["keep_player"]} 1
+                       set x 970; poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
+                       poke {py} 64; poke {py + 1} 0; poke {syms["facing"]} 0
+                       poke {syms["clear_t"]} 1; poke {syms["clear_phase"]} 4 }}
+    after time 161.0 {{ poke {eoff} 3; set ::wall0 [peek {syms["walls_now"]}]
+                        keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
+    after time 161.7 {{ set ::wall1 [peek {syms["walls_now"]}]; set ::bag [count_type 3]
+                        keymatrixdown 8 0x80 }}
+    after time 162.4 {{ keymatrixup 8 0x80
+                        set f [open "{result_file}" a]
+                        puts $f "wall $::wall0 $::wall1 $::bag [peek {py}] [peek {syms["cur_area"]}]"; close $f }}
+    after time 162.5 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}] $::vbl_worst_fc"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
 """ if areas > 1 else f"""
     after time 9 {{ snd_report; set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
@@ -1044,7 +1057,7 @@ def run():
                 continue
             if tag in ("medusa", "s4enemies", "hbat", "knight1", "knight2", "crush",
                        "medusa_wake", "medusa_dead", "b3ghost", "b3pillar", "mummies",
-                       "mummies_dead"):
+                       "mummies_dead", "wall"):
                 block2_enemies[tag] = kv
                 continue
             if tag == "bat":
@@ -1300,6 +1313,11 @@ def run():
            ("beaten, the mummies burst and the last leaves the orb",
             block2_enemies["mummies_dead"] == ["0", "0", "1"])]
           if n_areas > 11 and "mummies_dead" in block2_enemies else []),
+        *([("the whip breaks the hall's wall block (NES $FC78): its item drops, Simon falls "
+            "through the hole",
+            block2_enemies["wall"][:3] == ["0", "1", "1"] and block2_enemies["wall"][3] == "128"
+            and block2_enemies["wall"][4] == "1")]
+          if "wall" in block2_enemies else []),
         *([("the chain whip has its own poses and reaches 4 px further (NES $E40B)",
             any(16 <= int(p) < 24 for p in weapons["chain"]["poses"].split(","))
             and int(weapons["chain"]["reach"]) == whip_reach + 4),

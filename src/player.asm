@@ -121,6 +121,7 @@ new_game:
         jp load_area
 
 restart_section_vars:
+        call walls_reset
         xor a                           ; (NES: a death costs the whip upgrades
         ld (whip_level),a               ; and the sub-weapon)
         ld (subweapon),a

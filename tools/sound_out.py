@@ -63,7 +63,7 @@ MAX_BANKS = 8                   # ROM: 16 banks in all (256 KB)
 NAMES = ["STAGE", "STAGE2", "STAGE3", "STAGE4", "BOSS", "CLEAR", "DEATH", "GAME_OVER",
          "WHIP", "HIT", "HEART", "ITEM", "HURT", "THROW", "HOLY", "STOPWATCH",
          "SPLASH", "DOOR", "KILL", "TICK", "TALLY", "STAGE5", "STAGE6", "STAGE7", "MONEY",
-         "CROSS", "AXE"]
+         "CROSS", "AXE", "BREAK"]
 
 
 MUSIC = {"STAGE", "STAGE2", "STAGE3", "STAGE4", "STAGE5", "STAGE6", "STAGE7", "BOSS", "CLEAR", "DEATH", "GAME_OVER"}

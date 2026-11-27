@@ -217,7 +217,13 @@ shot_n          equ subhits+1           ; 1  0 single, 1 double, 2 triple shot (
 potion_t        equ shot_n+1            ; 1  invisible: frames / 2 left ($5B)
 rosary_t        equ potion_t+1          ; 1  rosary: frames / 2 left ($015D)
 shot_blink      equ rosary_t+1          ; 1  the HUD's II/III mark blinks: frames left ($0141)
-RAM_END         equ shot_blink+1
+WALL_BYTES      equ 8                   ;    2 bits per area (src/walls.asm)
+wall_bits       equ shot_blink+1        ; 8  broken walls of every area
+walls_now       equ wall_bits+WALL_BYTES ; 1  ... of the current area
+probe_col       equ walls_now+1         ; 2  solid_at's tile column
+probe_row       equ probe_col+2         ; 1  ... and row
+wall_row        equ probe_row+1         ; 1  wall_redraw
+RAM_END         equ wall_row+1
         ASSERT RAM_END < 0xF380
         ASSERT RAM_END <= RAMCODE
 RAMCODE         equ 0xC400              ; code copied from ROM (src/ramcode.asm)

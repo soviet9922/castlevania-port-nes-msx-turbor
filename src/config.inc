@@ -83,7 +83,8 @@ AH_ITEM_TAB     equ 101                 ; power-up pictures: (patterns, size) by
 AH_ITEM_SLOT    equ 103                 ; ... their window's first pattern
 AH_SUB5_SPT     equ 104                 ; the cross's window patterns (sub-weapon 5)
 AH_SUB5_SZ      equ 106
-AH_SIZE         equ 108
+AH_WALLS        equ 108                 ; breakable walls: count, then (column, row, item)
+AH_SIZE         equ 110
 CRUSH_FIRST_ROW equ 8                   ; playfield rows the crushers rewrite (NES
 CRUSH_ROWS      equ 8                   ; nametable rows 14-21)
 CRUSH_MAX       equ 4

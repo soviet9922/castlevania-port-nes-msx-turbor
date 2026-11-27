@@ -52,6 +52,7 @@ prepare_column:
         sbc hl,de
         jr c,.blank                     ; DE >= tile columns of the area
 
+        push de
         ld h,d
         ld l,e
         add hl,hl                       ; *2
@@ -69,6 +70,8 @@ prepare_column:
         ld de,col_buf
         ld bc,PF_ROWS
         ldir
+        pop de
+        call walls_patch                ; (broken walls)
         jr .done
 
 .blank:
@@ -228,6 +231,9 @@ solid_at:
         rr l
         srl h
         rr l                            ; HL = tile column
+        ld (probe_col),hl               ; (for wall_open)
+        ld a,c
+        ld (probe_row),a
         ld de,(area_hdr+AH_TCOLS)
         push hl
         or a
@@ -251,6 +257,17 @@ solid_at:
         ld a,(hl)
         or a
         jr z,.empty
+        ld a,(walls_now)                ; a broken wall's block isn't solid
+        or a
+        jr z,.solid
+        push bc
+        push de
+        push hl
+        call wall_open
+        pop hl
+        pop de
+        pop bc
+        jr c,.empty
 .solid:
         scf
         ret

@@ -69,6 +69,11 @@
       caught; the screen's edge turns it); double and triple shots (ten
       sub-weapon hits, then the next small heart; the HUD's II/III mark
       blinks after a change); one hit box per flying sub-weapon
+- [x] Breakable walls (NES $FC78): the whip breaks them (the NES's reach,
+      around Simon's feet), the block goes from the map and the collision,
+      its item drops the first time; broken until a restart
+- [ ] Hidden treasures (NES $FC3F: standing, crouching or pushing at a spot)
+- [ ] The wall's debris (4 pieces)
 - [ ] Morning star flashing
 - [x] Wall candles and small hearts; candles spawn by camera position like the NES
 - [x] The NES item drop rule ($EB8A: one power-up out at a time, a held

@@ -20,6 +20,7 @@ load_area:
         ld de,area_hdr
         ld bc,AH_SIZE
         ldir
+        call walls_load
 
         di
         call load_overlay
