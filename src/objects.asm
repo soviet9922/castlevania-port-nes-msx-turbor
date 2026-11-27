@@ -3560,7 +3560,8 @@ cross_update:
         inc a
         cp 16
         jr c,.speed
-        ld (ix+11),4                    ; (2 px again: state 4)
+        ld (ix+11),4                    ; (2 px again: state 4; it can hit
+        ld (ix+8),0xFF                  ; what it hit on the way out again)
         ld a,16
 .speed:
         ld (ix+9),a
@@ -3603,6 +3604,7 @@ cross_update:
         ld (ix+5),a
         ld (ix+9),16
         ld (ix+11),4
+        ld (ix+8),0xFF
         jr .anim
 .back:
         ld a,2                          ; 4: back at 2 px
@@ -3911,6 +3913,18 @@ weapon_hits:
         cp OBJ_HOLY-OBJ_DAGGER+1
         jr nc,.next
 .sub:
+        ld a,(iy+0)                     ; the axe and the cross hit each object
+        cp OBJ_AXE                      ; once a throw (NES obj_ydir: the slot
+        jr z,.once                      ; they hit last; the cross forgets it
+        cp OBJ_CROSS                    ; on its way back)
+        jr nz,.any
+.once:
+        push ix
+        pop hl
+        ld a,l
+        cp (iy+8)
+        jr z,.next
+.any:
         push bc
         call sub_box
         ld (hit_src),a
@@ -3931,6 +3945,9 @@ weapon_hits:
         jr nz,.counted
         dec (hl)                        ; (it stays at 255)
 .counted:
+        push ix                         ; (the axe's and the cross's: this
+        pop hl                          ; object)
+        ld (iy+8),l
         ld a,(hit_src)
         dec a
         jr nz,.pierce

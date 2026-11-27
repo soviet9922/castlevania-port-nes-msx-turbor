@@ -498,7 +498,25 @@ def tcl_script(syms, result_file):
                         set f [open "{result_file}" a]
                         puts $f "platform $::plat0 [expr {{[peek [expr {{$p+1}}]] + 256*[peek [expr {{$p+2}}]]}}] [expr {{[peek {px_a}] + 256*[peek {px_a + 1}]}}] [peek {syms["plat_ride"]}] [peek {syms["on_ground"]}] [peek {syms["cur_area"]}]"
                         close $f }}
-    after time 169.1 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}] $::vbl_worst_fc"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
+    # an axe through the bat boss hits it once (NES: a sub-weapon remembers
+    # the object it hit), not on every frame it overlaps it
+    after time 169.1 {{ poke {eoff} 2; poke {syms["area_hdr"] + 44} 4; poke {syms["keep_player"]} 1
+                       set x 530; poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
+                       poke {py} 128; poke {py + 1} 0; poke {syms["lives"]} 5
+                       poke {syms["clear_t"]} 1; poke {syms["clear_phase"]} 4 }}
+    after time 171.0 {{ set ::bb -1
+                        for {{set i 0}} {{$i < 8}} {{incr i}} {{ set b [expr {{{objt} + $i*{obj_size}}}]; if {{[peek $b] == 10}} {{ set ::bb $b }} }}
+                        if {{$::bb >= 0}} {{
+                            poke [expr {{$::bb+9}}] 3; poke {syms["boss_t"]} 250; poke {syms["invuln_t"]} 250
+                            poke {syms["boss_hp"]} 64
+                            set d [expr {{{objt} + 7*{obj_size}}}]
+                            set x [expr {{[peek [expr {{$::bb+1}}]] + 256*[peek [expr {{$::bb+2}}]] + 16}}]
+                            poke [expr {{$d+1}}] [expr {{$x & 255}}]; poke [expr {{$d+2}}] [expr {{$x >> 8}}]
+                            poke [expr {{$d+3}}] [expr {{[peek [expr {{$::bb+3}}]] - 8}}]
+                            poke [expr {{$d+4}}] 0; poke [expr {{$d+5}}] 0; poke [expr {{$d+9}}] 0; poke [expr {{$d+10}}] 0
+                            poke [expr {{$d+11}}] 0; poke [expr {{$d+8}}] 255; poke [expr {{$d+7}}] 3; poke $d 13 }} }}
+    after time 171.8 {{ set f [open "{result_file}" a]; puts $f "axe_boss [expr {{$::bb >= 0}}] [peek {syms["boss_hp"]}]"; close $f }}
+    after time 171.9 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}] $::vbl_worst_fc"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
 """ if areas > 1 else f"""
     after time 9 {{ snd_report; set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
@@ -1086,7 +1104,7 @@ def run():
                 continue
             if tag in ("medusa", "s4enemies", "hbat", "knight1", "knight2", "crush",
                        "medusa_wake", "medusa_dead", "b3ghost", "b3pillar", "mummies",
-                       "mummies_dead", "wall", "treasure", "platform"):
+                       "mummies_dead", "wall", "treasure", "platform", "axe_boss"):
                 block2_enemies[tag] = kv
                 continue
             if tag == "bat":
@@ -1356,6 +1374,9 @@ def run():
             (lambda p: p[0] != p[2] and p[1] - p[0] == 9 and p[3] - p[2] in (8, 9, 10)
              and p[4:] == [1, 1, 16])([int(v) for v in block2_enemies["platform"]]))]
           if "platform" in block2_enemies else []),
+        *([("an axe through the bat boss hits it once: 8 of its 64 (not every frame)",
+            block2_enemies["axe_boss"] == ["1", "56"])]
+          if "axe_boss" in block2_enemies else []),
         *([("the chain whip has its own poses and reaches 4 px further (NES $E40B)",
             any(16 <= int(p) < 24 for p in weapons["chain"]["poses"].split(","))
             and int(weapons["chain"]["reach"]) == whip_reach + 4),
