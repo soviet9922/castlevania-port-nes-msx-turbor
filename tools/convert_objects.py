@@ -672,6 +672,7 @@ FOLDS = [  # (least visible first: flickers and extra spin steps; the
          ("dagger", "mono"), ("bag100", "mono"), ("whipup", "mono"), ("heart", "mono"),
          # (stage 3's zombies share their patterns with the bat boss: they
          # keep both walking frames as long as anything else can give way)
+         ("panther_run2_l", "panther_run1_l"), ("panther_run2_r", "panther_run1_r"),
          ("zombie_l2", "zombie_l1"), ("zombie_r2", "zombie_r1"),
          ("aknight2_l", "aknight1_l"), ("aknight2_r", "aknight1_r"),
          ("frank3_l", "frank1_l"), ("frank3_r", "frank1_r"),
@@ -857,13 +858,19 @@ class ObjectSprites:
         return self.n_main + self.swap_window
 
 
+ALWAYS_MONO = ("candle1", "candle2")
+
+
 def object_sprites(rom, slot_for_nes, need, carried_items):
     """-> ObjectSprites: frames in `need` in the main patterns, the carried
     sub-weapons' frames in the window; FOLDS applied until it all fits."""
     subs = sorted({SUB_OF_ITEM[i] for i in carried_items if i in SUB_OF_ITEM})
     alias = {}
     need = set(need)
-    mono = set()                        # pictures drawn in one colour
+    # pictures drawn in one colour; the wall candles always (their black
+    # backing left out): one sprite instead of two at Simon's height, where
+    # the MSX's 8 sprites a line run out first (ghouls lost their heads)
+    mono = {n for n in ALWAYS_MONO if n in need}
     # (after the folds: whatever is left in one colour, one frame at a time)
     for drop, keep in [(None, None)] + FOLDS + [(n, "mono") for n in reversed(OBJ_FRAMES)]:
         if keep == "mono" and drop not in need:
