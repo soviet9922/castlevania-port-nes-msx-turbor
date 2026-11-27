@@ -327,6 +327,8 @@ medusa_vram:
 ; ---------------------------------------------------------------------------
 ; IX = new object, A = kind (spawn_candle)
 block3_spawn:
+        cp KIND_DRACULA
+        jp z,dracula_spawn
         cp KIND_DEATH
         jp z,death_spawn
         cp KIND_AKNIGHT
@@ -387,6 +389,10 @@ block3_update:
         jp z,death_update
         cp OBJ_SICKLE
         jp z,sickle_update
+        cp OBJ_DRAC
+        jp z,dracula_update
+        cp OBJ_DEBRIS
+        jp z,debris_update
         cp OBJ_EAGLE                    ; block 4's
         cp OBJ_EAGLE
         jp z,eagle_update
@@ -1895,13 +1901,26 @@ dragon_parts_clear:
 ; a fireball from a 16x16 shooter at (HL = x, E = top) at Simon's middle,
 ; 1 1/2 px a frame on the long axis (NES shoot_at_simon $EC94), at most 2
 fire_at_simon:
+        ld a,96                         ; 1 1/2 px, at Simon's middle, at most 2
+        ld (fire_speed),a
+        ld a,8
+        ld (fire_dy),a
+        ld a,2
+        ld (fire_max),a
+; the same with (fire_speed) in 1/64 px (at most 127), the target (fire_dy)
+; px below the middle of a 16x16 shooter at Simon's (+ 8), at most
+; (fire_max) fireballs out
+fire_aimed:
         push hl
         push de
         ld a,OBJ_FIREBALL
         call count_type
         pop de
         pop hl
-        cp 2
+        push hl
+        ld hl,fire_max
+        cp (hl)
+        pop hl
         ret nc
         push hl
         push de
@@ -1923,8 +1942,10 @@ fire_at_simon:
 .bx:
         pop de
         push de
-        ld a,(py)                       ; dy = Simon's middle - its middle
-        add a,8
+        ld a,(fire_dy)                  ; dy = Simon's middle - its middle
+        ld l,a
+        ld a,(py)
+        add a,l
         sub e
         jr nc,.dyp
         neg
@@ -1963,19 +1984,25 @@ fire_at_simon:
         ld a,d
         cp b
         jr nc,.ylong
-        ld (ix+11),96                   ; x long: 1 1/2 px (1/64 units)
+        push af
+        ld a,(fire_speed)               ; x long: the speed (1/64 units)
+        ld (ix+11),a
+        ld e,a
+        ld d,0
+        pop af
         ld l,b
-        ld de,96
         call boss_muldiv
         ld a,l
         jr .vy
 .ylong:
         ld l,a                          ; y long
+        ld a,(fire_speed)
+        ld e,a
+        ld d,0
         ld a,b
-        ld de,96
         call boss_muldiv
         ld (ix+11),l
-        ld a,96
+        ld a,(fire_speed)
 .vy:
         pop bc
         bit 0,c

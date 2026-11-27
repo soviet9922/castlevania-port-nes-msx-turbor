@@ -196,7 +196,18 @@ drg_dmg         equ drg_frz+1           ; 1  ... damage taken (192: dead)
 drg_parts       equ drg_dmg+1           ; 6*6  head, vertebrae 1-5: x offset, y dir,
                                         ;      y offset (8.8), speed (8.8)
 cur_ovl         equ drg_parts+36        ; 1  the RAM overlay loaded (0 none, 1, 2)
-RAM_END         equ cur_ovl+1
+fire_speed      equ cur_ovl+1           ; 1  fire_aimed: speed (1/64 px)
+fire_dy         equ fire_speed+1        ; 1  ... its target below Simon's top (+ 8)
+fire_max        equ fire_dy+1           ; 1  ... at most this many out
+drac_form       equ fire_max+1          ; 1  Dracula: 0 first form, 1 the monster
+drac_set        equ drac_form+1         ; 1  ... the swap set loaded (drac_show)
+drac_vis        equ drac_set+1          ; 1  ... his body is drawn
+drac_head       equ drac_vis+1          ; 1  ... head: 0 none, 1 shown, 2 flying off
+drac_frac       equ drac_head+1         ; 1  ... damage fraction (1/16)
+drac_hvy        equ drac_frac+1         ; 2  ... the flying head: vy (8.8, + = up)
+drac_hyf        equ drac_hvy+2          ; 1  ... its y fraction
+drac_box        equ drac_hyf+1          ; OBJ_SIZE  his head's box (whip tests)
+RAM_END         equ drac_box+OBJ_SIZE
         ASSERT RAM_END < 0xF380
         ASSERT RAM_END <= RAMCODE
 RAMCODE         equ 0xC600              ; code copied from ROM (src/ramcode.asm)

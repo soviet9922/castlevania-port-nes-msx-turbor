@@ -76,6 +76,7 @@ class SpriteBank:
                 cb = (SLOT_B | CC) if a else SLOT_B
                 sprites.append((oy, ox, self._pat(b), self._col([cb] * 16)))
 
+        plain_cells = []
         if plain:
             bx = min(x for x, _ in plain)
             by = min(y for _, y in plain)
@@ -111,10 +112,25 @@ class SpriteBank:
                     if len(order) > 1:
                         c2[ly] = order[1]
                         second |= {(x, ly) for x, v in line if v == order[1]}
-                # first sprite in front (lower sprite numbers have priority)
-                sprites.append((oy, ox, self._pat(first), self._col(c1)))
-                if second:
-                    sprites.append((oy, ox, self._pat(second), self._col(c2)))
+                plain_cells.append([oy, ox, first, c1, second, c2])
+        # over the limit: the cells whose second colour has the fewest pixels
+        # get one sprite (their second colour's pixels drawn in the first's
+        # colour; lines with only the second colour keep it)
+        extra = len(sprites) + sum(2 if c[4] else 1 for c in plain_cells) - MAX_SPRITES
+        for cell in sorted((c for c in plain_cells if c[4]), key=lambda c: len(c[4])):
+            if extra <= 0:
+                break
+            oy, ox, first, c1, second, c2 = cell
+            for ly in range(16):
+                if not c1[ly] and c2[ly]:
+                    c1[ly] = c2[ly]
+            cell[2], cell[4] = first | second, set()
+            extra -= 1
+        for oy, ox, first, c1, second, c2 in plain_cells:
+            # first sprite in front (lower sprite numbers have priority)
+            sprites.append((oy, ox, self._pat(first), self._col(c1)))
+            if second:
+                sprites.append((oy, ox, self._pat(second), self._col(c2)))
 
         if len(sprites) > MAX_SPRITES:
             raise SystemExit(f"frame {name}: {len(sprites)} sprites (max {MAX_SPRITES})")

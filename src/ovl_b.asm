@@ -1679,3 +1679,1041 @@ sickle_move:
         add a,(ix+3)
         ld (ix+3),a
         ret
+
+; --- Dracula (stage 18's boss; NES record $5D 6:$8B3B, object $1D 5:$950E,
+; hits $E327 on his body and $E34B on his head's box). Made when the screen
+; comes within 216 px of his room (every other enemy goes). 120 frames after
+; the screen locks his head shows at the floor, rises 56 px (1/2 px a frame),
+; and he flickers in. First form, a loop: stand 36/16/50/24 frames, open the
+; cape 16, 3 fireballs (at Simon's middle and 16 px below and above it, 2 px
+; a frame), 32, vanish 32, away 79, reappear by Simon (+16, -8, +128, +96,
+; +48, -40, +96, -88 px, kept on the screen), flicker in 32. Only the head
+; takes damage (half the weapon's), and only while he stands, opens the cape
+; or fires; the body clinks. At 0 the head flies off, the body stands 120
+; frames headless, crumbles (6 pieces), and the monster appears with a full
+; bar: it stands 33, waits 85/123 (crouching at once if Simon faces it
+; swinging), crouches 16 and jumps at Simon (6 or 4 1/2 px up, gravity 3/16,
+; 3/4 px across), lands, and (48 px or more away, 3 times in 4) opens its
+; mouth and fires 3. Its head takes a quarter of the weapon's damage, a hit
+; freezes it 8 frames; holy water also burns its body. 50000, then the orb.
+;   +4 timer  +5 facing  +9 state (0 placed; first form 1-14; the monster
+;   20-30; 31-32 burning)  +10 bit 0: moving left (jumps); burning: frames
+;   +11 frozen frames (the monster)  obj_ext: y fraction, vy (8.8, + = up),
+;   x fraction   his NES y (middle) = (ix+3) + 72
+; ---------------------------------------------------------------------------
+DRAC_Y0         equ 224                 ; NES y: his place (the head at the floor)
+DRAC_Y          equ 168                 ; standing (frame bottom on the floor, 192)
+
+dracula_spawn:
+        ld (ix+0),OBJ_DRAC
+        ld (ix+7),KIND_DRAC1
+        ld (ix+6),OBJF_DRAC
+        ld (ix+3),DRAC_Y0-72
+        xor a
+        ld (ix+9),a
+        ld (ix+10),a
+        ld (ix+11),a
+        ld (ix+5),-1
+        ld (drac_form),a
+        ld (drac_vis),a
+        ld (drac_head),a
+        ld (drac_frac),a
+        jp b5_ext_clear
+
+dracula_update:
+        ld a,(ix+9)
+        or a
+        jr nz,.made
+        ld hl,(cam_x)                   ; the record at screen x 8
+        ld de,216+1
+        or a
+        sbc hl,de
+        ret nc
+        push ix                         ; every other enemy goes
+        call enemies_burst
+        ld ix,obj_table
+        ld b,OBJ_MAX
+.gone:
+        ld a,(ix+0)
+        cp OBJ_BURST
+        jr nz,.gn
+        ld (ix+0),OBJ_NONE
+.gn:
+        ld de,OBJ_SIZE
+        add ix,de
+        djnz .gone
+        pop ix
+        ld a,BOSS_HP
+        ld (boss_hp),a
+        ld a,1
+        ld (hud_dirty),a
+        ld (ix+9),a
+        ret
+.made:
+        cp 31
+        jp nc,drac_burning
+        ld a,(freeze_t)                 ; the stopwatch: no AI
+        or a
+        jp nz,drac_hits
+        call knight_face
+        ld a,(ix+11)                    ; (the monster) frozen by a hit
+        or a
+        jr z,.nf
+        dec (ix+11)
+        jp drac_hits
+.nf:
+        ld a,(ix+9)
+        cp 20
+        jp nc,drac_form2
+        dec a
+        jr nz,.s2
+        ld hl,(cam_x)                   ; waiting for the lock (the stage's
+        ld de,(area_hdr+AH_MINCAM)      ; music goes on: NES 6:$998B)
+        or a
+        sbc hl,de
+        ret nz
+        ld hl,(cam_x)
+        ld (cam_min),hl
+        ld (area_hdr+AH_MAXCAM),hl
+        ld a,1
+        ld (cam_lock),a
+        ld (ix+4),120
+        ld (ix+9),2
+        ret
+.s2:
+        dec a
+        jr nz,.s3
+        dec (ix+4)                      ; 120 frames
+        ret nz
+        ld a,1                          ; his head shows at the floor
+        ld (drac_head),a
+        ld (ix+4),60
+        ld (ix+9),3
+        jp drac_hits
+.s3:
+        dec a
+        jr nz,.s4
+        dec (ix+4)                      ; 60 frames
+        jp nz,drac_hits
+        ld hl,0x0080                    ; rising 1/2 px a frame
+        call drac_set_vy
+        ld (ix+9),4
+        jp drac_hits
+.s4:
+        dec a
+        jr nz,.s5
+        call drac_y_move
+        ld a,(ix+3)
+        add a,72
+        cp DRAC_Y
+        jp nc,drac_hits
+        ld (ix+3),DRAC_Y-72
+        ld (ix+4),60
+        ld (ix+9),5
+        jp drac_hits
+.s5:
+        dec a
+        jr nz,.s6
+        dec (ix+4)                      ; 60 frames
+        jp nz,drac_hits
+        ld (ix+4),69
+        ld (ix+9),6
+        jp drac_hits
+.s6:
+        dec a
+        jr nz,.s7
+        ld a,(frame_count)              ; flickering in: the body on odd frames
+        and 1
+        ld (drac_vis),a
+        xor a
+        call drac_show
+        dec (ix+4)
+        jp nz,drac_hits
+.pick:
+        ld a,1
+        ld (drac_vis),a
+        xor a
+        call drac_show
+        call rng_and3
+        ld hl,drac_stands
+        call table_a
+        ld (ix+4),a
+        ld (ix+9),7
+        jp drac_hits
+.s7:
+        dec a
+        jr nz,.s8
+        xor a                           ; standing
+        call drac_show
+        dec (ix+4)
+        jp nz,drac_hits
+        ld (ix+4),16
+        ld (ix+9),8
+        jp drac_hits
+.s8:
+        dec a
+        jr nz,.s9
+        ld a,1                          ; the cape open
+        call drac_show
+        dec (ix+4)
+        jp nz,drac_hits
+        ld l,(ix+1)                     ; 3 fireballs from his middle
+        ld h,(ix+2)
+        ld a,(ix+3)
+        add a,72-56
+        ld e,a
+        call drac_volley
+        ld (ix+4),32
+        ld (ix+9),9
+        jp drac_hits
+.s9:
+        dec a
+        jr nz,.s10
+        ld a,1
+        call drac_show
+        dec (ix+4)
+        jp nz,drac_hits
+        ld (ix+4),32
+        ld (ix+9),10
+        jp drac_hits
+.s10:
+        dec a
+        jr nz,.s11
+        ld a,1                          ; vanishing (the head flickers; the
+        call drac_show                  ; body stays, as the NES draws it)
+        ld a,(frame_count)
+        and 1
+        inc a
+        ld (drac_head),a                ; (2 = hidden here)
+        dec (ix+4)
+        jp nz,drac_hits
+        xor a
+        ld (drac_vis),a
+        ld a,2
+        ld (drac_head),a
+        ld (ix+4),79
+        ld (ix+9),11
+        jp drac_hits
+.s11:
+        dec a
+        jr nz,.s12
+        dec (ix+4)                      ; away
+        jp nz,drac_hits
+        call drac_teleport
+        ld (ix+4),32
+        ld (ix+9),12
+        jp drac_hits
+.s12:
+        dec a
+        jr nz,.s14
+        xor a                           ; flickering in by Simon
+        call drac_show
+        ld a,(frame_count)
+        and 1
+        ld (drac_vis),a
+        xor 1
+        inc a
+        ld (drac_head),a                ; (shown with the body)
+        dec (ix+4)
+        jp nz,drac_hits
+        ld a,1
+        ld (drac_head),a
+        jp .pick
+.s14:
+        dec (ix+4)                      ; headless, 120 frames
+        jp nz,drac_hits
+        ld a,1                          ; the monster
+        ld (drac_form),a
+        ld (ix+4),32
+        ld (ix+9),20
+        jp drac_hits
+drac_stands:    db 36, 16, 50, 24
+
+; the second form (states 20-30)
+drac_form2:
+        sub 20
+        jr nz,.t21
+        dec (ix+4)                      ; the old body, 32 frames
+        jp nz,drac_hits
+        xor a                           ; it crumbles
+        ld (drac_vis),a
+        call drac_debris
+        ld a,SND_KILL
+        call sfx_play
+        ld (ix+4),16
+        ld (ix+9),21
+        jp drac_hits
+.t21:
+        dec a
+        jr nz,.t22
+        dec (ix+4)                      ; 16 frames
+        jp nz,drac_hits
+        ld a,BOSS_HP                    ; the bar fills again
+        ld (boss_hp),a
+        ld a,1
+        ld (hud_dirty),a
+.new:
+        ld a,1                          ; standing at y 168, the head live
+        ld (drac_vis),a
+        ld (drac_head),a
+        ld (ix+7),KIND_DRAC2
+        ld (ix+3),DRAC_Y-72
+        ld (ix+4),33
+        ld (ix+9),22
+        call drac_stand_pic
+        jp drac_hits
+.t22:
+        dec a
+        jr nz,.t23
+        call drac_stand_pic             ; standing 33
+        dec (ix+4)
+        jp nz,drac_hits
+.wait:
+        ld a,(frame_count)              ; 85 or 123
+        and 1
+        ld a,85
+        jr z,.w
+        ld a,123
+.w:
+        ld (ix+4),a
+        ld (ix+9),23
+        jp drac_hits
+.t23:
+        dec a
+        jr nz,.t24
+        call drac_stand_pic
+        ld a,(frame_count)              ; Simon faces it swinging: crouch now
+        and 15
+        jr nz,.wt
+        ld a,(whip_prev)
+        or a
+        jr z,.wt
+        ld a,(facing)                   ; (Simon's 0 right, 1 left; it faces
+        or a                            ; him: +1 = he is to its right)
+        ld a,1
+        jr z,.sf
+        ld a,-1
+.sf:
+        cp (ix+5)
+        jr nz,.crouch
+.wt:
+        dec (ix+4)
+        jp nz,drac_hits
+.crouch:
+        ld a,2
+        call drac_show
+        ld (ix+4),16
+        ld (ix+9),24
+        jp drac_hits
+.t24:
+        dec a
+        jr nz,.t25
+        dec (ix+4)                      ; crouching
+        jp nz,drac_hits
+        ld a,0                          ; the jump: at Simon
+        bit 7,(ix+5)
+        jr z,.jd
+        inc a
+.jd:
+        ld (ix+10),a
+        ld a,(frame_count)
+        rrca
+        ld hl,0x0600                    ; 6 or 4 1/2 px up
+        jr c,.jv
+        ld hl,0x0480
+.jv:
+        call drac_set_vy
+        ld (ix+9),25
+        jp drac_hits
+.t25:
+        dec a
+        jr nz,.t26
+        call drac_vy                    ; jumping: gravity 3/16
+        ld de,-0x30
+        add hl,de
+        call drac_set_vy
+        call drac_y_move
+        ld a,(ix+3)                     ; above NES y 32: no more rising
+        add a,72
+        cp 32
+        jr nc,.jp
+        ld hl,0
+        call drac_set_vy
+.jp:
+        ld a,(ix+3)
+        add a,72
+        cp 96
+        ld a,3                          ; low: the jump picture, high: the other
+        jr nc,.jpic
+        inc a
+.jpic:
+        call drac_show
+        call drac_x_move
+        ld a,8                          ; the floor at y + 8
+        call drac_probe
+        jp nc,drac_hits
+        ld a,(ix+3)
+        add a,72
+        and 0xF8
+        sub 72
+        ld (ix+3),a
+        ld a,5
+        call drac_show
+        ld a,SND_DOOR                   ; (the thud)
+        call sfx_play
+        ld (ix+4),24
+        ld (ix+9),26
+        jp drac_hits
+.t26:
+        dec a
+        jr nz,.t27
+        dec (ix+4)                      ; landed, 24
+        jp nz,drac_hits
+        ld a,(ix+3)
+        sub 16
+        ld (ix+3),a
+        ld (ix+4),16
+        ld (ix+9),27
+        call drac_stand_pic
+        jp drac_hits
+.t27:
+        dec a
+        jr nz,.t28
+        call drac_stand_pic
+        dec (ix+4)
+        jp nz,drac_hits
+        ld hl,(px)                      ; |dx| < 48 or a multiple of 4: wait
+        ld e,(ix+1)
+        ld d,(ix+2)
+        or a
+        sbc hl,de
+        call hl_abs
+        ld a,h
+        or a
+        jr nz,.far
+        ld a,l
+        cp 48
+        jp c,.wait
+        and 3
+        jp z,.wait
+.far:
+        ld a,(frame_count)
+        rrca
+        ld a,16
+        jr nc,.ft
+        ld a,40
+.ft:
+        ld (ix+4),a
+        ld (ix+9),28
+        jp drac_hits
+.t28:
+        dec a
+        jr nz,.t29
+        call drac_stand_pic
+        dec (ix+4)
+        jp nz,drac_hits
+        ld a,6                          ; the mouth open
+        call drac_show
+        ld (ix+4),16
+        ld (ix+9),29
+        jp drac_hits
+.t29:
+        dec a
+        jr nz,.t30
+        dec (ix+4)
+        jp nz,drac_hits
+        call drac_box_place             ; 3 fireballs from its head
+        ld hl,(drac_box+1)
+        ld a,(drac_box+3)
+        ld e,a
+        call drac_volley
+        ld (ix+4),16
+        ld (ix+9),30
+        jp drac_hits
+.t30:
+        dec (ix+4)
+        jp nz,drac_hits
+        jp .new
+
+; the monster's standing pictures, 32 frames each
+drac_stand_pic:
+        ld a,(frame_count)
+        rlca
+        rlca
+        rlca
+        and 1
+; show picture A (first form: 0 standing, 1 the cape; the monster: 0-1
+; standing, 2 crouching, 3 jumping, 4 jumping high, 5 landed, 6 the mouth
+; open) facing its way: loads that picture's patterns when they change
+drac_show:
+        ld c,a
+        ld a,(drac_form)
+        or a
+        ld a,c
+        jr nz,.mon
+        bit 7,(ix+5)                    ; first form: sets 0-1 left, 2-3 right
+        jr nz,.f1
+        add a,2
+.f1:
+        push af
+        ld e,a
+        ld d,0
+        ld hl,drac_frames1
+        add hl,de
+        ld a,(hl)
+        jr .set
+.mon:
+        bit 7,(ix+5)                    ; the monster: sets 4-10 left, 11-17
+        jr nz,.m1                       ; right
+        add a,7
+.m1:
+        add a,4
+        push af
+        add a,OBJF_MON-4
+.set:
+        ld (ix+6),a
+        pop af
+        ld hl,drac_set
+        cp (hl)
+        ret z
+        ld (hl),a
+        push ix
+        call load_swap_patterns
+        pop ix
+        ret
+drac_frames1:   db OBJF_DRAC, OBJF_DRAC+1, OBJF_DRAC+3, OBJF_DRAC+4
+
+; HL = vy, vy = HL (obj_ext 1-2; + = up)
+drac_vy:
+        call obj_ext_of
+        inc hl
+        ld a,(hl)
+        inc hl
+        ld h,(hl)
+        ld l,a
+        ret
+drac_set_vy:
+        push hl
+        call obj_ext_of
+        inc hl
+        pop de
+        ld (hl),e
+        inc hl
+        ld (hl),d
+        ret
+
+; y -= vy (the fraction in obj_ext 0)
+drac_y_move:
+        call obj_ext_of
+        ld a,(hl)
+        inc hl
+        sub (hl)
+        dec hl
+        ld (hl),a
+        inc hl
+        inc hl
+        ld a,(ix+3)
+        sbc a,(hl)
+        ld (ix+3),a
+        ret
+
+; 3/4 px along +10 bit 0; turns at screen x 24 (going left) and 232
+drac_x_move:
+        call obj_ext_of
+        inc hl
+        inc hl
+        inc hl
+        ld a,(hl)
+        add a,0xC0
+        ld (hl),a
+        jr nc,.edge
+        ld a,1
+        bit 0,(ix+10)
+        jr z,.r
+        ld a,-1
+.r:
+        call move_dir_a
+.edge:
+        ld l,(ix+1)
+        ld h,(ix+2)
+        ld de,8
+        add hl,de
+        ld de,(cam_x)
+        or a
+        sbc hl,de
+        ld a,l
+        bit 0,(ix+10)
+        jr z,.right
+        cp 24
+        ret nc
+        jr .turn
+.right:
+        cp 232
+        ret c
+.turn:
+        ld a,(ix+10)
+        xor 1
+        ld (ix+10),a
+        ret
+
+; Carry if the tile under his middle at NES y + A is solid
+drac_probe:
+        add a,(ix+3)
+        add a,72-48
+        ld e,a
+        ld d,0
+        ld l,(ix+1)
+        ld h,(ix+2)
+        ld bc,8
+        add hl,bc
+        jp solid_at
+
+; 3 fireballs from (HL = x, E = top of a 16x16 shooter) at Simon's middle
+; and 16 px below and above it, 2 px a frame (NES $99EB)
+drac_volley:
+        ld a,127
+        ld (fire_speed),a
+        ld a,6
+        ld (fire_max),a
+        ld b,3
+        ld c,8+16
+.lp:
+        push bc
+        push hl
+        push de
+        ld a,c
+        ld (fire_dy),a
+        push ix
+        call fire_aimed
+        pop ix
+        pop de
+        pop hl
+        pop bc
+        ld a,c
+        sub 16
+        ld c,a
+        djnz .lp
+        ret
+
+; he reappears by Simon (NES $96F1): his screen x + the table, kept in 20..235
+drac_teleport:
+        ld a,(frame_count)
+        ld c,a
+.try:
+        ld a,c
+        and 7
+        ld e,a
+        ld d,0
+        ld hl,drac_jumps
+        add hl,de
+        ld a,(px)
+        ld de,(cam_x)
+        sub e
+        add a,8
+        add a,(hl)
+        inc c
+        cp 20
+        jr c,.try
+        cp 236
+        jr nc,.try
+        sub 8
+        ld l,a
+        ld h,0
+        ld de,(cam_x)
+        add hl,de
+        ld (ix+1),l
+        ld (ix+2),h
+        ret
+drac_jumps:     db 16, -8, 128, 96, 48, -40, 96, -88
+
+; his head's box (drac_box): first form 16x16 at (x -/+ 6, y - 27), the
+; monster's at (x -/+ 8, y - 32), on the side he faces
+drac_box_place:
+        ld a,(drac_form)
+        or a
+        ld b,6
+        ld c,11
+        jr z,.f
+        ld b,8
+        ld c,16
+.f:
+        ld l,(ix+1)
+        ld h,(ix+2)
+        ld a,b
+        bit 7,(ix+5)
+        jr z,.r
+        neg
+.r:
+        ld e,a
+        rla
+        sbc a,a
+        ld d,a
+        add hl,de
+        ld (drac_box+1),hl
+        ld a,(ix+3)
+        sub c
+        ld (drac_box+3),a
+        ld a,KIND_BAT
+        ld (drac_box+7),a
+        ret
+
+; his collision, his head's picture (part 0), each frame
+drac_hits:
+        call drac_head_pic
+        ld a,(ix+9)                     ; the head's box: first form while he
+        ld b,a                          ; stands, opens the cape, fires; the
+        cp 7                            ; monster from state 22 on
+        jr c,.nohead
+        cp 10
+        jr c,.head
+        cp 22
+        jr c,.nohead
+.head:
+        call drac_box_place
+        push ix
+        ld ix,drac_box
+        call weapon_hits
+        pop ix
+        jr nc,.htouch
+        ld a,SND_HIT
+        call sfx_play
+        call drac_damage
+        ret
+.htouch:
+        push ix
+        ld ix,drac_box
+        ld a,8
+        ld bc,12*256+20
+        call b3_touch
+        pop ix
+        ret c
+.nohead:
+        ld a,(ix+9)                     ; the body: first form 7-9, the
+        cp 7                            ; monster 23-30
+        ret c
+        cp 10
+        jr c,.body
+        cp 23
+        ret c
+.body:
+        call weapon_hits
+        jr nc,.btouch
+        ld a,(drac_form)                ; holy water burns the monster's
+        or a                            ; body (1 every 32 frames)
+        jr z,.clink
+        ld a,(hit_src)
+        cp 3
+        jr nz,.clink
+        ld a,(frame_count)
+        and 31
+        ret nz
+        ld b,1
+        jp drac_sub_hp
+.clink:
+        ld a,SND_HIT                    ; (the NES's clink)
+        jp sfx_play
+.btouch:
+        ld a,(drac_form)
+        or a
+        ld bc,20*256+36
+        jr z,.bt
+        ld bc,28*256+36
+.bt:
+        ld a,24
+        jp b3_touch
+
+; a hit on his head
+drac_damage:
+        ld a,(drac_form)
+        or a
+        jr nz,.mon
+        ld a,(hit_src)                  ; first form: half the weapon's, holy
+        cp 3                            ; water 1 every 8 frames
+        jr nz,.half
+        ld a,(frame_count)
+        and 7
+        ret nz
+        ld b,1
+        jr .first
+.half:
+        call hit_damage
+        rrca
+        rrca
+        rrca
+        and 31
+        ld b,a
+.first:
+        ld a,1
+        ld (hud_dirty),a
+        ld a,(boss_hp)
+        sub b
+        jr z,.head_off
+        jr c,.head_off
+        ld (boss_hp),a
+        ret
+.head_off:
+        xor a                           ; the head flies off (no score)
+        ld (boss_hp),a
+        ld a,3
+        ld (drac_head),a
+        ld hl,0x0500                    ; 5 px up, 2 px a frame away
+        ld (drac_hvy),hl
+        xor a
+        ld (drac_hyf),a
+        ld a,(ix+5)
+        neg
+        ld (part_table+5),a
+        ld (ix+4),120
+        ld (ix+9),14
+        ret
+.mon:
+        ld a,(hit_src)                  ; the monster: a quarter (fractions
+        cp 3                            ; kept), holy water 1 every 16 frames
+        jr nz,.quarter
+        ld a,(frame_count)
+        and 15
+        ret nz
+        ld b,1
+        jr .freeze
+.quarter:
+        call hit_damage
+        ld b,a
+        ld a,(drac_frac)
+        add a,b
+        ld b,a
+        and 15
+        ld (drac_frac),a
+        ld a,b
+        rrca
+        rrca
+        rrca
+        rrca
+        and 15
+        ld b,a
+.freeze:
+        ld (ix+11),BOSS_FREEZE
+; boss_hp -= B; the monster beaten at 0
+drac_sub_hp:
+        ld a,1
+        ld (hud_dirty),a
+        ld a,(boss_hp)
+        sub b
+        jr z,.dead
+        jr c,.dead
+        ld (boss_hp),a
+        ret
+.dead:
+        xor a
+        ld (boss_hp),a
+        ld (drac_head),a
+        ld (part_table),a
+        ld b,10                         ; 50000
+.sc:
+        push bc
+        ld a,0x50
+        call add_score
+        pop bc
+        djnz .sc
+        ld a,1                          ; it burns 90 frames, then the orb
+        ld (drac_vis),a
+        ld (ix+9),31
+        ld (ix+10),0
+        ld (ix+4),0
+        ld a,(ix+3)                     ; (a burst at its middle, y + 8)
+        add a,72+8-56
+        ld (ix+3),a
+        ld (ix+7),KIND_BAT
+        ret
+
+drac_burning:
+        cp 32
+        jr z,.orb
+        inc (ix+10)                     ; the first 30 of the 90 frames
+        ld a,(ix+10)
+        rrca
+        rrca
+        rrca
+        and 3
+        add a,OBJF_BURST
+        ld (ix+6),a
+        ld a,(ix+10)
+        cp 30
+        ret c
+        ld (ix+9),32
+        ret
+.orb:
+        inc (ix+4)                      ; then the usual 60 and the orb
+        jp boss_update.burning
+
+; his head's picture (part 0): first form; flying off after the last hit
+drac_head_pic:
+        ld a,(drac_head)                ; (the flying head keeps its course
+        cp 3                            ; whatever the form)
+        jr z,.fly
+        ld a,(drac_form)
+        or a
+        jr nz,.none
+        ld a,(drac_head)
+        dec a
+        jr z,.show
+        dec a
+        jr z,.none
+        dec a
+        jr z,.fly
+.none:
+        ld a,(drac_head)                ; (the flying head stays its course)
+        cp 3
+        ret z
+        xor a
+        ld (part_table),a
+        ret
+.show:
+        ld a,OBJ_BRAZIER                ; (any id: parts are only drawn)
+        ld (part_table),a
+        ld a,(ix+1)
+        ld (part_table+1),a
+        ld a,(ix+2)
+        ld (part_table+2),a
+        ld a,(ix+3)
+        ld (part_table+3),a
+        ld a,OBJF_DRAC+2
+        bit 7,(ix+5)
+        jr nz,.hp
+        ld a,OBJF_DRAC+5
+.hp:
+        ld (part_table+6),a
+        ret
+.fly:
+        ld a,(part_table)
+        or a
+        ret z
+        ld hl,(part_table+1)            ; 2 px a frame away from Simon
+        ld a,(part_table+5)
+        add a,a
+        ld e,a
+        rla
+        sbc a,a
+        ld d,a
+        add hl,de
+        ld (part_table+1),hl
+        ld hl,(drac_hvy)                ; gravity 1/8, y -= vy
+        ld de,-0x20
+        add hl,de
+        ld (drac_hvy),hl
+        ld a,(drac_hyf)
+        sub l
+        ld (drac_hyf),a
+        ld a,(part_table+3)
+        sbc a,h
+        ld (part_table+3),a
+        add a,49+11                     ; gone below NES y 247 or above 8
+        cp 240
+        jr nc,.off
+        ld hl,(part_table+1)            ; or off the screen
+        ld de,(cam_x)
+        or a
+        sbc hl,de
+        ld a,h
+        or a
+        ret z
+.off:
+        xor a
+        ld (part_table),a
+        ret
+
+; 6 pieces fly out of the crumbling body (NES $996D): at 0 and 45 degrees,
+; 4 px a frame across, or 2.81 px on both axes; harmless, straight
+drac_debris:
+        push ix
+        ld l,(ix+1)
+        ld h,(ix+2)
+        ld a,(ix+3)
+        add a,72-56
+        ld c,a
+        ld de,drac_pieces
+        ld b,6
+.lp:
+        push bc
+        push de
+        push hl
+        call obj_free_slot
+        pop hl
+        pop de
+        pop bc
+        jr c,.done
+        ld (ix+0),OBJ_DEBRIS
+        ld (ix+1),l
+        ld (ix+2),h
+        ld (ix+3),c
+        ld (ix+6),OBJF_DEBRIS
+        ld (ix+7),KIND_BAT
+        ld (ix+8),0xFF
+        ld a,(de)
+        ld (ix+5),a                     ; x direction
+        inc de
+        ld a,(de)
+        ld (ix+10),a                    ; y direction
+        inc de
+        ld a,(de)
+        ld (ix+11),a                    ; speed (1/64 px)
+        inc de
+        push hl
+        call b5_ext_clear
+        pop hl
+        djnz .lp
+.done:
+        pop ix
+        ret
+drac_pieces:    db 1, 1, 180,  1, 0, 255,  1, -1, 180
+                db -1, 1, 180,  -1, 0, 255,  -1, -1, 180
+
+; a piece: x, y += its directions * speed (1/64 px; fractions in obj_ext)
+debris_update:
+        call obj_ext_of                 ; across
+        call frac64_step
+        or a
+        jr z,.y
+        ld b,a
+.mx:
+        push bc
+        ld a,(ix+5)
+        call move_dir_a
+        pop bc
+        djnz .mx
+.y:
+        ld a,(ix+10)                    ; up or down
+        or a
+        jr z,.cull
+        call obj_ext_of
+        inc hl
+        call frac64_step
+        bit 7,(ix+10)
+        jr z,.dn
+        neg
+.dn:
+        add a,(ix+3)
+        ld (ix+3),a
+.cull:
+        call b3_offscreen
+        jp c,obj_gone
+        ld a,(ix+3)
+        cp MT_ROWS*16
+        jp nc,obj_gone
+        ret
+
+; the fraction at HL += (ix+11) (1/64 px): A = the whole px this frame
+frac64_step:
+        ld a,(ix+11)
+        ld c,a
+        rlca
+        rlca
+        and 3
+        ld b,a
+        ld a,c
+        add a,a
+        add a,a
+        add a,(hl)
+        ld (hl),a
+        ld a,b
+        adc a,0
+        ret

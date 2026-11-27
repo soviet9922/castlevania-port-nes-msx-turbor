@@ -60,7 +60,11 @@ OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
               "frank1_l", "frank2_l", "frank3_l", "frank1_r", "frank2_r", "frank3_r",
               "aknight1_l", "aknight2_l", "aknight1_r", "aknight2_r", "gbat1", "gbat2",
               "death_l", "death_r", "sickle1_l", "sickle2_l", "sickle3_l", "sickle4_l",
-              "sickle1_r", "sickle2_r", "sickle3_r", "sickle4_r"]
+              "sickle1_r", "sickle2_r", "sickle3_r", "sickle4_r",
+              "drac_stand_l", "drac_cape_l", "drac_head_l", "drac_stand_r", "drac_cape_r", "drac_head_r",
+              "mon_stand1_l", "mon_stand2_l", "mon_crouch_l", "mon_jump_l", "mon_high_l", "mon_land_l",
+              "mon_fire_l", "mon_stand1_r", "mon_stand2_r", "mon_crouch_r", "mon_jump_r", "mon_high_r",
+              "mon_land_r", "mon_fire_r", "debris"]
 
 # Black panther: 32x16, palette 3, art faces left (recorded in the hall).
 # Run cycle run1 -> run2 -> run3, 7 frames each; the leap shows run2.
@@ -87,6 +91,7 @@ ENEMY_FRANK = 0x5C
 KIND_AKNIGHT, KIND_GBAT = 19, 20  # blocks 5-6: the axe knight ($4A, object $0A),
 ENEMY_AKNIGHT, ENEMY_GBAT = 0x4A, 0x5E  # the giant bat ($5E, object $1E)
 KIND_DEATH, ENEMY_DEATH = 21, 0x58  # stage 15's boss (record $58, object $18)
+KIND_DRACULA, ENEMY_DRACULA = 22, 0x5D  # stage 18's boss (record $5D, object $1D)
 ENEMY_RSKEL, ENEMY_DRAGON = 0x53, 0x54
 ENEMY_MUMMY = 0x5A
 ENEMY_MEDUSA_BOSS = 0x5B        # its enemy group record (object $1B)
@@ -318,6 +323,28 @@ for _i, (_a, _b, _fl, _fr) in enumerate(((0xF8, 0xF6, 1, 0), (0xFC, 0xFA, 1, 0),
     FRAME_SPRITES[f"sickle{_i + 1}_l"] = [(_a, 0, 0, 3, _fl), (_b, 8, 0, 3, _fl)]
     FRAME_SPRITES[f"sickle{_i + 1}_r"] = [(_b, 0, 0, 3, _fr), (_a, 8, 0, 3, _fr)]
 
+# Dracula (stage 18; NES frames by tools/nes_frames.py, facing left, from
+# (middle - 8, middle - 23): the first form $D0, $D1, the monster $D3, $D4,
+# $24, $D5, $6D, $7A, $7B (CHR sets 3 and 9)
+DRACULA_FRAMES = {
+    "drac_stand": [(224, -8, 0, 3, 0), (226, 0, 0, 3, 0), (228, 8, 0, 3, 0), (230, -8, 16, 3, 0), (230, 0, 16, 3, 0), (228, 8, 16, 3, 0), (232, -8, 32, 3, 0), (232, 0, 32, 3, 0), (234, 8, 32, 3, 0)],
+    "drac_cape": [(224, -8, 0, 3, 0), (236, 0, 0, 3, 0), (238, 8, 0, 3, 0), (240, 16, 0, 3, 0), (230, -8, 16, 3, 0), (242, 0, 16, 3, 0), (244, 8, 16, 3, 0), (246, 16, 16, 3, 0), (230, -8, 32, 3, 0), (248, 0, 32, 3, 0), (244, 8, 32, 3, 0), (250, 16, 32, 3, 0)],
+    "mon_stand1": [(128, -16, -16, 2, 0), (130, -8, -16, 2, 0), (132, 0, -16, 2, 0), (134, 8, -16, 2, 0), (136, 16, -16, 2, 0), (138, 24, -16, 2, 0), (140, -16, 0, 2, 0), (142, -8, 0, 2, 0), (144, 0, 0, 2, 0), (146, 8, 0, 2, 0), (148, 16, 0, 2, 0), (150, 24, 0, 2, 0), (180, -16, 16, 2, 0), (182, -8, 16, 2, 0), (188, 8, 16, 2, 0), (190, 16, 16, 2, 0), (184, -16, 32, 2, 0), (186, -8, 32, 2, 0), (192, 16, 32, 2, 0), (194, 24, 32, 2, 0)],
+    "mon_stand2": [(128, -16, -16, 2, 0), (164, -8, -16, 2, 0), (166, 0, -16, 2, 0), (134, 8, -16, 2, 0), (136, 16, -16, 2, 0), (138, 24, -16, 2, 0), (140, -16, 0, 2, 0), (142, -8, 0, 2, 0), (144, 0, 0, 2, 0), (146, 8, 0, 2, 0), (148, 16, 0, 2, 0), (150, 24, 0, 2, 0), (180, -16, 16, 2, 0), (182, -8, 16, 2, 0), (188, 8, 16, 2, 0), (190, 16, 16, 2, 0), (184, -16, 32, 2, 0), (186, -8, 32, 2, 0), (192, 16, 32, 2, 0), (194, 24, 32, 2, 0)],
+    "mon_crouch": [(128, -16, -16, 2, 0), (130, -8, -16, 2, 0), (132, 0, -16, 2, 0), (134, 8, -16, 2, 0), (136, 16, -16, 2, 0), (138, 24, -16, 2, 0), (140, -16, 0, 2, 0), (142, -8, 0, 2, 0), (144, 0, 0, 2, 0), (146, 8, 0, 2, 0), (148, 16, 0, 2, 0), (150, 24, 0, 2, 0), (176, -16, 16, 2, 0), (178, -8, 16, 2, 0), (180, 0, 16, 2, 0), (182, 8, 16, 2, 0), (184, 0, 32, 2, 0), (186, 8, 32, 2, 0)],
+    "mon_jump": [(152, -16, -32, 2, 0), (154, -8, -32, 2, 0), (156, 8, -32, 2, 0), (158, 16, -32, 2, 0), (160, 24, -32, 2, 0), (162, -16, -16, 2, 0), (164, -8, -16, 2, 0), (166, 0, -16, 2, 0), (168, 8, -16, 2, 0), (172, 16, -16, 2, 0), (150, 24, -16, 2, 0), (142, -8, 0, 2, 0), (144, 0, 0, 2, 0), (170, 8, 0, 2, 0), (172, 16, 0, 2, 0), (174, 24, 0, 2, 0), (176, -16, 16, 2, 0), (178, -8, 16, 2, 0), (180, 0, 16, 2, 0), (182, 8, 16, 2, 0), (184, 0, 32, 2, 0), (186, 8, 32, 2, 0)],
+    "mon_high": [(152, -16, -32, 2, 0), (154, -8, -32, 2, 0), (156, 8, -32, 2, 0), (158, 16, -32, 2, 0), (160, 24, -32, 2, 0), (162, -16, -16, 2, 0), (164, -8, -16, 2, 0), (166, 0, -16, 2, 0), (168, 8, -16, 2, 0), (172, 16, -16, 2, 0), (150, 24, -16, 2, 0), (142, -8, 0, 2, 0), (144, 0, 0, 2, 0), (170, 8, 0, 2, 0), (172, 16, 0, 2, 0), (174, 24, 0, 2, 0), (176, -16, 16, 2, 0), (178, -8, 16, 2, 0), (178, 8, 16, 2, 1), (176, 16, 16, 2, 1)],
+    "mon_land": [(128, -16, -16, 2, 0), (130, -8, -16, 2, 0), (132, 0, -16, 2, 0), (134, 8, -16, 2, 0), (136, 16, -16, 2, 0), (138, 24, -16, 2, 0), (140, -16, 0, 2, 0), (142, -8, 0, 2, 0), (144, 0, 0, 2, 0), (146, 8, 0, 2, 0), (148, 16, 0, 2, 0), (150, 24, 0, 2, 0), (176, -16, 16, 2, 0), (178, -8, 16, 2, 0), (178, 8, 16, 2, 1), (176, 16, 16, 2, 1)],
+    "mon_fire": [(152, -16, -32, 2, 0), (154, -8, -32, 2, 0), (156, 8, -32, 2, 0), (158, 16, -32, 2, 0), (160, 24, -32, 2, 0), (162, -16, -16, 2, 0), (130, -8, -16, 2, 0), (132, 0, -16, 2, 0), (168, 8, -16, 2, 0), (172, 16, -16, 2, 0), (150, 24, -16, 2, 0), (142, -8, 0, 2, 0), (144, 0, 0, 2, 0), (170, 8, 0, 2, 0), (172, 16, 0, 2, 0), (174, 24, 0, 2, 0), (180, -16, 16, 2, 0), (182, -8, 16, 2, 0), (188, 8, 16, 2, 0), (190, 16, 16, 2, 0), (184, -16, 32, 2, 0), (186, -8, 32, 2, 0), (192, 16, 32, 2, 0), (194, 24, 32, 2, 0)],
+}
+for _n, _sp in DRACULA_FRAMES.items():
+    FRAME_SPRITES[_n + "_l"], FRAME_SPRITES[_n + "_r"] = _sp, _mirror(_sp, 16)
+# his head (a sprite of its own on the NES: tile $FC at (x - 10, y - 34)
+# facing left, (x + 2, y - 34) flipped) and the first form's debris ($57)
+FRAME_SPRITES["drac_head_l"] = [(0xFC, -2, -11, 1, 0)]
+FRAME_SPRITES["drac_head_r"] = [(0xFC, 10, -11, 1, 1)]
+FRAME_SPRITES["debris"] = [(0x78, 0, 0, 2, 0), (0x7A, 8, 0, 2, 0)]
+
 ENEMY_ZOMBIE = 0x01             # spawner types in the enemy group records
 ENEMY_BAT = 0x02
 ENEMY_FISH = 0x03
@@ -402,6 +429,11 @@ def candles(rom, stage, section, level_px):
                     out.append((cx - 8, cy - 64, ITEM_NONE, KIND_RSKEL))
                 else:
                     out.append((cx - 8, cy - 56, ITEM_NONE, KIND_DRAGON))
+            continue
+        if kind == ENEMY_DRACULA:
+            # (his y is set by the engine)
+            cx = (chunk - 1) * 64 + rom.fixed(p + 1)
+            out.append((cx - 8, 0, ITEM_NONE, KIND_DRACULA))
             continue
         if kind == ENEMY_DEATH:
             # (his y is set by the engine: he appears at NES y 48)
@@ -521,6 +553,9 @@ def needed_frames(candle_list, spawners, carried=()):
         elif kind == KIND_AKNIGHT:     # (its axe: Simon's axe pictures)
             need |= {n for n in OBJ_FRAMES if n.startswith("aknight")}
             need |= {"axe1", "axe2", "axe3", "axe4"}
+        elif kind == KIND_DRACULA:
+            need |= {n for n in OBJ_FRAMES if n.startswith(("drac", "mon_"))}
+            need |= {"debris", "fireball", "orb"}
         elif kind == KIND_DEATH:
             need |= {n for n in OBJ_FRAMES if n.startswith(("death", "sickle"))} | {"orb"}
         elif kind == KIND_GBAT:
@@ -598,6 +633,14 @@ SWAP_PAIRS.append(
       "mhead1_l", "mhead2_l", "mhead1_r", "mhead2_r"],
      ["death_l", "death_r", "sickle1_l", "sickle2_l", "sickle3_l", "sickle4_l",
       "sickle1_r", "sickle2_r", "sickle3_r", "sickle4_r", "orb"]])
+# stage 18: Dracula has one set per picture (his monster is 48 px wide, up
+# to 80 tall: far more patterns than fit at once); the engine loads the set
+# of the picture it shows (drac_show). Order: DRAC_SETS in src/ovl_b.asm.
+DRAC_SETS = ["drac_stand_l", "drac_cape_l", "drac_stand_r", "drac_cape_r",
+             "mon_stand1_l", "mon_stand2_l", "mon_crouch_l", "mon_jump_l", "mon_high_l",
+             "mon_land_l", "mon_fire_l", "mon_stand1_r", "mon_stand2_r", "mon_crouch_r",
+             "mon_jump_r", "mon_high_r", "mon_land_r", "mon_fire_r"]
+SWAP_PAIRS.append([[n] for n in DRAC_SETS])
 SWAP_SETS = SWAP_PAIRS[0]           # (the pair an area uses: swap_sets(need))
 
 
@@ -675,12 +718,12 @@ def _object_sprites(rom, slot_for_nes, need, subs, alias):
                                                       slot_for_nes), name))
         sub_banks[n] = b
     window = max([len(b.patterns) for b in sub_banks.values()] + [0])
-    frames, offsets = bytearray(), []
+    frames, offsets = bytearray([0]), []   # (frames an area can't show: offset 0, no sprites)
     for name in OBJ_FRAMES:
-        offsets.append(len(frames))
         if name not in per_frame:
-            frames.append(0)
+            offsets.append(0)
             continue
+        offsets.append(len(frames))
         bank, idx = per_frame[name]
         spr = bank.frames[idx]
         frames.append(len(spr))

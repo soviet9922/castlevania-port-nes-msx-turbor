@@ -61,6 +61,8 @@ OBJ_KAXE        equ 34                  ; ... its axe
 OBJ_GBAT        equ 35                  ; the giant bat (stage 16)
 OBJ_DEATH       equ 36                  ; stage 15's boss: Death
 OBJ_SICKLE      equ 37                  ; ... his sickles
+OBJ_DRAC        equ 38                  ; stage 18's boss: Dracula
+OBJ_DEBRIS      equ 39                  ; ... the pieces of his first form
 
 KIND_BRAZIER    equ 0
 KIND_CANDLE     equ 1
@@ -84,6 +86,9 @@ KIND_FRANK      equ 18                  ; candle list only: Frankenstein (and Ig
 KIND_AKNIGHT    equ 19                  ; the axe knight: 12x28 box at +2, +2
 KIND_GBAT       equ 20                  ; the giant bat: 40x20 around its middle
 KIND_DEATH      equ 21                  ; Death: 24x44 around his middle
+KIND_DRACULA    equ 22                  ; candle list only: Dracula
+KIND_DRAC1      equ 23                  ; his first form: 32x48 around his middle
+KIND_DRAC2      equ 24                  ; the monster: 48x48 around its middle
 
 ; object frame numbers (OBJ_FRAMES in tools/convert_objects.py)
 OBJF_BRAZIER    equ 0
@@ -137,6 +142,9 @@ OBJF_AKNIGHT    equ 130                 ; the axe knight 1-2 left, then right
 OBJF_GBAT       equ 134                 ; the giant bat's two pictures
 OBJF_DEATH      equ 136                 ; Death facing left, right
 OBJF_SICKLE     equ 138                 ; a sickle's 4 pictures left, then right
+OBJF_DRAC       equ 146                 ; Dracula: stand, cape, head left, then right
+OBJF_MON        equ 152                 ; the monster's 7 pictures left, then right
+OBJF_DEBRIS     equ 166
 
 ITEM_WHIPUP     equ 0
 ITEM_HEART      equ 1
@@ -334,6 +342,8 @@ spawn_candle:
         cp KIND_FRANK
         jr z,.allowed
         cp KIND_DEATH
+        jr z,.allowed
+        cp KIND_DRACULA
         jr z,.allowed
 .placed:
         ld a,(enemies_off)
@@ -3280,6 +3290,13 @@ whip_hits_object:
         ld a,(ix+7)
         ld de,15                        ; DE = box width - 1
         ld bc,31*256 + 0                ; B = height - 1, C = top offset
+        cp KIND_PANTHER                 ; (the brazier and the candle first:
+        jr nc,.not_small                ; most of the objects)
+        or a
+        jp z,.box_ready
+        ld bc,15*256 + 8
+        jp .box_ready
+.not_small:
         cp KIND_PANTHER
         jr nz,.not_wide
         ld de,31
@@ -3325,9 +3342,9 @@ whip_hits_object:
         ld a,l
         add a,10
         ld l,a
-        jr nc,.box_x
+        jp nc,.box_x
         inc h
-        jr .box_x
+        jp .box_x
 .not_medusa:
         cp KIND_EAGLE                   ; the eagle: 28x28 at +2, +2
         jr nz,.not_eagle
@@ -3337,7 +3354,7 @@ whip_hits_object:
         ld h,(ix+2)
         inc hl
         inc hl
-        jr .box_x
+        jp .box_x
 .not_eagle:
         cp KIND_MUMMY                   ; a mummy: 16x44 from its top + 2
         jr nz,.not_mummy
@@ -3378,6 +3395,29 @@ whip_hits_object:
         dec hl
         jp .box_x
 .not_death:
+        cp KIND_DRAC1                   ; Dracula: 32x48 / 48x48 around his
+        jr c,.not_drac                  ; middle (x + 8, top + 24)
+        cp KIND_DRAC2+1
+        jr nc,.not_drac
+        ld de,31
+        ld bc,47*256 + 0
+        ld l,(ix+1)
+        ld h,(ix+2)
+        dec hl
+        dec hl
+        dec hl
+        dec hl
+        dec hl
+        dec hl
+        dec hl
+        dec hl
+        cp KIND_DRAC2
+        jp nz,.box_x
+        ld de,-8
+        add hl,de
+        ld de,47
+        jp .box_x
+.not_drac:
         cp KIND_CANDLE
         jr nz,.box_ready
         ld bc,15*256 + 8
@@ -3488,19 +3528,28 @@ draw_obj:
         ld a,(ix+0)
         or a
         ret z
-        cp OBJ_GHOST                    ; (a ghost not out yet: nothing)
-        jr z,.hidden
+        cp OBJ_GHOST                    ; (most objects: two compares)
+        jr nc,.late
         cp OBJ_ORB                      ; (an orb not shown yet / flashing)
         jr z,.hidden
-        cp OBJ_AKNIGHT                  ; (not out yet)
-        jr z,.hidden
-        cp OBJ_GBAT
-        jr z,.hidden
+        cp OBJ_MEDUSA                   ; asleep, Medusa is the statue in the
+        jr nz,.drawn                    ; map: no sprites
+        jr .hidden
+.late:
+        jr z,.hidden                    ; (a ghost not out yet: nothing)
+        cp OBJ_AKNIGHT
+        jr c,.drawn
+        cp OBJ_GBAT+1                   ; (the axe knight, the giant bat: not
+        jr c,.out                       ; out yet; not the knight's axe)
         cp OBJ_DEATH                    ; (until he appears)
         jr nz,.not_death
         ld a,(ix+9)
         cp 3
         ret c
+        jr .drawn
+.out:
+        cp OBJ_KAXE
+        jr nz,.hidden
         jr .drawn
 .not_death:
         cp OBJ_SICKLE                   ; (appearing: even frames only)
@@ -3513,8 +3562,12 @@ draw_obj:
         ret c
         jr .drawn
 .not_sickle:
-        cp OBJ_MEDUSA                   ; asleep, Medusa is the statue in the
-        jr nz,.drawn                    ; map: no sprites
+        cp OBJ_DRAC                     ; (Dracula: drac_vis)
+        jr nz,.drawn
+        ld a,(drac_vis)
+        or a
+        ret z
+        jr .drawn
 .hidden:
         ld a,(ix+9)
         or a
@@ -3546,6 +3599,8 @@ draw_obj:
         ld a,(de)
         inc de
         ld b,a                          ; B = sprites in the frame
+        or a                            ; (none: a frame this area doesn't
+        jr z,.empty                     ; have, e.g. a sub-weapon's)
         ld hl,(spr_sat_ptr)
 .spr:
         ld a,(spr_total)
@@ -3604,6 +3659,9 @@ draw_obj:
         djnz .spr
 .frame_done:
         ld (spr_sat_ptr),hl
+        pop ix
+        ret
+.empty:
         pop ix
         ret
 
@@ -3710,13 +3768,18 @@ load_window:                            ; (sub_src) bytes (sub_len) to pattern A
 
 ; Swap window set A (0: zombies, 1: the boss) into the area's swap window
 ; (both sprite pages); nothing in areas without one.
-load_swap_patterns:
+load_swap_patterns:                     ; A = the set (AH_SWAP_TAB)
         ld (swap_boss),a
+        add a,a
         add a,a
         ld e,a
         ld d,0
-        ld hl,area_hdr+AH_SWAP_SZ
+        ld hl,(area_hdr+AH_SWAP_TAB)
         add hl,de
+        ld e,(hl)
+        inc hl
+        ld d,(hl)
+        inc hl
         ld c,(hl)
         inc hl
         ld b,(hl)
@@ -3724,12 +3787,26 @@ load_swap_patterns:
         or c
         ret z
         ld (sub_len),bc
-        ld hl,area_hdr+AH_SWAP_SPT
-        add hl,de
-        ld e,(hl)
-        inc hl
-        ld d,(hl)
         ld (sub_src),de
+        ld a,(area_hdr+AH_SWAP_BANK)    ; (in a bank of their own: mapped
+        or a                            ; while they are copied; the sound
+        jr z,.here                      ; interrupt restores page2_bank)
+        di
+        ld hl,page2_bank
+        ld c,(hl)
+        ld (hl),a
+        ld (ASCII16_PAGE2),a
+        push bc
+        ld a,(area_hdr+AH_SWAP_SLOT)
+        call load_window
+        pop bc
+        di
+        ld a,c
+        ld (page2_bank),a
+        ld (ASCII16_PAGE2),a
+        ei
+        ret
+.here:
         ld a,(area_hdr+AH_SWAP_SLOT)
         jp load_window
 

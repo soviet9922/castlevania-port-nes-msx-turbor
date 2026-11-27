@@ -611,6 +611,9 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
     play_px = nes_width(area)               # objects only from the area itself
     cl = [(x + x_off, y, it, k) for x, y, it, k in
           convert_objects.candles(rom, area["stage"], area["section"], play_px)]
+    # (a record left of the least camera x never comes on the screen: stage
+    # 18 section 0 has the section above's Dracula in its list)
+    cl = [c for c in cl if c[0] + 16 > area.get("min_cam", x_off)]
     en = [(x + x_off, y, t) for x, y, t in
           convert_objects.enemy_spawners(rom, area["stage"], area["section"], play_px)]
     objs = convert_objects.object_sprites(
@@ -676,7 +679,7 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
 
     kinds = ["brazier", "candle", "panther", "?", "?", "boss", "knight", "hbat", "medusa",
              "flea", "skeleton", "pillar", "raven", "ghost", "mummy", "rskel", "dragon", "?", "frank",
-             "aknight", "gbat", "death"]
+             "aknight", "gbat", "death", "dracula"]
     print(f"area {index} {area['name']}: {width} px, tiles per band {params['tiles']}, "
           f"{params['lossy_rows']}/{params['total_rows']} tile rows reduced, "
           f"start ({sx},{sy}), {len(st)} stairs, {len(en)} enemy spawners {en}, {len(cl)} candles "
