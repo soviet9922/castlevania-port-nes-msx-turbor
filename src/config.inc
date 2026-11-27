@@ -122,7 +122,7 @@ CROUCH_Y        equ 8                   ; crouching pose is drawn this much lowe
 
 ; Player metasprites (see tools/msx_sprites.py)
 PLAYER_SPRITES  equ 12                  ; hardware sprites / pattern slots reserved
-NPOSES          equ 38                  ; poses per facing direction
+NPOSES          equ 70                  ; poses per facing direction
 POSE_WALK1      equ 1
 POSE_TUCK       equ 3
 POSE_STAIR      equ 12                  ; climbing (alternates with walk1)
@@ -132,6 +132,10 @@ POSE_DEAD2      equ 15                  ; dying: lying (32 px wide)
 POSE_CHAIN      equ 16                  ; whip1-4, whip1c-4c with the chain whip
 POSE_STAR       equ 24                  ; ... with the morning star (longer)
 POSE_THROW      equ 32                  ; throw1-3, throw1c-3c (a sub-weapon)
+POSE_STAIR_UP   equ 38                  ; on the stairs (NES $0E, 2 px higher)
+POSE_STAIR_DOWN equ 39                  ; ... going down (NES $0F)
+POSE_SWHIP      equ 40                  ; whip on the stairs: + whip*8 + down*4 + phase
+POSE_STHROW     equ 64                  ; throw on the stairs: + down*3 + phase
 STAR_EXTRA      equ 16                  ; the morning star reaches 16 px further
 DAGGER_SPEED    equ 4                   ; px per frame (NES)
 AXE_VY0         equ -68                 ; 1/16 px per frame: up 4.25 (NES)

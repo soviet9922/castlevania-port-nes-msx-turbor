@@ -143,6 +143,8 @@ def write(gen_dir, areas):
             "        ORG 0x8000",
             'player_spt:     INCBIN "player_spt.bin"         ; 32 bytes per 16x16 pattern',
             'player_sct:     INCBIN "player_sct.bin"         ; 16 colour bytes per sprite',
+            'player_frames:  INCBIN "player_frames.bin"      ; count, then (dy, dx, pattern, colour)',
+            '        INCLUDE "player_frames.inc"             ; player_frame_table (build_sat maps this bank)',
             '        INCLUDE "ramcode.asm"           ; code run from RAM (copied at start-up)',
             "player_bank_end:",
             "        ASSERT player_bank_end <= 0xC000",

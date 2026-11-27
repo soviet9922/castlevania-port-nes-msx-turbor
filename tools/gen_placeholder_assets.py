@@ -304,6 +304,9 @@ POSE_NAMES = ["stand", "walk1", "walk2", "tuck", "whip1", "whip2", "whip3", "whi
 POSE_NAMES += [p + w for p in ("chain_", "star_")
                for w in ("whip1", "whip2", "whip3", "whip4", "whip1c", "whip2c", "whip3c", "whip4c")]
 POSE_NAMES += ["throw1", "throw2", "throw3", "throw1c", "throw2c", "throw3c"]
+POSE_NAMES += ["stair_up", "stair_down"]
+POSE_NAMES += [f"{p}whip{n}{d}" for p in ("", "chain_", "star_") for d in "ud" for n in (1, 2, 3, 4)]
+POSE_NAMES += [f"throw{n}{d}" for d in "ud" for n in (1, 2, 3)]
 # Placeholder knock-back arc (dy per frame while rising; the fall mirrors it)
 PLACEHOLDER_KNOCKBACK = [-4, -3, -2, -2, -1, -1, -1, 0, -1, 0, 0, 0, 0, 0, 0, 0]
 
@@ -637,6 +640,18 @@ def player_sprites():
     for base in (stand, tuck):          # throwing: arm poses without a whip
         for n in (1, 2, 3):
             poses.append(dict(base))
+    poses.append(walk2)                 # on the stairs: up, down
+    poses.append(walk2)
+    for whip in (placeholder_whip, lambda n: placeholder_chain(n, 0),
+                 lambda n: placeholder_chain(n, 16)):
+        for d in "ud":                  # whips on the stairs (standing art)
+            for n in (1, 2, 3, 4):
+                px = dict(whip(n))
+                px.update(stand)
+                poses.append(px)
+    for d in "ud":                      # throws on the stairs
+        for n in (1, 2, 3):
+            poses.append(dict(stand))
     bank = msx_sprites.SpriteBank()
     names = []
     for facing in ("right", "left"):

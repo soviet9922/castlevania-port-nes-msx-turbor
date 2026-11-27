@@ -229,8 +229,6 @@ enable_page2:
 ; Data shared by all areas (stays in bank 0; Simon's sprite patterns and
 ; colours are in the last bank, see areas.asm)
 ; ---------------------------------------------------------------------------
-player_frames:  INCBIN "player_frames.bin"      ; count, then (dy, dx, pattern, colour)
-        INCLUDE "player_frames.inc"             ; player_frame_table
 jump_table:     INCBIN "player_jump.bin"        ; JUMP_LEN signed dy, rising half
 kb_table:       INCBIN "player_kb.bin"          ; knock-back arc, same format
 kb_table_end:

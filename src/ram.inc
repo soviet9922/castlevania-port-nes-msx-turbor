@@ -216,5 +216,5 @@ stair_frz       equ jump_skip+1         ; 1  hit on the stairs: frozen frames
 RAM_END         equ stair_frz+1
         ASSERT RAM_END < 0xF380
         ASSERT RAM_END <= RAMCODE
-RAMCODE         equ 0xC600              ; code copied from ROM (src/ramcode.asm)
+RAMCODE         equ 0xC400              ; code copied from ROM (src/ramcode.asm)
 RAMCODE_TOP     equ 0xF000              ; (the stack is above, from about 0xF370 down: 880 bytes)

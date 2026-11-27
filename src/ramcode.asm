@@ -4,6 +4,7 @@ ramcode_src:
         DISP RAMCODE
 ramcode_start:
         INCLUDE "enemies2.asm"
+        INCLUDE "player2.asm"
         IF DEBUG_MENU
         INCLUDE "debugmenu.asm"
         ENDIF

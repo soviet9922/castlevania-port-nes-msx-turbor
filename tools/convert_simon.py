@@ -62,9 +62,34 @@ for prefix, whips in (("chain_", CHAIN_WHIPS), ("star_", STAR_WHIPS)):
         POSES[prefix + name] = (_ARM[name] + LEGS_STAND, whips[name])
         POSES[prefix + name + "c"] = (_ARM[name] + LEGS_TUCK, whips[name])
 # throwing a sub-weapon: the whip's arm poses without a whip (recorded)
+# (the strike shows the hand, tile $2C: the NES's whip frame $0C, piece 1)
+_THROW_ARM = dict(_ARM)
+_THROW_ARM["whip3"] = _ARM["whip3"] + [(0x2C, 16, 0)]
 for i, name in enumerate(("whip1", "whip2", "whip3"), 1):
-    POSES[f"throw{i}"] = (_ARM[name] + LEGS_STAND, [])
-    POSES[f"throw{i}c"] = (_ARM[name] + LEGS_TUCK, [])
+    POSES[f"throw{i}"] = (_THROW_ARM[name] + LEGS_STAND, [])
+    POSES[f"throw{i}c"] = (_THROW_ARM[name] + LEGS_TUCK, [])
+
+# On the stairs (NES frames $0E / $0F, $A4-$A6 / $AA-$AC, from the code: see
+# docs/NES_NOTES.md): going up the body is 2 px higher with the climbing legs,
+# going down it has its own legs; the whip's arms and pieces as standing.
+LEGS_UP = [(0x38, 0, 14), (0x36, 8, 14)]
+LEGS_DOWN = [(0x34, 0, 16), (0x4C, 8, 16)]
+POSES["stair_up"] = ([(0x14, 0, -2), (0x12, 8, -2)] + LEGS_UP, [])
+POSES["stair_down"] = ([(0x14, 0, 0), (0x12, 8, 0)] + LEGS_DOWN, [])
+STAIR_WHIP_POSES = []
+for prefix, whips in (("", {n: w for n, (_, w) in WHIP_TOPS.items()}),
+                      ("chain_", CHAIN_WHIPS), ("star_", STAR_WHIPS)):
+    for d, (dy, legs) in (("u", (-2, LEGS_UP)), ("d", (0, LEGS_DOWN))):
+        for name in ("whip1", "whip2", "whip3", "whip4"):
+            arms = WHIP_TOPS[name][0] if not prefix else _ARM[name]
+            n = f"{prefix}{name}{d}"
+            POSES[n] = ([(t, x, y + dy) for t, x, y in arms] + legs, whips[name])
+            STAIR_WHIP_POSES.append(n)
+for d, (dy, legs) in (("u", (-2, LEGS_UP)), ("d", (0, LEGS_DOWN))):
+    for i, name in enumerate(("whip1", "whip2", "whip3"), 1):
+        n = f"throw{i}{d}"
+        POSES[n] = ([(t, x, y + dy) for t, x, y in _THROW_ARM[name]] + legs, [])
+        STAIR_WHIP_POSES.append(n)
 
 # engine pose numbers (src/player.asm)
 POSE_ORDER = ["stand", "walk1", "walk2", "tuck",
@@ -73,6 +98,7 @@ POSE_ORDER = ["stand", "walk1", "walk2", "tuck",
 POSE_ORDER += [p + w for p in ("chain_", "star_")
                for w in ("whip1", "whip2", "whip3", "whip4", "whip1c", "whip2c", "whip3c", "whip4c")]
 POSE_ORDER += ["throw1", "throw2", "throw3", "throw1c", "throw2c", "throw3c"]
+POSE_ORDER += ["stair_up", "stair_down"] + STAIR_WHIP_POSES     # 38, 39, 40..69
 
 SIMON_PALETTE = 0xCDE9          # fixed bank: $3F $10, then the sprite palettes
 JUMP_TABLE = (6, 0x9B90)        # 20 signed bytes: dy per frame while rising
