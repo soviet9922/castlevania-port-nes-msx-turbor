@@ -150,39 +150,12 @@ sound_init:
         ld a,0xBF
         ld (mus_state+SS_REGS+7),a
         ld (sfx_state+SS_REGS+7),a
+        call psg_write                  ; (the interrupt writes the PSG too)
         ei
-        jp psg_write
-
-; Main loop, after the VBLANK work: one step of the sound for every frame
-; since the last call (up to 4), so the music keeps its tempo when the game
-; runs late
-sound_tick:
-        ld hl,(frame_count)
-        ld de,(snd_frame)
-        ld (snd_frame),hl
-        or a
-        sbc hl,de
-        ld a,h
-        or a
-        jr nz,.one                      ; (first call, or a long pause)
-        ld a,l
-        or a
-        ret z
-        cp SOUND_CATCH_UP+1
-        jr c,.n
-.one:
-        ld a,1
-.n:
-        ld b,a
-.lp:
-        push bc
-        call sound_frame
-        pop bc
-        djnz .lp
         ret
 
 ; one frame of both streams, then the PSG; the ROM bank at 0x8000 is put
-; back as the game had it
+; back as the game had it. Called by the VBLANK interrupt (src/irq.asm).
 sound_frame:
         ld ix,mus_state
         call stream_step

@@ -3,7 +3,11 @@
 ;
 ;  VBLANK (H.TIMI): reset horizontal scroll to 0 so the HUD stays fixed,
 ;                   signal the main loop.
-;  Line   (H.KEYI): at SPLIT_LINE, apply the camera scroll for the playfield.
+;  Line   (H.KEYI): at SPLIT_LINE, apply the camera scroll for the playfield,
+;                   then step the music and effects: one step every frame
+;                   however long the game's frame takes, out of the vertical
+;                   blank the game's VRAM work needs (the BIOS has saved
+;                   every register).
 ;
 ; The BIOS calls H.KEYI for every interrupt before it reads S#0, so the
 ; line interrupt flag (S#1 bit 0) must be cleared here and S#0 must be
@@ -73,4 +77,4 @@ irq_line:
         ld hl,(line_irq_count)
         inc hl
         ld (line_irq_count),hl
-        ret
+        jp sound_frame                  ; (puts page2_bank back at 0x8000)

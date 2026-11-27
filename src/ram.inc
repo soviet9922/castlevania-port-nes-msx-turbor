@@ -143,7 +143,7 @@ page2_bank      equ swap_boss+1         ; 1  the ROM bank the game has at 0x8000
 mus_id          equ page2_bank+1        ; 1  music playing (SND_ number, 0xFF none)
 mus_state       equ mus_id+1            ; SS_SIZE  music stream (src/sound.asm)
 sfx_state       equ mus_state+20        ; SS_SIZE  sound effect stream
-snd_frame       equ sfx_state+20        ; 2  frame_count at the last sound step
+snd_frame       equ sfx_state+20        ; 2  (unused)
 psg_buf         equ snd_frame+2         ; 11 PSG registers being written
 medusa_t        equ psg_buf+11          ; 1  frames to the next Medusa head check
 crush_state     equ medusa_t+1          ; 2*CRUSH_MAX  per crusher: cycle step, frames left

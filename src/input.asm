@@ -4,6 +4,11 @@
 ; ---------------------------------------------------------------------------
 
 read_input:
+        di                              ; (the VBLANK interrupt writes the PSG,
+        call .read                      ; whose register select the joystick
+        ei                              ; reads share)
+        ret
+.read:
         xor a
         call GTSTCK                     ; cursor keys
         push af

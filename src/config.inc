@@ -278,4 +278,4 @@ ZOMBIE_VMAX     equ 64
 
 ; sound steps the main loop may run in one frame to catch up after running late
 ; (keeps the music's tempo; 1 = never catch up)
-SOUND_CATCH_UP  equ 1
+

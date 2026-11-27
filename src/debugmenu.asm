@@ -79,7 +79,6 @@ debug_menu:
         ei
 .loop:
         call wait_frame
-        call sound_tick
         call read_input
         call dbg_draw
         ld a,(dbg_go)                   ; (tests)

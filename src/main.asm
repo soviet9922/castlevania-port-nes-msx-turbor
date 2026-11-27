@@ -78,7 +78,6 @@ main_loop:
         call calc_scroll
         ei
 vblank_done:                            ; (tests measure VBLANK work up to here)
-        call sound_tick                 ; music and effects, one step per frame
 
         ; --- game logic ---
         ld a,(game_over_t)              ; game over: wait, then a new game
