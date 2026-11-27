@@ -504,6 +504,41 @@ Measured with `tools/nes_probe/record_simon.lua`, which records RAM and OAM ever
 - The bytes after the jump table (`$9BA4`: `81 A8 9B 80`, then another
   signed table) are probably the knock-back arc.
 
+### From the code (bank 6 `$934C`-`$A08A`; the port follows it)
+
+- `$3F` is Simon's **middle** line, not his feet (the floor probe is at
+  y + 16, the head probe at y - 19); `$40/$41` is his middle x. Port: px =
+  x - 8, py = y - 64.
+- A frame (`$9380`): the x move first (walls probed 8 px from his middle at
+  y - 9, -4, 0, +8, +15; his middle stays at screen x 9..239), then the
+  stairs, A (a jump, unless the tiles at y - 19, x - 7 / x / x + 7 are solid),
+  B (the whip), DOWN (a crouch). Crouched he turns. The walk animation steps
+  on the carry of a counter += 36 a walking frame, kept over stops.
+- The jump's arc starts the frame after the take-off; nothing stops it
+  while rising. After the mirrored table he falls 8 px a frame (`$9B8F`).
+  Walking off a ledge (`$9757`): 8 px a frame at once, 1 px forward. Eight
+  frames at 8 px end in a crouched landing (16 frames, sound `$0D`).
+  Landings put y on the 16-px grid (8 with a whip going on, and in stage 10).
+- Getting hit (`$96C1`): frozen 5 frames in his pose, then the knock-back
+  arc (`$9BA8`), then crouched 16 frames (he can turn and whip) and
+  invincible 96 frames (`$5B` = `$30`, every other frame) from the landing;
+  with a ceiling over him, only the crouch. A hit that empties his health
+  still knocks him back; he dies when he lands. On the stairs: frozen 16
+  frames, the whip paused.
+- The whip (`$9A2A`, `$9A71`): on the floor it starts the frame after B (in
+  the air and on the stairs at once); wind-up 5, swing 7, strike 9 frames,
+  then 1 frame of the strike body; the sound on its 11th frame, the hit on
+  its 17th only (`$E40B`), a sub-weapon leaves his hand then too, at y - 8.
+  Hit box: centre x + 24 / 26 / 34 (leather / chain / morning star), y - 2
+  (crouched + 3 on the crouched y), half sizes 16/6, 18/8, 26/8 added to the
+  enemy's. In the air the standing poses are used. The stopwatch also swings
+  the whip.
+- Stairs (`$9586`): a step (8 px across, 8 up or down, 1/2 px a frame each
+  way) once started always ends; the stick is read only at a step's end.
+  Mid-step (y & 7 in 2..5) the pose is walk1, else frame `$0E` going up (2 px
+  higher) or `$0F` going down; whips use `$A4`-`$A6` / `$AA`-`$AC`, only near a
+  step's end. UP + B throws the sub-weapon there too.
+
 ## Objects, candles and items
 
 Measured with `tools/nes_probe/record_courtyard.lua`, which walks through the courtyard whipping:

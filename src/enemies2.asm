@@ -1237,10 +1237,19 @@ b3_touch:
         inc d
 .y:
         ld hl,(py)
+        ld a,(crouching)                ; crouched: his middle 4 px lower, 2 px
+        or a                            ; less each way (NES $E6C6)
         push bc
         ld bc,16
-        add hl,bc
+        jr z,.mid
+        ld c,20
+.mid:
+        add hl,bc                       ; (Z kept)
         pop bc
+        jr z,.cr
+        dec c
+        dec c
+.cr:
         or a
         sbc hl,de
         call hl_abs
