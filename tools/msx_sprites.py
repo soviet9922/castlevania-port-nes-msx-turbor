@@ -115,21 +115,40 @@ class SpriteBank:
                     if len(order) > 1:
                         c2[ly] = order[1]
                         second |= {(x, ly) for x, v in line if v == order[1]}
-                plain_cells.append([oy, ox, first, c1, second, c2])
+                plain_cells.append([oy, ox, first, c1, second, c2, inside])
         # over the limit: the cells whose second colour has the fewest pixels
-        # get one sprite (their second colour's pixels drawn in the first's
-        # colour; lines with only the second colour keep it)
+        # get one sprite. A picture drawn in one colour (max_sprites given):
+        # each line in its most used colour other than black,
+        # its black pixels (outlines, shading) left out, so that the picture
+        # keeps its details; lines that are only black stay black
         extra = len(sprites) + sum(2 if c[4] else 1 for c in plain_cells) - limit
         for cell in sorted((c for c in plain_cells if c[4]), key=lambda c: len(c[4])):
             if extra <= 0:
                 break
-            oy, ox, first, c1, second, c2 = cell
+            if max_sprites is None:     # (a big frame over the hardware limit:
+                oy, ox, first, c1, second, c2, _inside = cell   # black may fill it)
+                for ly in range(16):
+                    if not c1[ly] and c2[ly]:
+                        c1[ly] = c2[ly]
+                cell[2], cell[4] = first | second, set()
+                extra -= 1
+                continue
+            inside = cell[6]
+            one, col = set(), [0] * 16
             for ly in range(16):
-                if not c1[ly] and c2[ly]:
-                    c1[ly] = c2[ly]
-            cell[2], cell[4] = first | second, set()
+                line = [(x, v) for (x, y), v in inside.items() if y == ly]
+                if not line:
+                    continue
+                lit = [v for _, v in line if v != BLACK]
+                if lit:
+                    col[ly] = max(set(lit), key=lambda v: (lit.count(v), -v))
+                    one |= {(x, ly) for x, v in line if v != BLACK}
+                else:
+                    col[ly] = BLACK
+                    one |= {(x, ly) for x, _ in line}
+            cell[2], cell[3], cell[4] = one, col, set()
             extra -= 1
-        for oy, ox, first, c1, second, c2 in plain_cells:
+        for oy, ox, first, c1, second, c2, _inside in plain_cells:
             # first sprite in front (lower sprite numbers have priority)
             sprites.append((oy, ox, self._pat(first), self._col(c1)))
             if second:

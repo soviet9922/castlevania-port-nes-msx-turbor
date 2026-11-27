@@ -651,10 +651,6 @@ FOLDS = [  # (least visible first: flickers and extra spin steps; the
          ("axe3", "axe1"), ("axe4", "axe2"),
          ("flame3", "flame1"), ("flame2", "flame1"), ("flame4", "flame1"), ("axe2", "axe1"),
          ("panther_sit_r", "panther_sit_l"),
-         # (items drawn in one colour: one pattern instead of two)
-         ("watch_item", "mono"), ("rosary", "mono"), ("potion", "mono"), ("shot2", "mono"),
-         ("holy_item", "mono"), ("axe_item", "mono"), ("cross_item", "mono"), ("pork", "mono"),
-         ("dagger", "mono"), ("bag100", "mono"), ("whipup", "mono"), ("heart", "mono"),
          ("bag400", "bag100"), ("bag700", "bag100"), ("shot3", "shot2"),   # (colours)
          ("sickle1_r", "sickle1_l"), ("sickle2_r", "sickle2_l"),    # (one spin way)
          ("sickle3_r", "sickle3_l"), ("sickle4_r", "sickle4_l"),
@@ -668,8 +664,15 @@ FOLDS = [  # (least visible first: flickers and extra spin steps; the
          ("eagle2_l", "eagle1_l"), ("eagle2_r", "eagle1_r"),
          ("fish_walk2_l", "fish_walk1_l"), ("fish_walk2_r", "fish_walk1_r"),
          ("panther_run3_l", "panther_run1_l"), ("panther_run3_r", "panther_run1_r"),
-         ("zombie_l2", "zombie_l1"), ("zombie_r2", "zombie_r1"),
          ("pop700", "pop400"), ("pop400", "pop100"), ("pop700", "pop100"),
+         # (pickups drawn in one colour, one pattern instead of two: only
+         # after the enemies' extra animation frames, as they show it most)
+         ("watch_item", "mono"), ("rosary", "mono"), ("potion", "mono"), ("shot2", "mono"),
+         ("holy_item", "mono"), ("axe_item", "mono"), ("cross_item", "mono"), ("pork", "mono"),
+         ("dagger", "mono"), ("bag100", "mono"), ("whipup", "mono"), ("heart", "mono"),
+         # (stage 3's zombies share their patterns with the bat boss: they
+         # keep both walking frames as long as anything else can give way)
+         ("zombie_l2", "zombie_l1"), ("zombie_r2", "zombie_r1"),
          ("aknight2_l", "aknight1_l"), ("aknight2_r", "aknight1_r"),
          ("frank3_l", "frank1_l"), ("frank3_r", "frank1_r"),
          ("rskel2_l", "rskel1_l"), ("rskel2_r", "rskel1_r"),
@@ -974,6 +977,27 @@ class _WindowBank(SpriteBank):
         if p in self.main.pat_index:
             return self.main.pat_index[p]
         return self.n_main + super()._pat(cell)
+
+
+# pickups: their colours come first when the palette's free slots are shared
+PICKUP_FRAMES = {"heart", "smallheart", "whipup", "dagger", "holy_item", "watch_item", "axe_item",
+                 "bag100", "bag400", "bag700", "pork", "cross_item", "rosary", "potion", "shot2",
+                 "shot3"}
+
+
+def frame_colour_counts(rom, names):
+    """-> {NES colour: weighted pixel count} over the object frames `names`
+    (a pickup's pixels count 8 times)"""
+    chr_ram = rom.chr_ram()
+    pals = [[rom.fixed(SPRITE_PALETTES + p * 4 + v) for v in range(4)] for p in range(4)]
+    counts = {}
+    for name in names:
+        if name not in FRAME_SPRITES and not name.startswith("panther"):
+            continue
+        w = 8 if name in PICKUP_FRAMES else 1
+        for nes in _pixels(chr_ram, pals, name, lambda c: c, use_overrides=False).values():
+            counts[nes] = counts.get(nes, 0) + w
+    return counts
 
 
 def _pixels(chr_ram, pals, name, slot_for_nes, use_overrides=True):

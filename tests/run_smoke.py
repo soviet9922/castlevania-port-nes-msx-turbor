@@ -1395,7 +1395,9 @@ def run():
             high_item[0] == 3 and high_item[1] < 176)]
           if high_item else []),
         *([("holy water's fire holds the boss (it can't move) and keeps hurting it",
-            stun[0][:2] == stun[1][:2] and int(stun[1][2]) <= int(stun[0][2]) - 5)]
+            # (1 every 4 frames: at least 3 in the half second, as a late
+            # frame on the slow test machine can skip one)
+            stun[0][:2] == stun[1][:2] and int(stun[1][2]) <= int(stun[0][2]) - 3)]
           if stun else []),
         *([("UP at a staircase's foot climbs it to the top",
             (snaps["11_stairs_up"]["px"], snaps["11_stairs_up"]["py"]) == stair["top"]

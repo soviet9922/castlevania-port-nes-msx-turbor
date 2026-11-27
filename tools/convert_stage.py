@@ -633,11 +633,28 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
     if pl:
         print("  platforms:", ", ".join(f"x {c + x_off} y {y - 48}" for _, _, c, y, _ in pl))
     convert_objects.write_platforms(os.path.join(out_dir, "platforms.bin"), pl, x_off)
-    objs = convert_objects.object_sprites(
-        rom, slot_for_nes, convert_objects.needed_frames(
-            cl, en, carried, convert_objects.DROP_LISTS[convert_objects.drop_group(area["stage"])],
-            {t[5] for t in tr}, bool(pl)),
-        carried)
+    need = convert_objects.needed_frames(
+        cl, en, carried, convert_objects.DROP_LISTS[convert_objects.drop_group(area["stage"])],
+        {t[5] for t in tr}, bool(pl))
+    # sprite colours the background lacks go into the palette's free slots,
+    # the most used first (pickups weigh most): else they take the nearest
+    # colour, e.g. red hearts turn brown where the background has no red
+    subs = {n for i in carried if i in convert_objects.SUB_OF_ITEM
+            for n in convert_objects.SUB_SETS[convert_objects.SUB_OF_ITEM[i]]}
+    added = []
+    for nes, _n in sorted(convert_objects.frame_colour_counts(rom, need | subs).items(),
+                          key=lambda kv: (-kv[1], kv[0])):
+        rgb = nes_to_msx_rgb(nes_rgb[nes])
+        if nes == 0x0F or rgb in msx_pal[1:]:
+            continue
+        if not free:
+            break
+        s = free.pop(0)
+        msx_pal[s] = rgb
+        added.append(f"${nes:02X}")
+    if added:
+        print("  sprite colours added to the palette:", ", ".join(added))
+    objs = convert_objects.object_sprites(rom, slot_for_nes, need, carried)
     write_object_sprites(out_dir, index, objs)
     n_obj_patterns = objs.n_main
     convert_objects.write_candles(os.path.join(out_dir, "candles.bin"), cl)
