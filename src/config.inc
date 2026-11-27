@@ -161,6 +161,7 @@ SCORE_DRAGON    equ 0x10
 SCORE_FRANK     equ 0x50                ; stage 12's boss: 5000
 SCORE_AKNIGHT   equ 0x05                ; blocks 5-7 (NES $DF35): 500
 SCORE_GBAT      equ 0x30                ; 3000
+SCORE_DEATH     equ 0x70                ; stage 15's boss: 7000
 SCORE_SNAKE     equ 0x01                ; snake, bandage, bone, fireball: 100
 
 ; Health and getting hit (measured in the NES entrance hall)

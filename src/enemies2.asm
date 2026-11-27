@@ -248,12 +248,16 @@ enemies_burst:
         cp OBJ_MEDUSA
         jr z,.next
         cp OBJ_DRAGON+1
-        jr nc,.next
+        jr nc,.late
         cp OBJ_DRAGON
         jr nz,.burst
         push bc
         call dragon_parts_clear         ; (and its parts)
         pop bc
+        jr .burst
+.late:
+        cp OBJ_DEATH                    ; (not Death, his sickles, Dracula)
+        jr nc,.next
 .burst:
         ld (ix+0),OBJ_BURST
         ld (ix+4),0
@@ -323,6 +327,8 @@ medusa_vram:
 ; ---------------------------------------------------------------------------
 ; IX = new object, A = kind (spawn_candle)
 block3_spawn:
+        cp KIND_DEATH
+        jp z,death_spawn
         cp KIND_AKNIGHT
         jp z,aknight_spawn
         cp KIND_GBAT
@@ -377,6 +383,10 @@ block3_update:
         jp z,kaxe_update
         cp OBJ_GBAT
         jp z,gbat_update
+        cp OBJ_DEATH
+        jp z,death_update
+        cp OBJ_SICKLE
+        jp z,sickle_update
         cp OBJ_EAGLE                    ; block 4's
         cp OBJ_EAGLE
         jp z,eagle_update

@@ -26,7 +26,8 @@ Outputs (bytes):
 SLOT_A, SLOT_B = 2, 4
 BLACK = 1               # palette slot of black (NES $0F)
 CC = 0x40
-MAX_SPRITES = 12        # hardware sprites per frame (engine reserves 12 slots)
+MAX_SPRITES = 16        # hardware sprites per frame (Death 40x48: 14; the engine
+                        # draws objects until its 32 slots are used)
 
 
 def _pattern(cell):

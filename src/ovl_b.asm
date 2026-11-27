@@ -1056,3 +1056,626 @@ gbat_move:
         adc a,(hl)                      ; + vy high
         ld (ix+3),a
         ret
+
+; --- Death (stage 15's boss; NES record $58 6:$8AA9, object $18 5:$8EE0,
+; hits $E282 as Medusa's). Made when the screen comes within 216 px of his
+; room (every other enemy vanishes); 120 frames after the screen locks at his
+; room he appears at the top right and floats down (2 1/2 px, slowing 5/256
+; a frame) to the first floor under him. At every landing he throws 3
+; sickles, then stands 144/95/185/84 frames: every 32 frames, with Simon
+; within 72 px, he leaps at him (1 1/4 px across, 2 px up); else when the
+; time is up he hops 1 or 2 px up, 3/4 px across to a random side. In the air
+; gravity is 6/256; he bounces off screen x 16 and 240; his feet probe the
+; floor (rising too, as the NES's). Half the weapon's damage off the boss bar
+; (64), 8 frames frozen a hit; 7000, then the orb.
+;   +4 timer  +5 facing  +9 state (0 placed, 1 waiting for the lock,
+;   2 appearing, 3 floating down, 4 standing, 5 in the air, 6 burning)
+;   +10 bit 0: moving left, bit 1: fast  +11 frozen frames
+;   obj_ext: x fraction, y fraction, vy (8.8, + = down)
+;   his NES y (middle) = (ix+3) + 72 (the top of his 40x48 picture: -72)
+; ---------------------------------------------------------------------------
+DEATH_Y0        equ 48                  ; his NES y when he appears
+death_spawn:
+        ld (ix+0),OBJ_DEATH
+        ld (ix+7),KIND_DEATH            ; 24x44 around his middle
+        ld (ix+6),OBJF_DEATH
+        ld (ix+3),DEATH_Y0-72
+        xor a
+        ld (ix+9),a
+        ld (ix+10),a
+        ld (ix+11),a
+        ld (ix+5),1
+        jp b5_ext_clear
+
+death_update:
+        ld a,(ix+9)
+        cp 6
+        jr nz,.alive
+        inc (ix+4)
+        jp boss_update.burning
+.alive:
+        or a
+        jr nz,.made
+        ld hl,(cam_x)                   ; the record at screen x 8: camera
+        ld de,216+1                     ; 216 (Simon comes from the right)
+        or a
+        sbc hl,de
+        ret nc
+        push ix                         ; every other enemy goes (NES $F47C)
+        call enemies_burst
+        ld ix,obj_table
+        ld b,OBJ_MAX
+.gone:
+        ld a,(ix+0)
+        cp OBJ_BURST
+        jr nz,.gn
+        ld (ix+0),OBJ_NONE
+.gn:
+        ld de,OBJ_SIZE
+        add ix,de
+        djnz .gone
+        ld a,1                          ; his patterns in the corridor
+        call load_swap_patterns         ; enemies' place (swap window)
+        pop ix
+        ld a,BOSS_HP
+        ld (boss_hp),a
+        ld a,1
+        ld (hud_dirty),a
+        ld (ix+9),a
+        ret
+.made:
+        ld a,(ix+11)                    ; frozen by a hit
+        or a
+        jr z,.nf
+        dec (ix+11)
+        jp .hits
+.nf:
+        ld a,(freeze_t)
+        or a
+        jp nz,.hits
+        call knight_face
+        ld a,(ix+9)
+        dec a
+        jr nz,.s2
+        ld hl,(cam_x)                   ; until the screen is at his room
+        ld de,(area_hdr+AH_MINCAM)
+        or a
+        sbc hl,de
+        ret nz
+        ld a,SND_BOSS
+        call music_restart
+        ld hl,(cam_x)                   ; the screen locks, both ways
+        ld (cam_min),hl
+        ld (area_hdr+AH_MAXCAM),hl
+        ld a,1
+        ld (cam_lock),a
+        ld (ix+9),2
+        ld (ix+4),120
+        ret
+.s2:
+        dec a
+        jr nz,.s3
+        dec (ix+4)                      ; appearing
+        ret nz
+        ld (ix+9),3
+        ld hl,0x0280                    ; 2 1/2 px down
+        jp death_set_vy
+.s3:
+        dec a
+        jr nz,.s4
+        call death_vy                   ; floating down: vy -= 5/256
+        ld de,-5
+        add hl,de
+        call death_set_vy
+        call death_y_move
+        ld a,24
+        call death_probe
+        jp nc,.hits
+        jp .land
+.s4:
+        dec a
+        jr nz,.s5
+        ld a,(frame_count)              ; standing: every 32 frames, with
+        and 31                          ; Simon near, the leap
+        jr nz,.tick
+        ld hl,(px)
+        ld e,(ix+1)
+        ld d,(ix+2)
+        or a
+        sbc hl,de
+        call hl_abs
+        ld a,h
+        or a
+        jr nz,.tick
+        ld a,l
+        cp 72
+        jr nc,.tick
+        ld a,2                          ; towards him, fast
+        bit 7,(ix+5)
+        jr z,.lr
+        inc a
+.lr:
+        ld (ix+10),a
+        ld hl,-0x0200                   ; 2 px up
+        jr .jump
+.tick:
+        dec (ix+4)
+        jp nz,.hits
+        ld a,(frame_count)              ; the hop: a random side, 3/4 px
+        and 1
+        ld (ix+10),a
+        ld a,(rng)
+        rrca
+        ld hl,-0x0100                   ; 1 or 2 px up
+        jr nc,.jump
+        ld hl,-0x0200
+.jump:
+        call death_set_vy
+        ld (ix+9),5
+        jp .hits
+.s5:
+        call death_x_move               ; in the air
+        call death_vy
+        ld de,6                         ; gravity 6/256
+        add hl,de
+        call death_set_vy
+        call death_y_move
+        ld a,(ix+3)                     ; the ceiling: NES y 32
+        add a,72
+        cp 32
+        jr nc,.probe
+        ld (ix+3),33-72
+        ld hl,0
+        call death_set_vy
+        jp .hits
+.probe:
+        ld a,25
+        call death_probe
+        jp nc,.hits
+.land:
+        ld a,(ix+3)                     ; on the tile: y &= $F8
+        add a,72
+        and 0xF8
+        sub 72
+        ld (ix+3),a
+        call sickles_throw
+        call rng_and3
+        ld hl,death_waits
+        call table_a
+        ld (ix+4),a
+        ld (ix+9),4
+.hits:
+        ld a,(ix+9)                     ; (placed, waiting, appearing: no
+        cp 3                            ; hits, no harm)
+        ret c
+        ld a,OBJF_DEATH
+        bit 7,(ix+5)
+        jr nz,.pic
+        inc a
+.pic:
+        ld (ix+6),a
+        call weapon_hits
+        jr nc,.touch
+        ld a,SND_HIT
+        call sfx_play
+        call hit_damage                 ; half the weapon's damage; holy
+        rrca                            ; water's fire 1 every 8 frames
+        rrca
+        rrca
+        and 31
+        ld b,a
+        ld a,(hit_src)
+        cp 3
+        jr nz,.dmg
+        ld b,0
+        ld a,(frame_count)
+        and 7
+        jr nz,.dmg
+        inc b
+.dmg:
+        ld a,1
+        ld (hud_dirty),a
+        ld a,(boss_hp)
+        sub b
+        jr z,.dead
+        jr c,.dead
+        ld (boss_hp),a
+        ld (ix+11),BOSS_FREEZE
+        ret
+.dead:
+        xor a
+        ld (boss_hp),a
+        ld a,SCORE_DEATH
+        call add_score
+        ld (ix+9),6                     ; he burns at his middle, then the
+        ld (ix+4),0                     ; orb (the sickles fly on)
+        ld a,(ix+3)
+        add a,16
+        ld (ix+3),a
+        ld (ix+7),KIND_BAT
+        ret
+.touch:
+        ld a,24
+        ld bc,16*256+34
+        jp b3_touch
+death_waits:    db 144, 95, 185, 84
+
+; HL = his vy (obj_ext 2-3)
+death_vy:
+        call obj_ext_of
+        inc hl
+        inc hl
+        ld a,(hl)
+        inc hl
+        ld h,(hl)
+        ld l,a
+        ret
+
+; his vy = HL
+death_set_vy:
+        push hl
+        call obj_ext_of
+        inc hl
+        inc hl
+        pop de
+        ld (hl),e
+        inc hl
+        ld (hl),d
+        ret
+
+; y += vy (8.8, the fraction in obj_ext 1)
+death_y_move:
+        call obj_ext_of
+        inc hl
+        ld a,(hl)
+        inc hl
+        add a,(hl)
+        dec hl
+        ld (hl),a
+        inc hl
+        inc hl
+        ld a,(ix+3)
+        adc a,(hl)
+        ld (ix+3),a
+        ret
+
+; x += 3/4 or 1 1/4 px along +10; bounces off screen x 16 and 240 (middle)
+death_x_move:
+        call obj_ext_of
+        ld b,0xC0                       ; 3/4 px
+        ld c,0
+        bit 1,(ix+10)
+        jr z,.sp
+        ld b,0x40                       ; fast: 1 1/4 px
+        inc c
+.sp:
+        ld a,(hl)
+        add a,b
+        ld (hl),a
+        ld a,c
+        adc a,0
+        or a
+        jr z,.clamp
+        bit 0,(ix+10)
+        jr z,.r
+        neg
+.r:
+        call move_dir_a
+.clamp:
+        ld l,(ix+1)
+        ld h,(ix+2)
+        ld de,8
+        add hl,de
+        ld de,(cam_x)
+        or a
+        sbc hl,de                       ; screen x of his middle
+        ld a,h
+        or a
+        jr nz,.left
+        ld a,l
+        cp 240
+        jr nc,.right
+        cp 16
+        ret nc
+.left:
+        ld a,16
+        jr .set
+.right:
+        ld a,240
+.set:
+        sub 8
+        ld l,a
+        ld h,0
+        ld de,(cam_x)
+        add hl,de
+        ld (ix+1),l
+        ld (ix+2),h
+        ld a,(ix+10)
+        xor 1
+        ld (ix+10),a
+        ret
+
+; Carry if the tile under his middle at NES y + A is solid
+death_probe:
+        add a,(ix+3)
+        add a,72-48
+        ld e,a
+        ld d,0
+        ld l,(ix+1)
+        ld h,(ix+2)
+        ld bc,8
+        add hl,bc
+        jp solid_at
+
+; --- the sickles (NES $9083, object $0B 5:$8FF8): 3 at each of Death's
+; landings, at most 4 out, placed from SIMON (screen x, y wrapping): (+160,
+; -80), (+48, +24), (+4, -48). Each flickers 40 frames (shown and hittable
+; on even frames), then aims at Simon: 7/8 px on the long axis, short/long
+; on the other; flies 119 frames, stops 32, aims again. Gone off the screen
+; (NES x outside 8..248, y outside 8..247) or by any hit (100).
+;   +4 timer  +5 x direction  +9 state (0 appearing, 1 aim, 2 flying,
+;   3 stopped)  +10 y direction (0 down, 1 up)  +11 bit 0 vx 1 px, bit 1 vy
+;   1 px  obj_ext: x fraction, y fraction, vx fraction, vy fraction
+;   (ix+3): the 16x16 top, NES y - 56 (0xC0-0xFF: above the playfield)
+sickles_throw:
+        push ix
+        ld hl,sickle_offsets
+        ld b,3
+.lp:
+        push bc
+        push hl
+        ld a,OBJ_SICKLE
+        call count_type
+        cp 4
+        jr nc,.skip
+        call obj_free_slot
+        jr c,.skip
+        pop hl
+        push hl
+        ld a,(px)                       ; Simon's NES middle: screen x, y
+        ld de,(cam_x)
+        sub e
+        add a,8
+        add a,(hl)
+        ld e,a                          ; its screen x (wrapping)
+        ld a,(py)
+        add a,64
+        inc hl
+        add a,(hl)                      ; its NES y (wrapping)
+        sub 56
+        ld (ix+3),a
+        ld d,0
+        ld hl,(cam_x)
+        add hl,de
+        ld de,-8
+        add hl,de
+        ld (ix+1),l
+        ld (ix+2),h
+        ld (ix+0),OBJ_SICKLE
+        ld (ix+4),40
+        ld (ix+5),-1
+        ld (ix+6),OBJF_SICKLE
+        ld (ix+7),KIND_BAT
+        ld (ix+8),0xFF
+        xor a
+        ld (ix+9),a
+        ld (ix+10),a
+        ld (ix+11),a
+        call b5_ext_clear
+.skip:
+        pop hl
+        inc hl
+        inc hl
+        pop bc
+        djnz .lp
+        pop ix
+        ret
+sickle_offsets: db 160, -80, 48, 24, 4, -48
+
+sickle_update:
+        ld a,(freeze_t)
+        or a
+        jp nz,.cull
+        ld a,(ix+9)
+        or a
+        jr nz,.s1
+        dec (ix+4)                      ; appearing
+        jp nz,.cull
+        inc (ix+9)
+.s1:
+        ld a,(ix+9)
+        cp 1
+        jr nz,.s2
+.aim:
+        call sickle_aim
+        ld (ix+4),120
+        ld (ix+9),2
+        jp .cull
+.s2:
+        cp 2
+        jr nz,.s3
+        dec (ix+4)                      ; flying
+        jr nz,.fly
+        ld (ix+4),32
+        ld (ix+9),3
+        jp .cull
+.fly:
+        call sickle_move
+        jp .cull
+.s3:
+        dec (ix+4)                      ; stopped
+        jr z,.aim
+.cull:
+        ld l,(ix+1)                     ; NES screen x outside 8..248
+        ld h,(ix+2)
+        ld de,(cam_x)
+        or a
+        sbc hl,de
+        ld a,h
+        or a
+        jp nz,obj_gone
+        ld a,l
+        cp 241
+        jp nc,obj_gone
+        ld a,(ix+3)                     ; NES y outside 8..247
+        add a,56
+        sub 8
+        cp 240
+        jp nc,obj_gone
+        ld a,(frame_count)              ; its picture: 3 frames each
+        ld b,0
+.d3:
+        sub 3
+        jr c,.p
+        inc b
+        jr .d3
+.p:
+        ld a,b
+        and 3
+        bit 7,(ix+5)
+        jr nz,.l
+        add a,4
+.l:
+        add a,OBJF_SICKLE
+        ld (ix+6),a
+        ld a,(ix+9)                     ; appearing: only on even frames
+        or a
+        jr nz,.hits
+        ld a,(frame_count)
+        rrca
+        ret c
+.hits:
+        call weapon_hits
+        jr nc,.touch
+        ld a,SCORE_SNAKE
+        ld c,2
+        jp enemy_killed
+.touch:
+        ld a,(ix+3)
+        cp 0xC0
+        ret nc
+        ld a,8
+        ld bc,10*256+18
+        jp b3_touch
+
+; aim at Simon's middle: 7/8 px on the long axis, short/long on the other
+sickle_aim:
+        ld hl,(px)                      ; dx = (px + 8) - (x + 8)
+        ld e,(ix+1)
+        ld d,(ix+2)
+        or a
+        sbc hl,de
+        ld (ix+5),1
+        bit 7,h
+        jr z,.xp
+        ld (ix+5),-1
+.xp:
+        call hl_abs
+        ld a,h
+        or a
+        ld a,l
+        jr z,.x1
+        ld a,255
+.x1:
+        or a
+        jr nz,.x2
+        inc a
+.x2:
+        ld c,a                          ; C = |dx|
+        push bc
+        ld a,8                          ; dy = (py + 16) - (top + 8)
+        call gbat_dy
+        pop bc
+        ld (ix+10),0
+        bit 7,a
+        jr z,.yp
+        ld (ix+10),1
+        neg
+.yp:
+        or a
+        jr nz,.y1
+        inc a
+.y1:
+        ld b,a                          ; B = |dy|
+        call obj_ext_of
+        inc hl
+        inc hl
+        push hl
+        ld a,c
+        cp b
+        jr c,.ylong
+        ld a,b                          ; x long: vx 7/8, vy = dy / dx
+        ld l,c
+        ld de,256
+        call boss_muldiv
+        ex de,hl
+        pop hl
+        ld (hl),0xE0
+        inc hl
+        ld (hl),e
+        ld a,d
+        add a,a
+        ld (ix+11),a
+        ret
+.ylong:
+        ld a,c                          ; y long: vy 7/8, vx = dx / dy
+        ld l,b
+        ld de,256
+        call boss_muldiv
+        ex de,hl
+        pop hl
+        ld (hl),e
+        inc hl
+        ld (hl),0xE0
+        ld (ix+11),d
+        ret
+
+; x, y += the speeds (fractions in obj_ext 0, 1)
+sickle_move:
+        call obj_ext_of
+        ld a,(ix+11)
+        and 1
+        ld c,a                          ; vx whole
+        ld a,(hl)
+        inc hl
+        inc hl
+        add a,(hl)                      ; x fraction + vx fraction
+        dec hl
+        dec hl
+        ld (hl),a
+        ld a,c
+        adc a,0
+        push hl
+        or a
+        jr z,.y
+        ld b,a
+.xl:
+        push bc
+        ld a,(ix+5)
+        call move_dir_a
+        pop bc
+        djnz .xl
+.y:
+        pop hl
+        ld a,(ix+11)
+        rrca
+        and 1
+        ld c,a                          ; vy whole
+        inc hl
+        ld a,(hl)
+        inc hl
+        inc hl
+        add a,(hl)                      ; y fraction + vy fraction
+        dec hl
+        dec hl
+        ld (hl),a
+        ld a,c
+        adc a,0
+        ret z
+        bit 0,(ix+10)
+        jr z,.down
+        neg
+.down:
+        add a,(ix+3)
+        ld (ix+3),a
+        ret

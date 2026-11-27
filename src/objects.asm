@@ -59,6 +59,8 @@ OBJ_IGOR        equ 32                  ; ... and Igor
 OBJ_AKNIGHT     equ 33                  ; blocks 5-6: the axe knight
 OBJ_KAXE        equ 34                  ; ... its axe
 OBJ_GBAT        equ 35                  ; the giant bat (stage 16)
+OBJ_DEATH       equ 36                  ; stage 15's boss: Death
+OBJ_SICKLE      equ 37                  ; ... his sickles
 
 KIND_BRAZIER    equ 0
 KIND_CANDLE     equ 1
@@ -81,6 +83,7 @@ KIND_EAGLE      equ 17                  ; 28x28 box at +2, +2
 KIND_FRANK      equ 18                  ; candle list only: Frankenstein (and Igor)
 KIND_AKNIGHT    equ 19                  ; the axe knight: 12x28 box at +2, +2
 KIND_GBAT       equ 20                  ; the giant bat: 40x20 around its middle
+KIND_DEATH      equ 21                  ; Death: 24x44 around his middle
 
 ; object frame numbers (OBJ_FRAMES in tools/convert_objects.py)
 OBJF_BRAZIER    equ 0
@@ -132,6 +135,8 @@ OBJF_DHEAD      equ 121                 ; the bone dragon: skull, open, vertebra
 OBJF_FRANK      equ 124                 ; his walk 1-3 left, then right
 OBJF_AKNIGHT    equ 130                 ; the axe knight 1-2 left, then right
 OBJF_GBAT       equ 134                 ; the giant bat's two pictures
+OBJF_DEATH      equ 136                 ; Death facing left, right
+OBJF_SICKLE     equ 138                 ; a sickle's 4 pictures left, then right
 
 ITEM_WHIPUP     equ 0
 ITEM_HEART      equ 1
@@ -327,6 +332,8 @@ spawn_candle:
         cp KIND_MUMMY
         jr z,.allowed
         cp KIND_FRANK
+        jr z,.allowed
+        cp KIND_DEATH
         jr z,.allowed
 .placed:
         ld a,(enemies_off)
@@ -3305,9 +3312,9 @@ whip_hits_object:
         ld a,l
         add a,8
         ld l,a
-        jr nc,.box_x
+        jp nc,.box_x
         inc h
-        jr .box_x
+        jp .box_x
 .not_boss:
         cp KIND_MEDUSA                  ; Medusa: 28x28 around her middle
         jr nz,.not_medusa
@@ -3359,6 +3366,18 @@ whip_hits_object:
         pop de
         jr .box_x
 .not_gbat:
+        cp KIND_DEATH                   ; Death: 24x44 around his middle
+        jr nz,.not_death                ; (x + 8, top + 24)
+        ld de,23
+        ld bc,43*256 + 2
+        ld l,(ix+1)
+        ld h,(ix+2)
+        dec hl
+        dec hl
+        dec hl
+        dec hl
+        jp .box_x
+.not_death:
         cp KIND_CANDLE
         jr nz,.box_ready
         ld bc,15*256 + 8
@@ -3477,6 +3496,23 @@ draw_obj:
         jr z,.hidden
         cp OBJ_GBAT
         jr z,.hidden
+        cp OBJ_DEATH                    ; (until he appears)
+        jr nz,.not_death
+        ld a,(ix+9)
+        cp 3
+        ret c
+        jr .drawn
+.not_death:
+        cp OBJ_SICKLE                   ; (appearing: even frames only)
+        jr nz,.not_sickle
+        ld a,(ix+9)
+        or a
+        jr nz,.drawn
+        ld a,(frame_count)
+        rrca
+        ret c
+        jr .drawn
+.not_sickle:
         cp OBJ_MEDUSA                   ; asleep, Medusa is the statue in the
         jr nz,.drawn                    ; map: no sprites
 .hidden:

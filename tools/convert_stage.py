@@ -676,7 +676,7 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
 
     kinds = ["brazier", "candle", "panther", "?", "?", "boss", "knight", "hbat", "medusa",
              "flea", "skeleton", "pillar", "raven", "ghost", "mummy", "rskel", "dragon", "?", "frank",
-             "aknight", "gbat"]
+             "aknight", "gbat", "death"]
     print(f"area {index} {area['name']}: {width} px, tiles per band {params['tiles']}, "
           f"{params['lossy_rows']}/{params['total_rows']} tile rows reduced, "
           f"start ({sx},{sy}), {len(st)} stairs, {len(en)} enemy spawners {en}, {len(cl)} candles "

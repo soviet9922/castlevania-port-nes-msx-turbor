@@ -58,7 +58,9 @@ OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
               "rpile_l", "rhalf_l", "rpile_r", "rhalf_r",
               "dhead", "dhead2", "vert",
               "frank1_l", "frank2_l", "frank3_l", "frank1_r", "frank2_r", "frank3_r",
-              "aknight1_l", "aknight2_l", "aknight1_r", "aknight2_r", "gbat1", "gbat2"]
+              "aknight1_l", "aknight2_l", "aknight1_r", "aknight2_r", "gbat1", "gbat2",
+              "death_l", "death_r", "sickle1_l", "sickle2_l", "sickle3_l", "sickle4_l",
+              "sickle1_r", "sickle2_r", "sickle3_r", "sickle4_r"]
 
 # Black panther: 32x16, palette 3, art faces left (recorded in the hall).
 # Run cycle run1 -> run2 -> run3, 7 frames each; the leap shows run2.
@@ -84,6 +86,7 @@ KIND_FRANK = 18                 # stage 12's boss (record $5C: Frank $1C and Igo
 ENEMY_FRANK = 0x5C
 KIND_AKNIGHT, KIND_GBAT = 19, 20  # blocks 5-6: the axe knight ($4A, object $0A),
 ENEMY_AKNIGHT, ENEMY_GBAT = 0x4A, 0x5E  # the giant bat ($5E, object $1E)
+KIND_DEATH, ENEMY_DEATH = 21, 0x58  # stage 15's boss (record $58, object $18)
 ENEMY_RSKEL, ENEMY_DRAGON = 0x53, 0x54
 ENEMY_MUMMY = 0x5A
 ENEMY_MEDUSA_BOSS = 0x5B        # its enemy group record (object $1B)
@@ -303,6 +306,18 @@ FRAME_SPRITES["gbat1"] = _box([(0xD0, -24, -7, 3, 0), (0xD2, -16, -7, 3, 0), (0x
 FRAME_SPRITES["gbat2"] = _box([(0xD8, -16, -7, 3, 0), (0xDA, -8, -7, 3, 0), (0xDA, 0, -7, 3, 1),
                                (0xD8, 8, -7, 3, 1), (0xDC, -8, 9, 3, 0), (0xDC, 0, 9, 3, 1)], 8, 7)
 
+# Death ($C2: 40x48, palette 1, art facing left; from (middle - 8, middle - 24))
+# and his sickles ($C5-$C8: 16x16, palette 3; flips 1 = h, 2 = v, 3 = both)
+FRAME_SPRITES["death_l"] = [(0xD0, -4, 0, 1, 0), (0xD2, 4, 0, 1, 0), (0xD4, 12, 0, 1, 0),
+                            (0xD6, 20, 0, 1, 0), (0xD8, -4, 16, 1, 0), (0xDA, 4, 16, 1, 0),
+                            (0xDC, 12, 16, 1, 0), (0xDE, -12, 32, 1, 0), (0xF0, -4, 32, 1, 0),
+                            (0xF2, 4, 32, 1, 0), (0xF4, 12, 32, 1, 0)]
+FRAME_SPRITES["death_r"] = _mirror(FRAME_SPRITES["death_l"], 16)
+for _i, (_a, _b, _fl, _fr) in enumerate(((0xF8, 0xF6, 1, 0), (0xFC, 0xFA, 1, 0),
+                                         (0xF6, 0xF8, 2, 3), (0xFA, 0xFC, 2, 3))):
+    FRAME_SPRITES[f"sickle{_i + 1}_l"] = [(_a, 0, 0, 3, _fl), (_b, 8, 0, 3, _fl)]
+    FRAME_SPRITES[f"sickle{_i + 1}_r"] = [(_b, 0, 0, 3, _fr), (_a, 8, 0, 3, _fr)]
+
 ENEMY_ZOMBIE = 0x01             # spawner types in the enemy group records
 ENEMY_BAT = 0x02
 ENEMY_FISH = 0x03
@@ -388,6 +403,11 @@ def candles(rom, stage, section, level_px):
                 else:
                     out.append((cx - 8, cy - 56, ITEM_NONE, KIND_DRAGON))
             continue
+        if kind == ENEMY_DEATH:
+            # (his y is set by the engine: he appears at NES y 48)
+            cx = (chunk - 1) * 64 + rom.fixed(p + 1)
+            out.append((cx - 8, 0, ITEM_NONE, KIND_DEATH))
+            continue
         if kind in (ENEMY_AKNIGHT, ENEMY_GBAT):
             # the knight: 16x32 box (top = NES y - 64); the bat: 16x16 (- 57)
             cx, cy = (chunk - 1) * 64 + rom.fixed(p + 1), rom.fixed(p + 2)
@@ -442,6 +462,10 @@ ITEM_FRAMES = {ITEM_WHIPUP: "whipup", ITEM_HEART: "heart",
 # Frames to fold into another one when an area is over the pattern budget,
 # least visible loss first.
 FOLDS = [  # (the NES frames added last go first)
+         ("sickle1_r", "sickle1_l"), ("sickle2_r", "sickle2_l"),    # (one spin way)
+         ("sickle3_r", "sickle3_l"), ("sickle4_r", "sickle4_l"),
+         ("sickle3_l", "sickle1_l"), ("sickle4_l", "sickle2_l"),
+         ("sickle3_r", "sickle1_l"), ("sickle4_r", "sickle2_l"),
          ("aknight2_l", "aknight1_l"), ("aknight2_r", "aknight1_r"), ("gbat2", "gbat1"),
          ("frank3_l", "frank1_l"), ("frank3_r", "frank1_r"),
          ("flea2_l", "flea_l"), ("flea2_r", "flea_r"),
@@ -497,6 +521,8 @@ def needed_frames(candle_list, spawners, carried=()):
         elif kind == KIND_AKNIGHT:     # (its axe: Simon's axe pictures)
             need |= {n for n in OBJ_FRAMES if n.startswith("aknight")}
             need |= {"axe1", "axe2", "axe3", "axe4"}
+        elif kind == KIND_DEATH:
+            need |= {n for n in OBJ_FRAMES if n.startswith(("death", "sickle"))} | {"orb"}
         elif kind == KIND_GBAT:
             need |= {"gbat1", "gbat2", "fireball"}
         elif kind == KIND_DRAGON:
@@ -563,6 +589,15 @@ SWAP_PAIRS.append(
     [["rskel1_l", "rskel2_l", "rskel1_r", "rskel2_r", "rpile_l", "rhalf_l", "rpile_r",
       "rhalf_r", "dhead", "dhead2", "vert", "skel1_l", "skel2_l", "skel1_r", "skel2_r", "bone"],
      ["frank1_l", "frank2_l", "frank3_l", "frank1_r", "frank2_r", "frank3_r", "orb"]])
+# stage 15: the corridor's enemies until Death (every other enemy goes when he
+# is made)
+SWAP_PAIRS.append(
+    [["rskel1_l", "rskel2_l", "rskel1_r", "rskel2_r", "rpile_l", "rhalf_l", "rpile_r",
+      "rhalf_r", "aknight1_l", "aknight2_l", "aknight1_r", "aknight2_r",
+      "axe1", "axe2", "axe3", "axe4", "pillar", "pillar_r", "pillar_fl", "pillar_fr", "fireball",
+      "mhead1_l", "mhead2_l", "mhead1_r", "mhead2_r"],
+     ["death_l", "death_r", "sickle1_l", "sickle2_l", "sickle3_l", "sickle4_l",
+      "sickle1_r", "sickle2_r", "sickle3_r", "sickle4_r", "orb"]])
 SWAP_SETS = SWAP_PAIRS[0]           # (the pair an area uses: swap_sets(need))
 
 
