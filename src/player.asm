@@ -1064,9 +1064,20 @@ start_throw:
         ld a,(subweapon)
         or a
         ret z
-        ld a,(dagger_on)
-        or a
-        ret nz
+        push bc                         ; one more in the air than the extra
+        push de                         ; shots (NES $64: free slots 20 .. 20
+        call count_subs                 ; + $64)
+        pop de
+        pop bc
+        ld hl,shot_n
+        cp (hl)
+        jr z,.free
+        ret nc
+.free:
+        push ix                         ; (and an object slot for it: the
+        call obj_free_slot              ; port's 8 are shared with enemies)
+        pop ix
+        ret c
         ld a,(hearts)
         or a
         ret z
@@ -1113,6 +1124,8 @@ throw_dagger:
         jr z,.axe
         cp 3
         jp z,.holy
+        cp 5
+        jp z,.cross
         ld hl,(px)
         ld (ix+1),l
         ld (ix+2),h
@@ -1133,9 +1146,6 @@ throw_dagger:
         ld (ix+4),0
         ld (ix+7),KIND_BAT              ; (16x16; never hit by the whip)
         ld (ix+8),0xFF
-        ld a,1
-        ld (dagger_on),a
-        call dagger_box
 .none:
         pop ix
         ret
@@ -1177,9 +1187,33 @@ throw_dagger:
         ld (ix+8),0xFF
         ld (ix+10),0
         ld (ix+11),0
+        pop ix
+        ret
+.cross:                                 ; the cross: at the dagger's height,
+        ld hl,(px)                      ; 64 frames out at 2 px (cross_update)
+        ld (ix+1),l
+        ld (ix+2),h
+        ld a,(pyoff)
+        rrca
+        ld b,a
+        ld a,(py)
+        add a,b
+        ld (ix+3),a
+        ld (ix+0),OBJ_CROSS
+        ld a,(facing)
+        or a
         ld a,1
-        ld (dagger_on),a
-        call sub_box16
+        jr z,.cd
+        ld a,-1
+.cd:
+        ld (ix+5),a
+        ld (ix+4),64
+        ld (ix+6),OBJF_CROSS
+        ld (ix+7),KIND_BAT
+        ld (ix+8),0xFF
+        ld (ix+9),16
+        ld (ix+10),0
+        ld (ix+11),1
         pop ix
         ret
 

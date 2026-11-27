@@ -158,7 +158,7 @@ HUD_TILES = [
 # Sub-weapon icons for the HUD (16x16 = 4 tiles each: top left, top right,
 # bottom left, bottom right; white on black). Original placeholder art; the
 # converted build replaces them with the ROM's icons (tools/convert_stage.py).
-HUD_ICON_NAMES = ["DAGGER", "AXE", "HOLY", "WATCH"]
+HUD_ICON_NAMES = ["DAGGER", "AXE", "HOLY", "WATCH", "CROSS"]
 _ICON_ART = {
     "DAGGER": ["................"] * 6 + ["..x.............", "..xx.xxxxxxxxx..",
                "xxxxxxxxxxxxxxx.", "..xx.xxxxxxxxx..", "..x............."] + ["................"] * 5,
@@ -170,6 +170,10 @@ _ICON_ART = {
              "......xxxx......", ".....xxxxxx.....", "....xxxxxxxx....", "...xxxxxxxxxx...",
              "...xxxxxxxxxx...", "...xxxxxxxxxx...", "....xxxxxxxx....", ".....xxxxxx.....",
              "................", "................", "................", "................"],
+    "CROSS": ["................", "......xxxx......", ".....xx..xx.....", ".....x....x.....",
+              "..xxxx....xxxx..", ".xx..........xx.", ".x............x.", ".x............x.",
+              ".xx..........xx.", "..xxxx....xxxx..", ".....x....x.....", ".....x....x.....",
+              ".....x....x.....", ".....xx..xx.....", "......xxxx......", "................"],
     "WATCH": ["................", "......xxxx......", ".......xx.......", ".....xxxxxx.....",
               "...xxx....xxx...", "..xx..........xx", "..x.....x.....x.", ".x......x......x",
               ".x......xxxx...x", ".x.............x", "..x...........x.", "..xx........xx..",
@@ -191,6 +195,11 @@ def icon_tiles(art):
 for _name in HUD_ICON_NAMES:
     for _q, _rows in zip(("TL", "TR", "BL", "BR"), icon_tiles(_ICON_ART[_name])):
         HUD_TILES.append((f"I_{_name}_{_q}", _rows))
+# the double / triple shot's mark beside the icon (white on black)
+HUD_TILES.append(("SHOT2", ["11111111", "1f1f1111", "1f1f1111", "1f1f1111",
+                            "1f1f1111", "1f1f1111", "1f1f1111", "11111111"]))
+HUD_TILES.append(("SHOT3", ["11111111", "f1f1f111", "f1f1f111", "f1f1f111",
+                            "f1f1f111", "f1f1f111", "f1f1f111", "11111111"]))
 
 # ---------------------------------------------------------------------------
 # Player sprite: an original placeholder "hunter", 16x32, facing right.

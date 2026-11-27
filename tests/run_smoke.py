@@ -180,17 +180,15 @@ def tcl_script(syms, result_file):
                        if {{[peek {cur}] == 4}} {{
                            poke {px_a} [expr {{530 & 255}}]; poke {px_a + 1} [expr {{530 >> 8}}]
                            poke {py} 128; poke {py + 1} 0; set ::boss_hunt 1 }} }}
-    after time 67.6 {{ # asleep it can't be hurt: a flying dagger right on it
+    after time 67.6 {{ # asleep it can't be hurt: a dagger right on it (standing still)
                        for {{set i 0}} {{$i < 8}} {{incr i}} {{
                            set b [expr {{{objt} + $i*{obj_size}}}]
                            if {{[peek $b] == 10}} {{
                                set x [expr {{[peek [expr {{$b+1}}]] + 256*[peek [expr {{$b+2}}]] + 16}}]
-                               set d {syms["dagger_x1"]}
-                               poke $d [expr {{$x & 255}}]; poke [expr {{$d+1}}] [expr {{$x >> 8}}]
-                               poke [expr {{$d+2}}] [expr {{($x+16) & 255}}]; poke [expr {{$d+3}}] [expr {{($x+16) >> 8}}]
-                               poke [expr {{$d+4}}] [peek [expr {{$b+3}}]]; poke [expr {{$d+5}}] 0
-                               poke [expr {{$d+6}}] [expr {{[peek [expr {{$b+3}}]] + 16}}]; poke [expr {{$d+7}}] 0
-                               poke {syms["sub_kind"]} 1; poke {syms["dagger_on"]} 1
+                               set d [expr {{{objt} + 7*{obj_size}}}]
+                               poke [expr {{$d+1}}] [expr {{$x & 255}}]; poke [expr {{$d+2}}] [expr {{$x >> 8}}]
+                               poke [expr {{$d+3}}] [expr {{[peek [expr {{$b+3}}]] + 4}}]
+                               poke [expr {{$d+4}}] 0; poke [expr {{$d+5}}] 0; poke [expr {{$d+8}}] 255; poke $d 12
                            }}
                        }} }}
     after time 67.85 {{ set f [open "{result_file}" a]
@@ -200,7 +198,8 @@ def tcl_script(syms, result_file):
                             if {{[peek $b] == 10}} {{ set st [peek [expr {{$b+9}}]] }}
                         }}
                         puts $f "asleep_hit [peek {syms["boss_hp"]}] $st"; close $f
-                        poke {syms["dagger_on"]} 0 }}
+                        set d [expr {{{objt} + 7*{obj_size}}}]
+                        if {{[peek $d] == 12}} {{ poke $d 0 }} }}
     after time 67.9 {{ if {{[peek {cur}] == 4}} {{
                            poke {px_a} [expr {{711 & 255}}]; poke {px_a + 1} [expr {{711 >> 8}}]
                            poke {py} 64; poke {py + 1} 0 }} }}
@@ -238,15 +237,14 @@ def tcl_script(syms, result_file):
                        set x [expr {{[peek [expr {{$::bossb+1}}]] + 256*[peek [expr {{$::bossb+2}}]] + 16}}]
                        poke [expr {{$f+1}}] [expr {{$x & 255}}]; poke [expr {{$f+2}}] [expr {{$x >> 8}}]
                        poke [expr {{$f+3}}] [peek [expr {{$::bossb+3}}]]; poke [expr {{$f+4}}] 0
-                       poke [expr {{$f+11}}] 1; poke [expr {{$f+5}}] 1; poke $f 14
-                       poke {syms["sub_kind"]} 3; poke {syms["dagger_on"]} 1; poke {syms["holy_fire"]} 1
+                       poke [expr {{$f+11}}] 1; poke [expr {{$f+5}}] 1; poke [expr {{$f+8}}] 255; poke $f 14
                        }}
     after time 78.9 {{ # (from the frame after the fire took hold)
                        set ::stun0 "[peek [expr {{$::bossb+1}}]],[peek [expr {{$::bossb+3}}]],[peek {syms["boss_hp"]}]" }}
     after time 79.4 {{ set f [open "{result_file}" a]
                        puts $f "stun $::stun0 [peek [expr {{$::bossb+1}}]],[peek [expr {{$::bossb+3}}]],[peek {syms["boss_hp"]}]"
                        close $f
-                       set fo [expr {{{objt} + 7*{obj_size}}}]; poke $fo 0; poke {syms["dagger_on"]} 0; poke {syms["holy_fire"]} 0 }}
+                       set fo [expr {{{objt} + 7*{obj_size}}}]; poke $fo 0 }}
     after time 79.6 {{ {dump('27c_floor_end')}; set ::boss_floor 0
                        set f [open "{result_file}" a]; puts $f "floor_fires $::floor_fires"; close $f
                        # fireballs (NES): a hover ends with Simon's middle above

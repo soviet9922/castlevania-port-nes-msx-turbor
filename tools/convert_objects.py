@@ -66,7 +66,7 @@ OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
               "mon_fire_l", "mon_stand1_r", "mon_stand2_r", "mon_crouch_r", "mon_jump_r", "mon_high_r",
               "mon_land_r", "mon_fire_r", "debris",
               "bag100", "bag400", "bag700", "pork", "cross_item", "rosary", "potion",
-              "shot2", "shot3", "pop100", "pop400", "pop700"]
+              "shot2", "shot3", "pop100", "pop400", "pop700", "cross1", "cross2", "cross3"]
 
 # Black panther: 32x16, palette 3, art faces left (recorded in the hall).
 # Run cycle run1 -> run2 -> run3, 7 frames each; the leap shows run2.
@@ -143,6 +143,11 @@ FRAME_SPRITES = {
     "shot2": [(0xA5, 0, 8, 2, 0), (0xA7, 8, 8, 2, 0)],
     "shot3": [(0xA9, 0, 8, 3, 0), (0xAB, 8, 8, 3, 0)],
     "pop100": [(0xC9, 0, 8, 2, 0), (0xC5, 8, 8, 2, 0)],
+    # the flying cross (NES frames $27, $28, $29: a 9-frame spin, 3 frames
+    # each; facing left shows $28 and $29 the other way round)
+    "cross1": [(0x4A, 0, 0, 2, 0), (0x4A, 8, 0, 2, 1)],
+    "cross2": [(0x52, 0, 0, 2, 0), (0x54, 8, 0, 2, 0)],
+    "cross3": [(0x54, 0, 0, 2, 1), (0x52, 8, 0, 2, 1)],
     "pop400": [(0xCD, 0, 8, 2, 0), (0xC5, 8, 8, 2, 0)],
     "pop700": [(0xCF, 0, 8, 2, 0), (0xC5, 8, 8, 2, 0)],
     # zombie: 16x32 like Simon, palette 1; art faces left, flipped for right
@@ -567,7 +572,8 @@ FOLDS = [  # (least visible first: flickers and extra spin steps; the
 
 SUB_FRAMES = {ITEM_DAGGER: {"dagger_fly_r", "dagger_fly_l"},
               ITEM_AXE: {"axe1", "axe2", "axe3", "axe4"},
-              ITEM_HOLYWATER: {"bottle", "flame1", "flame2", "flame3", "flame4", "flame5"}}
+              ITEM_HOLYWATER: {"bottle", "flame1", "flame2", "flame3", "flame4", "flame5"},
+              ITEM_CROSS: {"cross1", "cross2", "cross3"}}
 
 
 def needed_frames(candle_list, spawners, carried=(), drops=()):
@@ -644,10 +650,11 @@ def needed_frames(candle_list, spawners, carried=(), drops=()):
 
 
 # the engine's sub-weapon numbers (src/ram.inc: subweapon) for the items
-SUB_OF_ITEM = {ITEM_DAGGER: 1, ITEM_AXE: 2, ITEM_HOLYWATER: 3}   # (stopwatch 4, cross 5)
+SUB_OF_ITEM = {ITEM_DAGGER: 1, ITEM_AXE: 2, ITEM_HOLYWATER: 3, ITEM_CROSS: 5}   # (stopwatch 4)
 SUB_SETS = {1: ["dagger_fly_r", "dagger_fly_l"],
             2: ["axe1", "axe2", "axe3", "axe4"],
-            3: ["bottle", "flame1", "flame2", "flame3", "flame4", "flame5"]}
+            3: ["bottle", "flame1", "flame2", "flame3", "flame4", "flame5"],
+            5: ["cross1", "cross2", "cross3"]}
 
 
 # frames that are never on screen together share one window of patterns: an

@@ -65,7 +65,11 @@
 - [x] Axe and holy water (from the candles that drop them)
 - [x] The stopwatch; the sub-weapon icon in the HUD; a heart instead of a
       sub-weapon already held
-- [ ] Morning star flashing; the cross; double and triple shots
+- [x] The cross (NES $DC6A: out 64 frames, slows, turns, comes back to be
+      caught; the screen's edge turns it); double and triple shots (ten
+      sub-weapon hits, then the next small heart; the HUD's II/III mark
+      blinks after a change); one hit box per flying sub-weapon
+- [ ] Morning star flashing
 - [x] Wall candles and small hearts; candles spawn by camera position like the NES
 - [x] The NES item drop rule ($EB8A: one power-up out at a time, a held
       sub-weapon becomes a small heart or a money bag), money bags with their

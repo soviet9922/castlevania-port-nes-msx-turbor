@@ -152,6 +152,7 @@ OBJF_ROSARY     equ 172
 OBJF_POTION     equ 173
 OBJF_SHOT       equ 174                 ; II, III
 OBJF_POP        equ 176                 ; score popups 100, 400, 700
+OBJF_CROSS      equ 179                 ; the flying cross: 3 spin frames
 
 ; items: the NES's obj_item codes ($EC16; a money bag's value in bits 4-5)
 ITEM_SMALLHEART equ 0x00                ; (as a candle's code: candle_item decides)
@@ -169,6 +170,7 @@ ITEM_POTION     equ 0x0E
 ITEM_STOPWATCH  equ 0x0F
 ITEM_NONE       equ 0xFF                ; burst of an enemy: nothing drops
 OBJ_POPUP       equ 40                  ; a money bag's score (32 frames)
+OBJ_CROSS       equ 41                  ; the flying cross (sub-weapon 5)
 
 SPAWN_LEFT      equ 16                  ; spawn when -16 <= box x - camera <= 272
 SPAWN_RIGHT     equ 272
@@ -479,6 +481,7 @@ obj_free_slot:
 
 objects_update:
         call item_effects               ; (the rosary, the potion)
+        call count_subs                 ; (for weapon_hits)
         ld ix,obj_table
         ld b,OBJ_MAX
 .lp:
@@ -585,6 +588,11 @@ objects_update:
         call snake_update
         jp .next
 .not_snake:
+        cp OBJ_CROSS
+        jr nz,.not_cross
+        call cross_update
+        jp .next
+.not_cross:
         cp OBJ_POPUP
         jr nz,.not_popup
         call popup_update
@@ -816,7 +824,7 @@ item_window_load:
         ld (sub_src),de
         ld a,(area_hdr+AH_ITEM_SLOT)
         push ix
-        call load_window
+        call load_window_far
         pop ix
         ret
 
@@ -1144,6 +1152,8 @@ item_collect:
         ld a,(ix+6)
         sub OBJF_SHOT-1
         ld (shot_n),a
+        ld a,128
+        ld (shot_blink),a
         ld a,SND_ITEM
         call sfx_play
         jr .hud
@@ -1195,6 +1205,7 @@ item_collect:
         xor a
         ld (shot_n),a
         ld (subhits),a
+        ld (shot_blink),a
         push ix
         call load_sub_patterns          ; its sprites into the window
         pop ix
@@ -1215,6 +1226,17 @@ popup_update:
 ; 30 frames the screen flashes and every enemy (not a boss) and enemy shot
 ; bursts, without points or items; the potion counts down every other frame.
 item_effects:
+        ld hl,shot_blink                ; the shot mark blinks (every 4 frames)
+        ld a,(hl)
+        or a
+        jr z,.no_blink
+        dec (hl)
+        ld a,(frame_count)
+        and 3
+        jr nz,.no_blink
+        inc a
+        ld (hud_dirty),a
+.no_blink:
         ld a,(frame_count)
         and 1
         ret nz
@@ -3333,9 +3355,6 @@ orb_update:
 ; thrown until it leaves the screen or hits something (weapon_hits).
 ; ---------------------------------------------------------------------------
 dagger_update:
-        ld a,(dagger_on)
-        or a
-        jr z,.gone                      ; spent on a hit
         ld a,(ix+5)
         ld e,a
         rla
@@ -3361,31 +3380,9 @@ dagger_update:
         ld de,256+16+1
         or a
         sbc hl,de
-        jr nc,.gone
-        jp dagger_box
+        ret c
 .gone:
-        xor a
-        ld (dagger_on),a
-        ld (ix+0),OBJ_NONE
-        ret
-
-; the dagger's hit box from its object (IX): x..x+15, y+4..y+11
-dagger_box:
-        ld l,(ix+1)
-        ld h,(ix+2)
-        ld (dagger_x1),hl
-        ld de,15
-        add hl,de
-        ld (dagger_x1+2),hl
-        ld a,(ix+3)
-        add a,4
-        ld l,a
-        ld h,0
-        ld (dagger_x1+4),hl
-        ld de,7
-        add hl,de
-        ld (dagger_x1+6),hl
-        ret
+        jp sub_gone
 
 
 ; ---------------------------------------------------------------------------
@@ -3418,6 +3415,11 @@ axe_update:
         ld (ix+9),a
         call obj_fall_step
         ld a,(ix+4)                     ; turning: frame (timer / 4) mod 4
+        and 15                          ; (its sound each turn, NES sound 9)
+        cp 1
+        ld a,SND_AXE
+        call z,sfx_play
+        ld a,(ix+4)
         rrca
         rrca
         and 3
@@ -3431,7 +3433,7 @@ axe_update:
 .on_screen:
         call sub_on_screen
         jp nc,sub_gone
-        jp sub_box16
+        ret
 
 ; Holy water (measured on the NES): the bottle is lobbed forward 3 px every
 ; 2 frames, up at HOLY_VY0/16 px per frame, gravity HOLY_GRAVITY/16; on the
@@ -3466,7 +3468,7 @@ holy_update:
         jp nc,sub_gone
         ld a,(ix+9)                     ; coming down onto the floor?
         or a
-        jp m,sub_box16
+        ret m
         ld l,(ix+1)
         ld h,(ix+2)
         ld de,8
@@ -3476,7 +3478,7 @@ holy_update:
         ld e,a
         ld d,0
         call solid_at
-        jp nc,sub_box16
+        ret nc
         ld a,(ix+3)                     ; it breaks: fire, standing on the tile
         add a,16                        ; (the flames are drawn 8 px down,
         and 0xF8                        ; like the bursts)
@@ -3487,11 +3489,9 @@ holy_update:
         ld a,SND_HOLY
         call sfx_play
 .burning:
-        ld a,1
-        ld (holy_fire),a
         ld a,(ix+4)
         cp HOLY_BURN
-        jr nc,sub_gone
+        jp nc,sub_gone
         rrca                            ; flames: (timer / 8) mod 5, NES order
         rrca
         rrca
@@ -3506,40 +3506,221 @@ holy_update:
         add hl,de
         ld a,(hl)
         ld (ix+6),a
-        call sub_box16                  ; the fire: 16x16 from y+8
-        ld hl,(dagger_x1+4)
-        ld de,8
-        add hl,de
-        ld (dagger_x1+4),hl
-        ld hl,(dagger_x1+6)
-        add hl,de
-        ld (dagger_x1+6),hl
         ret
 
 flame_frames:
         db OBJF_FLAME, OBJF_FLAME+1, OBJF_FLAME+2, OBJF_FLAME4, OBJF_FLAME4+1
 
+; ---------------------------------------------------------------------------
+; The cross (NES $DC6A): 2 px a frame for 64 frames, then it slows by 1/8 px
+; a frame, turns, speeds up again to 2 px and flies back; Simon catches it
+; as it passes him (|dx| < 8, |dy| < 16), else it flies off the screen. On the
+; way out, the screen's edge turns it at once. It spins every 9 frames (3
+; pictures of 3 frames) with NES sound 7.
+;   +4 frames left (state 1)  +5 direction (+1/-1)  +9 speed (1/8 px)
+;   +10 fraction  +11 state: 1 out, 2 slowing, 3 back and speeding up, 4 back
+; ---------------------------------------------------------------------------
+cross_update:
+        ld a,(ix+11)
+        cp 4
+        jp z,.back
+        cp 1
+        jr nz,.not_out
+        dec (ix+4)                      ; 1: out at 2 px
+        jr nz,.two
+        ld (ix+11),2
+.two:
+        ld a,2
+        jr .move
+.not_out:
+        cp 2
+        jr nz,.speeding
+        ld a,(ix+9)                     ; 2: slowing down
+        sub 1
+        jr nc,.speed
+        ld (ix+9),0                     ; stopped: it turns
+        ld a,(ix+5)
+        neg
+        ld (ix+5),a
+        ld (ix+11),3
+        jr .edge
+.speeding:
+        ld a,(ix+9)                     ; 3: back, faster and faster
+        inc a
+        cp 16
+        jr c,.speed
+        ld (ix+11),4                    ; (2 px again: state 4)
+        ld a,16
+.speed:
+        ld (ix+9),a
+        add a,(ix+10)                   ; pixels this frame: (speed + fraction) / 8
+        ld c,a
+        and 7
+        ld (ix+10),a
+        ld a,c
+        rrca
+        rrca
+        rrca
+        and 31
+.move:
+        call .step
+.edge:                                  ; states 1-3: the screen's edge
+        ld l,(ix+1)                     ; (NES: its middle at 8 / $F8)
+        ld h,(ix+2)
+        ld de,(cam_x)
+        or a
+        sbc hl,de
+        bit 7,h
+        jr nz,.left_edge
+        ld a,h
+        or a
+        jr nz,.right_edge
+        ld a,l
+        cp 0xF0
+        jr c,.anim
+.right_edge:
+        ld hl,0xF0
+        ld a,-1
+        jr .turn
+.left_edge:
+        ld hl,0
+        ld a,1
+.turn:
+        add hl,de
+        ld (ix+1),l
+        ld (ix+2),h
+        ld (ix+5),a
+        ld (ix+9),16
+        ld (ix+11),4
+        jr .anim
+.back:
+        ld a,2                          ; 4: back at 2 px
+        call .step
+        ld l,(ix+1)                     ; caught as it passes Simon
+        ld h,(ix+2)
+        ld de,(px)
+        or a
+        sbc hl,de
+        ld de,8
+        add hl,de
+        ld de,16
+        or a
+        sbc hl,de
+        jr nc,.not_caught               ; |dx| >= 8
+        ld a,(pyoff)                    ; (his throwing height)
+        rrca
+        ld b,a
+        ld a,(py)
+        add a,b
+        sub (ix+3)
+        add a,16
+        cp 32
+        jp c,sub_gone
+.not_caught:
+        call sub_on_screen
+        jp nc,sub_gone
+.anim:                                  ; (frame count mod 9) / 3; facing left
+        ld a,(frame_count)              ; the second and third the other way
+.mod9:
+        sub 9
+        jr nc,.mod9
+        add a,9
+        jr nz,.no_sound
+        push af
+        ld a,SND_CROSS
+        call sfx_play
+        pop af
+.no_sound:
+        ld c,0
+.div3:
+        sub 3
+        jr c,.pic
+        inc c
+        jr .div3
+.pic:
+        ld a,c
+        or a
+        jr z,.set
+        bit 7,(ix+5)
+        jr z,.set
+        xor 3                           ; 1 <-> 2
+.set:
+        add a,OBJF_CROSS
+        ld (ix+6),a
+        ret
+.step:                                  ; x += A along +5
+        bit 7,(ix+5)
+        jr z,.fwd
+        neg
+.fwd:
+        ld e,a
+        rla
+        sbc a,a
+        ld d,a
+        ld l,(ix+1)
+        ld h,(ix+2)
+        add hl,de
+        ld (ix+1),l
+        ld (ix+2),h
+        ret
+
 ; Carry if holy water's fire touches the object at IX (multi-hit enemies are
 ; held in it)
 in_holy_fire:
-        ld a,(holy_fire)
+        ld a,(sub_out)
         or a
         ret z
-        ld a,(dagger_on)
+        push iy
+        ld iy,obj_table
+        ld b,OBJ_MAX
+.lp:
+        ld a,(iy+0)
+        cp OBJ_HOLY
+        jr nz,.next
+        ld a,(iy+11)                    ; (burning, not flying)
         or a
-        ret z
-        ld hl,dagger_x1
-        ld de,hit_x1
-        ld bc,8
-        ldir
-        jp whip_hits_object
+        jr z,.next
+        push bc
+        call sub_box
+        ld (hit_src),a
+        call whip_hits_object
+        pop bc
+        jr c,.yes
+.next:
+        ld de,OBJ_SIZE
+        add iy,de
+        djnz .lp
+        pop iy
+        or a
+        ret
+.yes:
+        pop iy
+        ret
 
 ; the sub-weapon is gone
 sub_gone:
-        xor a
-        ld (dagger_on),a
-        ld (holy_fire),a
         ld (ix+0),OBJ_NONE
+        ret
+
+; -> A = (sub_out) = the sub-weapons flying (dagger, axe, holy water, cross)
+count_subs:
+        ld hl,obj_table
+        ld de,OBJ_SIZE
+        ld bc,OBJ_MAX*256
+.lp:
+        ld a,(hl)
+        cp OBJ_CROSS
+        jr z,.one
+        sub OBJ_DAGGER
+        cp OBJ_HOLY-OBJ_DAGGER+1
+        jr nc,.next
+.one:
+        inc c
+.next:
+        add hl,de
+        djnz .lp
+        ld a,c
+        ld (sub_out),a
         ret
 
 ; carry if the object (16 px wide) is still (partly) on the screen
@@ -3558,23 +3739,52 @@ sub_on_screen:
         sbc hl,de
         ret                             ; carry: on screen
 
-; the sub-weapon's hit box: the object's 16x16 (x..x+15, y..y+15)
-sub_box16:
-        ld l,(ix+1)
-        ld h,(ix+2)
-        ld (dagger_x1),hl
+; The hit box of the sub-weapon at IY into hit_x1..hit_y2: the dagger
+; x..x+15, y+4..y+11; holy water's fire 16x16 from y+8; the others 16x16.
+; -> A = its hit_src (1 dagger, 2 axe, 3 holy water, 5 cross)
+sub_box:
+        ld l,(iy+1)
+        ld h,(iy+2)
+        ld (hit_x1),hl
         ld de,15
         add hl,de
-        ld (dagger_x1+2),hl
-        ld l,(ix+3)
+        ld (hit_x2),hl
+        ld l,(iy+3)
         ld h,0
         bit 7,l
         jr z,.y
         dec h
 .y:
-        ld (dagger_x1+4),hl
+        ld a,(iy+0)
+        cp OBJ_DAGGER
+        jr nz,.not_dagger
+        ld e,4
+        add hl,de                       ; (D = 0)
+        ld (hit_y1),hl
+        ld e,7
         add hl,de
-        ld (dagger_x1+6),hl
+        ld (hit_y2),hl
+        ld a,1
+        ret
+.not_dagger:
+        cp OBJ_HOLY
+        jr nz,.square
+        ld a,(iy+11)
+        or a
+        jr z,.square
+        ld e,8
+        add hl,de
+.square:
+        ld (hit_y1),hl
+        ld e,15
+        add hl,de
+        ld (hit_y2),hl
+        ld a,(iy+0)
+        cp OBJ_CROSS
+        ld a,5
+        ret z
+        ld a,(iy+0)
+        sub OBJ_DAGGER-1                ; axe 2, holy water 3
         ret
 
 ; y += (+9) / 16 with the fraction in +10 (signed)
@@ -3659,39 +3869,65 @@ sway_table:
 ; Carry set if the whip's strike box overlaps the object's box.
 ; Boxes by kind: brazier/zombie 16x32 at y, wall candle 16x16 at y+8,
 ; panther 32x16 at y. (signed 16-bit compares: the whip can be left of x = 0)
-; Carry if the whip (while it can hit) or the flying dagger hits the object at
-; IX. A dagger that hits is spent.
+; Carry if the whip (while it can hit) or a flying sub-weapon hits the object
+; at IX (hit_src: what hit). A dagger that hits is spent; the axe, the cross
+; and holy water go on. Each sub-weapon hit counts towards the shot item
+; (NES $79).
 weapon_hits:
         xor a
         ld (hit_src),a
         ld a,(whip_active)
         or a
-        jr z,.dagger
+        jr z,.subs
         ld hl,whip_x1
-        call .try
-        ret c
-.dagger:
-        ld a,(dagger_on)
-        or a
-        ret z
-        ld hl,dagger_x1
-        call .try
-        ret nc
-        ld a,(sub_kind)
-        ld (hit_src),a
-        cp 1                            ; the dagger is spent; the axe and the
-                                        ; holy water's fire go on
-        jr nz,.pierce
-        xor a
-        ld (dagger_on),a
-.pierce:
-        scf
-        ret
-.try:
         ld de,hit_x1
         ld bc,8
         ldir
-        jp whip_hits_object
+        call whip_hits_object
+        ret c
+.subs:
+        ld a,(sub_out)
+        or a
+        ret z
+        push iy
+        ld iy,obj_table
+        ld b,OBJ_MAX
+.lp:
+        ld a,(iy+0)
+        cp OBJ_CROSS
+        jr z,.sub
+        sub OBJ_DAGGER
+        cp OBJ_HOLY-OBJ_DAGGER+1
+        jr nc,.next
+.sub:
+        push bc
+        call sub_box
+        ld (hit_src),a
+        call whip_hits_object
+        pop bc
+        jr c,.hit
+.next:
+        ld de,OBJ_SIZE
+        add iy,de
+        djnz .lp
+        xor a
+        ld (hit_src),a                  ; (no carry)
+        pop iy
+        ret
+.hit:
+        ld hl,subhits
+        inc (hl)
+        jr nz,.counted
+        dec (hl)                        ; (it stays at 255)
+.counted:
+        ld a,(hit_src)
+        dec a
+        jr nz,.pierce
+        ld (iy+0),OBJ_NONE              ; the dagger is spent
+.pierce:
+        pop iy
+        scf
+        ret
 
 ; A = the damage of the hit weapon_hits found, in the NES's units x 4
 ; ($E5E5: the whip 6 at level 0, 8 at levels 1-2; the dagger 6, the axe 8,
@@ -3708,13 +3944,13 @@ hit_damage:
         ret
 .sub:
         cp 1
-        ld a,24
+        ld a,24                         ; the dagger 6
         ret z
         ld a,(hit_src)
-        cp 2
-        ld a,32
+        cp 3
+        ld a,8                          ; holy water 2 a frame
         ret z
-        ld a,8
+        ld a,32                         ; the axe, the cross 8
         ret
 
 ; Carry if the box at hit_x1..hit_y2 overlaps the object at IX
@@ -4139,10 +4375,13 @@ objects_load_patterns:
         jp vram_r14_zero                ; (enables interrupts)
 
 ; The patterns of the sub-weapon Simon holds into the area's sub-weapon window
-; (both sprite pages): only one sub-weapon can be in the air, so the dagger,
-; the axe and holy water share these slots. Area load and pickups.
+; (both sprite pages): only the one Simon holds can be in the air, so the
+; dagger, the axe, holy water and the cross share these slots. Area load and
+; pickups.
 load_sub_patterns:
         ld a,(subweapon)
+        cp 5
+        jr z,.cross
         dec a
         cp 3
         ret nc                          ; none, or the stopwatch (no sprites)
@@ -4154,17 +4393,23 @@ load_sub_patterns:
         ld c,(hl)
         inc hl
         ld b,(hl)
-        ld a,b
-        or c
-        ret z                           ; not in this area
-        ld (sub_len),bc
         ld hl,area_hdr+AH_SUB_SPT
         add hl,de
         ld e,(hl)
         inc hl
         ld d,(hl)
+        jr .got
+.cross:
+        ld de,(area_hdr+AH_SUB5_SPT)
+        ld bc,(area_hdr+AH_SUB5_SZ)
+.got:
+        ld a,b
+        or c
+        ret z                           ; not in this area
+        ld (sub_len),bc
         ld (sub_src),de
         ld a,(area_hdr+AH_SUB_SLOT)
+        jp load_window_far
 load_window:                            ; (sub_src) bytes (sub_len) to pattern A
         ld (win_slot),a
         xor a
@@ -4220,16 +4465,24 @@ load_swap_patterns:                     ; A = the set (AH_SWAP_TAB)
         ret z
         ld (sub_len),bc
         ld (sub_src),de
-        ld a,(area_hdr+AH_SWAP_BANK)    ; (in a bank of their own: mapped
-        or a                            ; while they are copied; the sound
-        jr z,.here                      ; interrupt restores page2_bank)
+        ld a,(area_hdr+AH_SWAP_SLOT)
+; load_window from the area's far bank when it has one (AH_SWAP_BANK: its
+; window pictures in a bank of their own, mapped while they are copied; the
+; sound interrupt restores page2_bank)
+load_window_far:
+        ld b,a
+        ld a,(area_hdr+AH_SWAP_BANK)
+        or a
+        ld a,b
+        jp z,load_window
+        ld a,(area_hdr+AH_SWAP_BANK)
         di
         ld hl,page2_bank
         ld c,(hl)
         ld (hl),a
         ld (ASCII16_PAGE2),a
         push bc
-        ld a,(area_hdr+AH_SWAP_SLOT)
+        ld a,b
         call load_window
         pop bc
         di
@@ -4238,9 +4491,6 @@ load_swap_patterns:                     ; A = the set (AH_SWAP_TAB)
         ld (ASCII16_PAGE2),a
         ei
         ret
-.here:
-        ld a,(area_hdr+AH_SWAP_SLOT)
-        jp load_window
 
 ; ---------------------------------------------------------------------------
 ; HUD: hearts counter (row 1, columns 25-26), written during VBLANK
@@ -4384,6 +4634,28 @@ hud_update:
         inc a
         ld e,a
 .icon:
+        push bc
+        ld hl,HUD_ICON_ADDR+32-1        ; the double / triple shot's mark
+        call vram_set_write             ; (blinking after a change)
+        ld a,(shot_n)
+        or a
+        jr z,.no_mark
+        add a,HUDT_SHOT2-1
+        ld b,a
+        ld a,(shot_blink)
+        or a
+        jr z,.mark
+        ld a,(frame_count)
+        and 4
+        jr nz,.no_mark
+.mark:
+        ld a,b
+        jr .put_mark
+.no_mark:
+        ld a," "
+.put_mark:
+        out (VDP_DATA),a
+        pop bc
         ld hl,HUD_ICON_ADDR
         call vram_set_write
         ld a,b

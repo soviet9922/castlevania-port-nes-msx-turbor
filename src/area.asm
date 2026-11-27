@@ -61,8 +61,7 @@ load_area:
         xor a
         ld (cam_lock),a
         ld (freeze_t),a
-        ld (dagger_on),a
-        ld (holy_fire),a
+        ld (sub_out),a
         call objects_reset
         call crushers_reset
         ld a,(keep_player)

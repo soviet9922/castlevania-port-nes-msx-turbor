@@ -118,11 +118,10 @@ hit_x1          equ game_over_t+1       ; 8  box tested by whip_hits_object (x1 
 hit_x2          equ hit_x1+2
 hit_y1          equ hit_x1+4
 hit_y2          equ hit_x1+6
-dagger_x1       equ hit_x1+8            ; 8  the flying dagger's box, same layout
-dagger_on       equ dagger_x1+8         ; 1  a dagger is flying
-throwing        equ dagger_on+1         ; 1  this whip action throws the dagger
+sub_out         equ hit_x1+8            ; 1  sub-weapons flying (counted each frame)
+throwing        equ sub_out+1           ; 1  this whip action throws the sub-weapon
 thrown          equ throwing+1          ; 1  ... and it has left his hand
-sub_kind        equ thrown+1            ; 1  what is flying: 1 dagger, 2 axe, 3 holy water
+sub_kind        equ thrown+1            ; 1  what is thrown: 1 dagger, 2 axe, 3 holy water, 5 cross
 freeze_t        equ sub_kind+1          ; 1  stopwatch: frames the enemies stand still
 seq_kind        equ freeze_t+1          ; 1  exit sequence: 0 none, 1 gate, 2 door
 seq_phase       equ seq_kind+1          ; 1
@@ -136,8 +135,7 @@ door_dst        equ door_src+2          ; 2
 clip_l          equ door_dst+2          ; 1  gate: pattern masks for Simon's left
 clip_r          equ clip_l+1            ; 1  and right 8 columns
 clip_buf        equ clip_r+1            ; 32 a masked pattern
-holy_fire       equ clip_buf+32         ; 1  holy water's fire is burning
-sub_src         equ holy_fire+1         ; 2
+sub_src         equ clip_buf+32         ; 2
 sub_len         equ sub_src+2           ; 2
 win_slot        equ sub_len+2           ; window being loaded: first pattern
 swap_boss       equ win_slot+1          ; 1 = the boss's patterns are in the swap window
@@ -218,7 +216,8 @@ subhits         equ pwr_out+1           ; 1  sub-weapon hits since the last shot
 shot_n          equ subhits+1           ; 1  0 single, 1 double, 2 triple shot ($64)
 potion_t        equ shot_n+1            ; 1  invisible: frames / 2 left ($5B)
 rosary_t        equ potion_t+1          ; 1  rosary: frames / 2 left ($015D)
-RAM_END         equ rosary_t+1
+shot_blink      equ rosary_t+1          ; 1  the HUD's II/III mark blinks: frames left ($0141)
+RAM_END         equ shot_blink+1
         ASSERT RAM_END < 0xF380
         ASSERT RAM_END <= RAMCODE
 RAMCODE         equ 0xC400              ; code copied from ROM (src/ramcode.asm)

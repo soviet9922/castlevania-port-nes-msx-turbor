@@ -81,7 +81,9 @@ AH_SWAP_TAB     equ 98                  ; swap sets: table of (patterns, size) w
 AH_SWAP_BANK    equ 100                 ; ... the bank they are in (0: the area's)
 AH_ITEM_TAB     equ 101                 ; power-up pictures: (patterns, size) by code
 AH_ITEM_SLOT    equ 103                 ; ... their window's first pattern
-AH_SIZE         equ 104
+AH_SUB5_SPT     equ 104                 ; the cross's window patterns (sub-weapon 5)
+AH_SUB5_SZ      equ 106
+AH_SIZE         equ 108
 CRUSH_FIRST_ROW equ 8                   ; playfield rows the crushers rewrite (NES
 CRUSH_ROWS      equ 8                   ; nametable rows 14-21)
 CRUSH_MAX       equ 4

@@ -699,6 +699,7 @@ HUD_ICONS = [
     [(0xB7, 0, 1, 0), (0xB9, 8, 1, 0)],         # axe
     [(0xA1, 0, 2, 0), (0xA3, 8, 2, 0)],         # holy water
     [(0x89, 0, 2, 0), (0x8B, 8, 2, 0)],         # stopwatch
+    [(0x52, 0, 2, 0), (0x54, 8, 2, 0)],         # cross (its item's picture)
 ]
 HUD_ICON_FIRST = 4                  # HUD tile index of the first icon tile
 
