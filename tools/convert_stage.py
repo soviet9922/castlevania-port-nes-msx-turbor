@@ -617,7 +617,9 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
     en = [(x + x_off, y, t) for x, y, t in
           convert_objects.enemy_spawners(rom, area["stage"], area["section"], play_px)]
     objs = convert_objects.object_sprites(
-        rom, slot_for_nes, convert_objects.needed_frames(cl, en, carried), carried)
+        rom, slot_for_nes, convert_objects.needed_frames(
+            cl, en, carried, convert_objects.DROP_LISTS[convert_objects.drop_group(area["stage"])]),
+        carried)
     write_object_sprites(out_dir, index, objs)
     n_obj_patterns = objs.n_main
     convert_objects.write_candles(os.path.join(out_dir, "candles.bin"), cl)
@@ -645,6 +647,7 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
         walk_end, cam_end = 0, area.get("play_px", width)
     params.update(dir=f"area_{index}", obj_patterns=n_obj_patterns, subs=sorted(objs.subs),
                   sub_slot=objs.sub_slot, swaps=len(objs.swaps), swap_slot=objs.n_main,
+                  items=sorted(c for c, d in objs.items.items() if d), item_slot=objs.item_slot,
                   exit_x=area.get("exit_x"), exit_y=area.get("exit_y", 0xFF),
                   below=area.get("below", 0xFF), above=area.get("above", 0xFF),
                   respawn=area.get("respawn", index),
@@ -815,6 +818,9 @@ def write_object_sprites(out_dir, index, objs):
     for n, data in objs.subs.items():
         with open(os.path.join(out_dir, f"a{index}_sub{n}_spt.bin"), "wb") as f:
             f.write(data)
+    for n, data in objs.items.items():
+        with open(os.path.join(out_dir, f"a{index}_item{n}_spt.bin"), "wb") as f:
+            f.write(data)
     for n, data in enumerate(objs.swaps):
         with open(os.path.join(out_dir, f"a{index}_swap{n}_spt.bin"), "wb") as f:
             f.write(data)
@@ -882,6 +888,7 @@ def convert(rom_path, out_dir, nes_pal_path=None):
         width = nes_width(a)
         rom.chr_sets = cv_rom.BLOCK_CHR_SETS[a.get("block", 1)]
         items = {it for _, _, it, _ in convert_objects.candles(rom, a["stage"], a["section"], width)}
+        items |= set(convert_objects.DROP_LISTS[convert_objects.drop_group(a["stage"])])
         carried |= items & set(convert_objects.SUB_FRAMES)
         areas.append(convert_area(rom, a, i, out_dir, nes_rgb, simon_slots, carried))
     rom.chr_sets = cv_rom.BLOCK_CHR_SETS[1]

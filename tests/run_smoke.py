@@ -74,9 +74,9 @@ def tcl_script(syms, result_file):
     after time 14 {{ {dump('10_next_area_walk')}; keymatrixup 8 0x80
                        # first staircase of the area (if any): stand 6 px right of its foot
                        set sp [expr {{[peek {stairs}] + 256*[peek {stairs + 1}]}}]
-                       set ::nst [peek $sp]
+                       set ::nst [apeek $sp]
                        if {{$::nst > 0}} {{
-                           set fx [expr {{[peek [expr {{$sp+1}}]] + 256*[peek [expr {{$sp+2}}]] + 6}}]
+                           set fx [expr {{[apeek [expr {{$sp+1}}]] + 256*[apeek [expr {{$sp+2}}]] + 6}}]
                            poke {px_a} [expr {{$fx & 255}}]; poke {px_a + 1} [expr {{$fx >> 8}}]
                            set f [open "{result_file}" a]
                            puts $f "stair foot=[expr {{[peek [expr {{$sp+1}}]] + 256*[peek [expr {{$sp+2}}]]}}],[peek [expr {{$sp+3}}]] top=[expr {{[peek [expr {{$sp+4}}]] + 256*[peek [expr {{$sp+5}}]]}}],[peek [expr {{$sp+6}}]]"
@@ -100,12 +100,12 @@ def tcl_script(syms, result_file):
                        close $f
                        # a staircase that leads to the section below (foot off the playfield)
                        set sp [expr {{[peek {stairs}] + 256*[peek {stairs + 1}]}}]
-                       for {{set i 0}} {{$i < [peek $sp]}} {{incr i}} {{
+                       for {{set i 0}} {{$i < [apeek $sp]}} {{incr i}} {{
                            set r [expr {{$sp + 1 + 7*$i}}]
-                           if {{[peek [expr {{$r+2}}]] > 176 && [peek [expr {{$r+5}}]] < 176}} {{
-                               set x [expr {{[peek [expr {{$r+3}}]] + 256*[peek [expr {{$r+4}}]] + 4}}]
+                           if {{[apeek [expr {{$r+2}}]] > 176 && [apeek [expr {{$r+5}}]] < 176}} {{
+                               set x [expr {{[apeek [expr {{$r+3}}]] + 256*[apeek [expr {{$r+4}}]] + 4}}]
                                poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
-                               poke {py} [peek [expr {{$r+5}}]]; poke {py + 1} 0
+                               poke {py} [apeek [expr {{$r+5}}]]; poke {py + 1} 0
                                keymatrixdown 8 0x40
                                break
                            }}
@@ -119,12 +119,12 @@ def tcl_script(syms, result_file):
                        set f [open "{result_file}" a]; puts $f "bat $::bat_seen"; close $f
                        # back down into the waterway
                        set sp [expr {{[peek {stairs}] + 256*[peek {stairs + 1}]}}]
-                       for {{set i 0}} {{$i < [peek $sp]}} {{incr i}} {{
+                       for {{set i 0}} {{$i < [apeek $sp]}} {{incr i}} {{
                            set r [expr {{$sp + 1 + 7*$i}}]
-                           if {{[peek [expr {{$r+2}}]] > 176 && [peek [expr {{$r+5}}]] < 176}} {{
-                               set x [expr {{[peek [expr {{$r+3}}]] + 256*[peek [expr {{$r+4}}]] + 4}}]
+                           if {{[apeek [expr {{$r+2}}]] > 176 && [apeek [expr {{$r+5}}]] < 176}} {{
+                               set x [expr {{[apeek [expr {{$r+3}}]] + 256*[apeek [expr {{$r+4}}]] + 4}}]
                                poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
-                               poke {py} [peek [expr {{$r+5}}]]; poke {py + 1} 0
+                               poke {py} [apeek [expr {{$r+5}}]]; poke {py + 1} 0
                                keymatrixdown 8 0x40
                                break
                            }}
@@ -137,12 +137,12 @@ def tcl_script(syms, result_file):
                        set f [open "{result_file}" a]; puts $f "fish $::fish_seen"; close $f }}
     after time 54.8 {{ # up the stairs from the waterway (foot on the playfield, top off it)
                        set sp [expr {{[peek {stairs}] + 256*[peek {stairs + 1}]}}]
-                       for {{set i 0}} {{$i < [peek $sp]}} {{incr i}} {{
+                       for {{set i 0}} {{$i < [apeek $sp]}} {{incr i}} {{
                            set r [expr {{$sp + 1 + 7*$i}}]
-                           if {{[peek [expr {{$r+2}}]] < 176 && [peek [expr {{$r+5}}]] > 176}} {{
-                               set x [expr {{[peek $r] + 256*[peek [expr {{$r+1}}]] + 4}}]
+                           if {{[apeek [expr {{$r+2}}]] < 176 && [apeek [expr {{$r+5}}]] > 176}} {{
+                               set x [expr {{[apeek $r] + 256*[apeek [expr {{$r+1}}]] + 4}}]
                                poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
-                               poke {py} [peek [expr {{$r+2}}]]; poke {py + 1} 0
+                               poke {py} [apeek [expr {{$r+2}}]]; poke {py + 1} 0
                                keymatrixdown 8 0x20
                                break
                            }}
@@ -345,18 +345,18 @@ def tcl_script(syms, result_file):
     after time 110.5 {{ sub_report "watch_start" }}
     after time 112.1 {{ sub_report "watch_frozen"; poke {eoff} 3; {dump('35_stopwatch')} }}
     after time 114.1 {{ sub_report "watch_end"
-                       # the drop rule: an axe item while Simon holds the axe -> a heart
+                       # the drop rule: an axe item while Simon holds the axe -> a small heart or a money bag
                        poke {syms["subweapon"]} 2
                        set b [expr {{{objt} + 7*{obj_size}}}]
                        poke [expr {{$b+1}}] 100; poke [expr {{$b+2}}] 0; poke [expr {{$b+3}}] 60
-                       poke [expr {{$b+4}}] 0; poke [expr {{$b+5}}] 4; poke [expr {{$b+6}}] 2; poke $b 2 }}
+                       poke [expr {{$b+4}}] 0; poke [expr {{$b+5}}] 13; poke [expr {{$b+6}}] 2; poke $b 2 }}
     after time 114.7 {{ sub_report "drop_rule"
                        # an item from a candle above the playfield's top (y -8, as the
                        # hall's holy water candle): it must fall into view, not vanish
                        set b [expr {{{objt} + 6*{obj_size}}}]
                        set x [expr {{[peek {px_a}] + 256*[peek {px_a + 1}] + 60}}]
                        poke [expr {{$b+1}}] [expr {{$x & 255}}]; poke [expr {{$b+2}}] [expr {{$x >> 8}}]
-                       poke [expr {{$b+3}}] 248; poke [expr {{$b+4}}] 10; poke [expr {{$b+5}}] 5
+                       poke [expr {{$b+3}}] 248; poke [expr {{$b+4}}] 10; poke [expr {{$b+5}}] 11
                        poke [expr {{$b+6}}] 50; poke [expr {{$b+9}}] 0; poke $b 3 }}
     after time 115.5 {{ set b [expr {{{objt} + 6*{obj_size}}}]
                        set f [open "{result_file}" a]; puts $f "high_item [peek $b] [peek [expr {{$b+3}}]]"; close $f }}
@@ -466,6 +466,14 @@ def tcl_script(syms, result_file):
     # Times are relative to the moment the game's main loop is running.
     return f"""
 # normal speed: with "throttle off" openMSX skips rendering and screenshots are black
+# the area's data at 0x8000-0xBFFF, read from the ROM image: at any moment the
+# game may have another bank (Simon's frames, a swap set) at 0x8000
+proc apeek {{addr}} {{
+    if {{$addr < 0x8000 || $addr >= 0xC000}} {{ return [peek $addr] }}
+    set a [peek {syms["cur_area"]}]
+    set bank [expr {{$a < 6 ? $a + 1 : $a + 10}}]
+    return [debug read "{os.path.basename(ROM)}" [expr {{$bank * 0x4000 + $addr - 0x8000}}]]
+}}
 proc play {{}} {{
     set ::vbl_on 1
     after time 0.5 {{ {dump('01_boot')}; keymatrixdown 8 0x80 }}
@@ -580,11 +588,11 @@ proc panther_test {{}} {{
         if {{[peek $b] == 5}} {{ poke $b 0 }}
     }}
     set c [expr {{[peek {cand}] + 256*[peek {cand + 1}]}}]
-    set n [peek $c]
+    set n [apeek $c]
     for {{set i 0}} {{$i < $n}} {{incr i}} {{
         set r [expr {{$c + 1 + $i*5}}]
-        if {{[peek [expr {{$r+4}}]] == 2}} {{
-            set x [expr {{[peek $r] + 256*[peek [expr {{$r+1}}]] + 16 - 8 - 55}}]
+        if {{[apeek [expr {{$r+4}}]] == 2}} {{
+            set x [expr {{[apeek $r] + 256*[apeek [expr {{$r+1}}]] + 16 - 8 - 55}}]
             poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
             after time 0.5 [list panther_state $i]
             after time 0.05 {{ set ::hunting 1 }}
@@ -1326,8 +1334,8 @@ def run():
             and subs["watch_frozen"]["time"] == subs["watch_start"]["time"]),
            ("after about 3 seconds they move again",
             subs["watch_end"]["freeze"] == "0" and subs["watch_end"]["zx"] != subs["watch_frozen"]["zx"]),
-           ("a candle drops a heart instead of the sub-weapon Simon holds (NES)",
-            subs["drop_rule"]["item7"] == "3")]
+           ("a candle drops a small heart or a money bag instead of the sub-weapon Simon holds (NES)",
+            subs["drop_rule"]["item7"] in ("0", "1"))]
           if "drop_rule" in subs else []),
         *([("an item from a candle above the playfield's top falls into view (holy water)",
             high_item[0] == 3 and high_item[1] < 176)]

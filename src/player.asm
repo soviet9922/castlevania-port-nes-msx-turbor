@@ -124,6 +124,10 @@ restart_section_vars:
         xor a                           ; (NES: a death costs the whip upgrades
         ld (whip_level),a               ; and the sub-weapon)
         ld (subweapon),a
+        ld (shot_n),a
+        ld (subhits),a
+        ld (potion_t),a
+        ld (rosary_t),a
         ld a,HP_MAX
         ld (hp),a
         ld a,5
@@ -356,6 +360,9 @@ arc_jump:
 ; ---------------------------------------------------------------------------
 simon_hurt:
         ld a,(invuln_t)
+        or a
+        ret nz
+        ld a,(potion_t)                 ; (the potion: nothing hurts him)
         or a
         ret nz
         ld a,(hurt_state)
@@ -1248,7 +1255,8 @@ build_sat:
         ld (page2_bank),a               ; sound interrupt puts it back)
         ld (ASCII16_PAGE2),a
         ld a,(invuln_t)                 ; invincible: blink (not while flying back)
-        or a
+        ld hl,potion_t                  ; (or the potion)
+        or (hl)
         jr z,.no_blink
         ld a,(hurt_state)
         cp HURT_FLY

@@ -556,9 +556,10 @@ PLACEHOLDER_OBJECTS["dagger_fly_r"] = _DAGGER
 PLACEHOLDER_OBJECTS["dagger_fly_l"] = [r[::-1] for r in _DAGGER]
 PLACEHOLDER_SPAWNERS = [(900, 128)]     # one zombie spawner near the end
 # placeholder candles: (box x, box y, item id, kind) - see tools/convert_objects.py
-# item ids: 0 whip upgrade, 1 big heart, 2 dagger, 3 small heart; kind 0 brazier, 1 candle
-PLACEHOLDER_CANDLES = [(88, 128, 1, 0), (216, 128, 0, 0),     # braziers on the floor (y 160)
-                       (344, 96, 3, 1), (472, 96, 3, 1),       # wall candles
+# item ids are the NES codes: 0 small heart, 3 whip upgrade, 4 big heart, 8 dagger;
+# kind 0 brazier, 1 candle
+PLACEHOLDER_CANDLES = [(88, 128, 4, 0), (216, 128, 3, 0),     # braziers on the floor (y 160)
+                       (344, 96, 0, 1), (472, 96, 0, 1),       # wall candles
                        (376, 112, 0xFF, 2)]                    # panther on the platform
 
 

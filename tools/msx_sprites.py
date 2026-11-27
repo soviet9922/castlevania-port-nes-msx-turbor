@@ -58,7 +58,10 @@ class SpriteBank:
             self.colors.append(c)
         return self.col_index[c]
 
-    def add_frame(self, pixels, name=""):
+    def add_frame(self, pixels, name="", max_sprites=None):
+        """max_sprites: fewer than MAX_SPRITES: cells get one sprite (their
+        second colour merged into the first) until the frame fits"""
+        limit = MAX_SPRITES if max_sprites is None else max_sprites
         sprites = []    # (dy, dx, pattern, colour)
         body = {k: v for k, v in pixels.items() if isinstance(v, str)}
         plain = {k: v for k, v in pixels.items() if not isinstance(v, str)}
@@ -116,7 +119,7 @@ class SpriteBank:
         # over the limit: the cells whose second colour has the fewest pixels
         # get one sprite (their second colour's pixels drawn in the first's
         # colour; lines with only the second colour keep it)
-        extra = len(sprites) + sum(2 if c[4] else 1 for c in plain_cells) - MAX_SPRITES
+        extra = len(sprites) + sum(2 if c[4] else 1 for c in plain_cells) - limit
         for cell in sorted((c for c in plain_cells if c[4]), key=lambda c: len(c[4])):
             if extra <= 0:
                 break

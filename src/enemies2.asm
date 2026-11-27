@@ -1379,12 +1379,6 @@ enemy_killed:
         ld a,c
         cp 2
         jr z,.no_sub
-        ld hl,drop_idx
-        inc (hl)
-        ld a,(hl)
-        and 3
-        ld e,a
-        ld d,0
         ld hl,drops_lists               ; by the stage (BCD): 1-3, 4-6, 7-9,
         ld a,(area_hdr+AH_STAGE)        ; 10-12, 13-15, 16-18
         ld b,a
@@ -1404,9 +1398,30 @@ enemy_killed:
         inc hl
         inc hl
         jr .list
-.pick:
+.pick:                                  ; the next in the list (again if it is
+        push hl                         ; the sub-weapon Simon holds)
+.again:
+        ld hl,drop_idx
+        inc (hl)
+        ld a,(hl)
+        and 3
+        ld e,a
+        ld d,0
+        pop hl
+        push hl
         add hl,de
         ld a,(hl)
+        push af
+        call item_subweapon
+        jr z,.ok
+        ld hl,subweapon
+        cp (hl)
+        jr nz,.ok
+        pop af
+        jr .again
+.ok:
+        pop af
+        pop hl
         jr .set
 .no_sub:
         ld a,c
@@ -1427,14 +1442,13 @@ enemy_killed:
         ld (ix+4),0
         ld (ix+6),OBJF_BURST
         ret
-; the sub-weapon drops by block (NES $E137; the NES's items the port doesn't
-; have give a small heart)
-drops_13:       db ITEM_SMALLHEART, ITEM_SMALLHEART, ITEM_SMALLHEART, ITEM_SMALLHEART
-drops_46:       db ITEM_HOLYWATER, ITEM_SMALLHEART, ITEM_SMALLHEART, ITEM_SMALLHEART
-drops_79:       db ITEM_SMALLHEART, ITEM_SMALLHEART, ITEM_STOPWATCH, ITEM_SMALLHEART
-drops_1012:     db ITEM_SMALLHEART, ITEM_STOPWATCH, ITEM_AXE, ITEM_SMALLHEART
-drops_1315:     db ITEM_SMALLHEART, ITEM_STOPWATCH, ITEM_STOPWATCH, ITEM_DAGGER
-drops_1618:     db ITEM_SMALLHEART, ITEM_STOPWATCH, ITEM_SMALLHEART, ITEM_SMALLHEART
+; the random drops by stage group (NES $E143; code 0 goes through candle_item)
+drops_13:       db ITEM_ROSARY, ITEM_STOPWATCH, ITEM_HOLYWATER, 0
+drops_46:       db ITEM_HOLYWATER, ITEM_ROSARY, 0, ITEM_CROSS
+drops_79:       db ITEM_ROSARY, ITEM_ROSARY, ITEM_POTION, 0
+drops_1012:     db ITEM_ROSARY, ITEM_POTION, ITEM_AXE, 0
+drops_1315:     db 0, ITEM_STOPWATCH, ITEM_POTION, ITEM_DAGGER
+drops_1618:     db ITEM_CROSS, ITEM_STOPWATCH, ITEM_ROSARY, 0
 ; the last stage (BCD) of each list
 drops_lists:    db 0x03
                 dw drops_13

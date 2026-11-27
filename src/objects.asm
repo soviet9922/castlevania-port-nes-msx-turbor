@@ -145,15 +145,30 @@ OBJF_SICKLE     equ 138                 ; a sickle's 4 pictures left, then right
 OBJF_DRAC       equ 146                 ; Dracula: stand, cape, head left, then right
 OBJF_MON        equ 152                 ; the monster's 7 pictures left, then right
 OBJF_DEBRIS     equ 166
+OBJF_BAG        equ 167                 ; money bags 100, 400, 700
+OBJF_PORK       equ 170
+OBJF_CROSS_ITEM equ 171
+OBJF_ROSARY     equ 172
+OBJF_POTION     equ 173
+OBJF_SHOT       equ 174                 ; II, III
+OBJF_POP        equ 176                 ; score popups 100, 400, 700
 
-ITEM_WHIPUP     equ 0
-ITEM_HEART      equ 1
-ITEM_DAGGER     equ 2
-ITEM_SMALLHEART equ 3
-ITEM_AXE        equ 4
-ITEM_HOLYWATER  equ 5
-ITEM_STOPWATCH  equ 6
+; items: the NES's obj_item codes ($EC16; a money bag's value in bits 4-5)
+ITEM_SMALLHEART equ 0x00                ; (as a candle's code: candle_item decides)
+ITEM_BAG        equ 0x01                ; 100, 400 ($11), 700 ($21)
+ITEM_WHIPUP     equ 0x03
+ITEM_HEART      equ 0x04
+ITEM_PORK       equ 0x05
+ITEM_DAGGER     equ 0x08
+ITEM_CROSS      equ 0x09
+ITEM_ROSARY     equ 0x0A
+ITEM_HOLYWATER  equ 0x0B
+ITEM_SHOT       equ 0x0C                ; double / triple shot
+ITEM_AXE        equ 0x0D
+ITEM_POTION     equ 0x0E
+ITEM_STOPWATCH  equ 0x0F
 ITEM_NONE       equ 0xFF                ; burst of an enemy: nothing drops
+OBJ_POPUP       equ 40                  ; a money bag's score (32 frames)
 
 SPAWN_LEFT      equ 16                  ; spawn when -16 <= box x - camera <= 272
 SPAWN_RIGHT     equ 272
@@ -162,6 +177,8 @@ KEEP_RIGHT      equ 304
 
 ; Clear all objects and candle flags (area load / respawn).
 objects_reset:
+        xor a                           ; (no power-up item out now)
+        ld (pwr_out),a
         ld hl,obj_table
         ld de,obj_table+1
         ld bc,OBJ_MAX*OBJ_SIZE-1
@@ -461,6 +478,7 @@ obj_free_slot:
         ret
 
 objects_update:
+        call item_effects               ; (the rosary, the potion)
         ld ix,obj_table
         ld b,OBJ_MAX
 .lp:
@@ -567,6 +585,11 @@ objects_update:
         call snake_update
         jp .next
 .not_snake:
+        cp OBJ_POPUP
+        jr nz,.not_popup
+        call popup_update
+        jp .next
+.not_popup:
         cp OBJ_FLEA
         jr c,.not_block3
         call block3_update
@@ -643,104 +666,338 @@ burst_update:
         ld (ix+0),OBJ_NONE              ; an enemy's burst: gone
         ret
 .item:
-        call item_subweapon             ; the sub-weapon Simon already holds:
-        jr z,.not_held                  ; a heart instead (NES)
-        ld hl,subweapon
-        cp (hl)
-        jr nz,.not_held
-        ld (ix+5),ITEM_SMALLHEART
-.not_held:
+        call candle_item                ; what it really is (NES $EB8A)
         ld (ix+0),OBJ_ITEM              ; the item appears
-        ld (ix+4),0
-        ld (ix+9),0
-        ld e,(ix+5)
-        ld d,0
-        ld hl,item_frames
-        add hl,de
-        ld c,(hl)
+        xor a
+        ld (ix+4),a
+        ld (ix+9),a
+        ld (ix+10),a
+        ld (ix+11),a
+        call obj_ext_of
+        xor a
+        ld (hl),a
+        inc hl
+        ld (hl),a
+        ld a,(ix+5)
+        or a
+        jr nz,.not_small
+        ld (ix+10),0xE0                 ; the small heart: sideways 7/8 px
+.not_small:
+        ld a,(ix+5)                     ; a power-up: its picture into the item
+        call item_power_up              ; window (one is out at a time, NES $72)
+        call nz,item_window_load
+        call item_frame
+        ld c,a
 .frame:
         ld (ix+6),c
         ret
 
-; A = the sub-weapon number of item (IX+5), Z if it is not a sub-weapon
-item_subweapon:
+; What an item (IX+5, a candle's or an enemy's code) really is (NES $EB8A):
+; a money bag, the pork chop as they are; code 0 (or $0C) after 10 hits of
+; a sub-weapon: the double / triple shot; while a power-up item is out, or
+; the sub-weapon Simon holds: a small heart or the 100 bag at random; code
+; 0: a whip upgrade if hearts >= 8 and the whip below the morning star, or
+; 4-7 hearts and the leather whip, else at random.
+candle_item:
         ld a,(ix+5)
-        cp ITEM_DAGGER
-        jr z,.dagger
-        sub ITEM_AXE
-        jr c,.none
-        cp 3
-        jr nc,.none
-        add a,2                         ; axe 2, holy water 3, stopwatch 4
-        ret
-.dagger:
-        ld a,1
+        and 15
+        cp ITEM_BAG
+        ret z
+        cp ITEM_PORK
+        jr c,.not57
+        cp 8
+        ret c
+.not57:
+        ld a,(ix+5)
+        cp ITEM_SHOT
+        jr z,.shot
         or a
+        jr nz,.power
+        ld a,(subhits)
+        cp 10
+        jr c,.code0
+.shot:
+        xor a
+        ld (subhits),a
+        ld a,(shot_n)
+        cp 2
+        jr nc,.code0
+        ld (ix+5),ITEM_SHOT
         ret
-.none:
+.power:
+        ld a,(pwr_out)
+        or a
+        jr nz,.random
+        ld a,(ix+5)
+        call item_subweapon
+        jr z,.mark
+        ld hl,subweapon
+        cp (hl)
+        jr z,.random
+.mark:
+        ld a,0xFF
+        ld (pwr_out),a
+        ret
+.code0:
+        ld a,(pwr_out)
+        or a
+        jr nz,.random
+        ld a,(whip_level)
+        ld c,a
+        ld a,(hearts)
+        cp 8
+        jr c,.lt8
+        ld a,c
+        cp 2
+        jr c,.whip
+        jr .random
+.lt8:
+        cp 4
+        jr c,.random
+        ld a,c
+        or a
+        jr nz,.random
+.whip:
+        ld (ix+5),ITEM_WHIPUP
+        ld a,0xFF
+        ld (pwr_out),a
+        ret
+.random:
+        ld a,(rng)
+        and 1
+        ld (ix+5),a
+        ret
+
+; NZ if item code A is a power-up (codes 2-4, 8-$0F but the shot)
+item_power_up:
+        and 15
+        cp ITEM_SHOT
+        jr z,.no
+        cp 8
+        jr nc,.yes
+        cp 2
+        jr c,.no
+        cp ITEM_PORK
+        jr nc,.no
+.yes:
+        or 1
+        ret
+.no:
         xor a
         ret
 
-item_frames:
-        db OBJF_WHIPUP, OBJF_HEART, OBJF_DAGGER, OBJF_SMALLHEART, OBJF_AXE_ITEM, OBJF_HOLY_ITEM
-        db OBJF_WATCH_ITEM
-
-item_update:
-        inc (ix+4)
+; load the picture of power-up item (IX+5) into the item window
+item_window_load:
         ld a,(ix+5)
-        cp ITEM_SMALLHEART
-        jr z,.small_heart
-        ld a,(ix+4)
-        cp 5
-        jr c,.pickup                    ; hangs in the air for 4 frames
-        ld b,1
-        cp 8
-        jr c,.fall
-        inc b
-        jr .fall
+        and 15
+        ld c,a
+        ld hl,(area_hdr+AH_ITEM_TAB)
+.find:
+        ld a,(hl)
+        inc hl
+        cp 0xFF
+        ret z                   ; no picture of its own
+        cp c
+        jr z,.found
+        inc hl
+        inc hl
+        inc hl
+        inc hl
+        jr .find
+.found:
+        ld e,(hl)
+        inc hl
+        ld d,(hl)
+        inc hl
+        ld c,(hl)
+        inc hl
+        ld b,(hl)
+        ld (sub_len),bc
+        ld (sub_src),de
+        ld a,(area_hdr+AH_ITEM_SLOT)
+        push ix
+        call load_window
+        pop ix
+        ret
 
-.small_heart:                           ; 1/2 px per frame, swaying
-        call item_on_ground
-        jr c,.pickup
-        ld a,(ix+4)
-        and 0x7C
+; A = the picture of item (IX+5)
+item_frame:
+        ld a,(ix+5)
+        ld c,a
+        and 15
+        cp ITEM_BAG
+        jr nz,.table
+        ld a,c
         rrca
         rrca
+        rrca
+        rrca
+        and 3
+        add a,OBJF_BAG
+        ret
+.table:
+        cp ITEM_SHOT
+        jr nz,.t
+        ld a,(shot_n)
+        add a,OBJF_SHOT
+        ret
+.t:
         ld e,a
         ld d,0
-        ld hl,sway_table
+        ld hl,item_frames
         add hl,de
-        ld a,(hl)                       ; wanted offset
-        ld c,a
-        sub (ix+9)                      ; move by the difference
-        ld (ix+9),c
+        ld a,(hl)
+        ret
+
+; A = the port's sub-weapon number of NES item code A (1 dagger, 2 axe,
+; 3 holy water, 4 stopwatch, 5 cross), Z if it is not a sub-weapon
+item_subweapon:
+        ld hl,.map
+        ld b,5
+.lp:
+        cp (hl)
+        jr z,.found
+        inc hl
+        djnz .lp
+        xor a
+        ret
+.found:
+        ld a,6
+        sub b
+        or a
+        ret
+.map:   db ITEM_DAGGER, ITEM_AXE, ITEM_HOLYWATER, ITEM_STOPWATCH, ITEM_CROSS
+
+item_frames:                            ; by the code's low nibble
+        db OBJF_SMALLHEART, OBJF_BAG, OBJF_WHIPUP, OBJF_WHIPUP, OBJF_HEART, OBJF_PORK
+        db OBJF_ORB, OBJF_SMALLHEART, OBJF_DAGGER, OBJF_CROSS_ITEM, OBJF_ROSARY
+        db OBJF_HOLY_ITEM, OBJF_SHOT, OBJF_AXE_ITEM, OBJF_POTION, OBJF_WATCH_ITEM
+
+; An item (NES $DE1D): the small heart drifts down 1/2 px a frame on a
+; spring (7/8 px across at first, pulled back by its offset/256 a frame:
+; +-14 px, about 100 frames a swing) and can be taken from its 12th frame;
+; the others fall 1/4 px a frame faster each frame and can be taken from their
+; 2nd. On the floor they stay 180 frames (the rosary for good), then go.
+;   +4 frames  +9 the heart's offset / landed  +10, +11 speed (8.8)
+;   obj_ext: x fraction, y fraction
+item_update:
+        inc (ix+4)
+        jr nz,.t
+        dec (ix+4)                      ; (stays at 255)
+.t:
+        ld l,(ix+1)                     ; off the screen: gone
+        ld h,(ix+2)
+        ld de,(cam_x)
+        or a
+        sbc hl,de
+        ld de,8
+        add hl,de
+        ld a,h
+        or a
+        jp nz,.culled
+        ld a,(ix+5)
+        or a
+        jr nz,.other
+        ld a,(ix+9)                     ; small heart
+        cp 0x80
+        jp z,.lying
+        call item_on_ground
+        jp c,.landed
+        ld a,(ix+9)                     ; vx -= offset / 256
         ld e,a
         rla
         sbc a,a
         ld d,a
-        ld l,(ix+1)
-        ld h,(ix+2)
-        add hl,de
-        ld (ix+1),l
-        ld (ix+2),h
+        ld l,(ix+10)
+        ld h,(ix+11)
+        or a
+        sbc hl,de
+        ld (ix+10),l
+        ld (ix+11),h
+        call obj_ext_of                 ; x += vx
+        ld a,(hl)
+        add a,(ix+10)
+        ld (hl),a
+        ld a,(ix+11)
+        adc a,0
+        jr z,.ydrift
+        ld b,a
+        add a,(ix+9)
+        ld (ix+9),a
+        ld a,b
+        call move_x_a
+.ydrift:
+        call obj_ext_of                 ; y += 1/2
+        inc hl
+        ld a,(hl)
+        add a,0x80
+        ld (hl),a
+        jr nc,.take12
+        inc (ix+3)
+.take12:
         ld a,(ix+4)
-        and 1
+        cp 12
+        ret c
+        jr .pickup
+.other:
+        ld a,(ix+9)
+        or a
+        jr nz,.lying
+        call item_on_ground
+        jr c,.landed
+        ld l,(ix+10)                    ; vy += 1/4 (no cap)
+        ld h,(ix+11)
+        ld de,0x40
+        add hl,de
+        ld (ix+10),l
+        ld (ix+11),h
+        call obj_ext_of
+        inc hl
+        ld a,(hl)
+        add a,(ix+10)
+        ld (hl),a
+        ld a,(ix+11)
+        adc a,0
         jr z,.pickup
-        ld b,1
-
-.fall:                                  ; fall B pixels, one at a time
+        ld b,a
+.fall:                                  ; pixel by pixel onto the floor
         push bc
         call item_on_ground
         pop bc
-        jr c,.pickup                    ; resting on the ground
+        jr c,.landed
         inc (ix+3)
         ld a,(ix+3)
         cp MT_ROWS*16
         jr c,.in_view
-        cp 256-32                       ; (y 224-255: still above the top, from
-        jp c,.gone                      ; a candle high on a wall): else a pit
+        cp 256-32                       ; (above the top: from a candle high on
+        jp c,.culled                    ; a wall): else a pit
 .in_view:
         djnz .fall
+        jr .pickup
+.landed:
+        ld (ix+9),0x80
+        ld (ix+4),0
+        jr .pickup
+.lying:
+        ld a,(ix+5)
+        cp ITEM_ROSARY                  ; (the rosary stays)
+        jr z,.pickup
+        ld a,(ix+4)
+        cp 180
+        jr c,.pickup
+        ld a,(ix+5)                     ; gone (but bags, the pork chop and
+        call item_power                 ; the shot: another power-up may come)
+        jr z,.gone
+        xor a
+        ld (pwr_out),a
+        jr .gone
+.culled:
+        ld a,(ix+5)
+        cp 2
+        jr c,.gone
+        xor a
+        ld (pwr_out),a
+        jr .gone
 
 .pickup:                                ; Simon's box (px+3..px+12, py..py+31)
         ld hl,(px)                      ; vs item (x..x+15, y+8..y+23)
@@ -786,55 +1043,230 @@ item_update:
         sbc hl,de
         bit 7,h
         ret nz
+        jp item_collect
+.gone:
+        ld (ix+0),OBJ_NONE
+        ret
 
-        ld a,(ix+5)                     ; collected: hearts have their own
-        cp ITEM_HEART                   ; sound, the rest share one
-        ld b,SND_HEART
-        jr z,.snd
-        cp ITEM_SMALLHEART
-        jr z,.snd
-        ld b,SND_ITEM
-.snd:
-        ld a,b
-        call sfx_play
+; Z if item code A is a money bag, the pork chop or the double/triple shot
+; (going, they don't free the power-up rule)
+item_power:
+        and 15
+        cp ITEM_BAG
+        ret z
+        cp ITEM_PORK
+        ret z
+        cp ITEM_SHOT
+        ret
+; x += A (signed)
+move_x_a:
+        ld e,a
+        rla
+        sbc a,a
+        ld d,a
+        ld l,(ix+1)
+        ld h,(ix+2)
+        add hl,de
+        ld (ix+1),l
+        ld (ix+2),h
+        ret
+
+; Simon takes item IX (NES $E76E)
+item_collect:
+        ld (ix+0),OBJ_NONE
         ld a,(ix+5)
-        ld c,5
+        or a
+        jr nz,.not_small
+        ld c,1                          ; small heart: + 1
+        jr .hearts
+.not_small:
         cp ITEM_HEART
-        jr z,.add_hearts
-        ld c,1
-        cp ITEM_SMALLHEART
-        jr z,.add_hearts
+        jr nz,.not_big
+        xor a
+        ld (pwr_out),a
+        ld c,5                          ; big heart: + 5
+.hearts:
+        ld a,SND_HEART
+        call sfx_play
+        ld a,(hearts)
+        add a,c
+        cp 100
+        jr c,.h
+        ld a,99
+.h:
+        ld (hearts),a
+        jp .hud
+.not_big:
+        ld c,a
+        and 15
+        cp ITEM_BAG
+        jr nz,.not_bag
+        ld a,c                          ; a money bag: 100, 400, 700
+        rrca
+        rrca
+        rrca
+        rrca
+        and 3
+.bag:
+        push af
+        ld e,a
+        ld d,0
+        ld hl,bag_scores
+        add hl,de
+        ld a,(hl)
+        call add_score
+        ld hl,kills                     ; (not a kill)
+        dec (hl)
+        ld a,SND_MONEY
+        call sfx_play
+        pop af
+        add a,OBJF_POP                  ; its score shows 32 frames by Simon
+        ld (ix+6),a
+        ld (ix+0),OBJ_POPUP
+        ld (ix+4),32
+        ld hl,(px)
+        ld de,16
+        add hl,de
+        ld (ix+1),l
+        ld (ix+2),h
+        ld a,(py)
+        ld (ix+3),a
+        ld (ix+7),KIND_BAT
+        ret
+.not_bag:
+        cp ITEM_SHOT
+        jr nz,.not_shot
+        ld a,(subweapon)                ; double/triple shot: with a thrown
+        or a                            ; sub-weapon (else a 700 bag)
+        jr z,.shot_bag
+        cp 4
+        jr z,.shot_bag
+        ld a,(ix+6)
+        sub OBJF_SHOT-1
+        ld (shot_n),a
+        ld a,SND_ITEM
+        call sfx_play
+        jr .hud
+.shot_bag:
+        ld a,2
+        jr .bag
+.not_shot:
+        push af
+        ld a,SND_ITEM
+        call sfx_play
+        xor a
+        ld (pwr_out),a
+        pop af
         cp ITEM_WHIPUP
         jr nz,.not_whip
         ld a,(whip_level)
         cp 2
-        jr nc,.gone
+        jr nc,.hud
         inc a
         ld (whip_level),a
-        jr .gone
+        jr .hud
 .not_whip:
-        call item_subweapon             ; sub-weapons: dagger 1, axe 2, holy water 3,
-        jr z,.gone                      ; stopwatch 4
+        cp ITEM_PORK
+        jr nz,.not_pork
+        ld a,(hp)                       ; health + 24
+        add a,24
+        cp HP_MAX+1
+        jr c,.hp
+        ld a,HP_MAX
+.hp:
+        ld (hp),a
+        jr .hud
+.not_pork:
+        cp ITEM_ROSARY
+        jr nz,.not_rosary
+        ld a,15                         ; 30 frames: every enemy bursts
+        ld (rosary_t),a
+        ret
+.not_rosary:
+        cp ITEM_POTION
+        jr nz,.not_potion
+        ld a,180                        ; 360 frames: nothing hurts Simon
+        ld (potion_t),a
+        ret
+.not_potion:
+        call item_subweapon             ; a sub-weapon: dagger 1, axe 2, holy
+        ret z                           ; water 3, stopwatch 4, cross 5
         ld (subweapon),a
-        ld a,1
-        ld (hud_dirty),a
+        xor a
+        ld (shot_n),a
+        ld (subhits),a
         push ix
         call load_sub_patterns          ; its sprites into the window
         pop ix
-        jr .gone
-.add_hearts:
-        ld a,(hearts)
-        add a,c
-        cp 100
-        jr c,.hearts_ok
-        ld a,99
-.hearts_ok:
-        ld (hearts),a
+.hud:
         ld a,1
         ld (hud_dirty),a
-.gone:
+        ret
+bag_scores:     db 0x01, 0x04, 0x07
+
+; a money bag's score popup: 32 frames
+popup_update:
+        dec (ix+4)
+        ret nz
         ld (ix+0),OBJ_NONE
         ret
+
+; The rosary (NES $FA71) and the potion, each frame: every other frame for
+; 30 frames the screen flashes and every enemy (not a boss) and enemy shot
+; bursts, without points or items; the potion counts down every other frame.
+item_effects:
+        ld a,(frame_count)
+        and 1
+        ret nz
+        ld hl,potion_t
+        ld a,(hl)
+        or a
+        jr z,.no_potion
+        dec (hl)
+.no_potion:
+        ld hl,rosary_t
+        ld a,(hl)
+        or a
+        ret z
+        dec (hl)
+        ld b,15                         ; (the backdrop flashes white)
+        jr nz,.flash
+        ld b,0
+.flash:
+        di
+        ld a,b
+        out (VDP_CTRL),a
+        ld a,0x80|7
+        out (VDP_CTRL),a
+        ei
+        push ix
+        ld ix,obj_table
+        ld b,OBJ_MAX
+.lp:
+        ld a,(ix+0)
+        ld e,a
+        ld d,0
+        ld hl,rosary_kills
+        add hl,de
+        ld a,(hl)
+        or a
+        jr z,.next
+        ld (ix+0),OBJ_BURST
+        ld (ix+4),0
+        ld (ix+6),OBJF_BURST
+        ld (ix+5),ITEM_NONE
+.next:
+        ld de,OBJ_SIZE
+        add ix,de
+        djnz .lp
+        pop ix
+        ret
+; 1: an object type the rosary bursts (enemies and their shots; not bosses)
+rosary_kills:
+        db 0, 0, 0, 0, 0, 1, 1, 1, 1, 1         ; 0-9: zombie .. fireball
+        db 0, 0, 0, 0, 0, 1, 1, 1, 0, 1         ; 10-19: knight, head, bat, snake
+        db 1, 1, 1, 1, 1, 1, 0, 1, 1, 1         ; 20-29: flea .. ghost, bandage, eagle, red skeleton
+        db 1, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0      ; 30-40: dragon, axe knight, axe, giant bat, sickle
 
 ; ---------------------------------------------------------------------------
 ; Zombie (measured in the NES entrance hall): walks straight across at

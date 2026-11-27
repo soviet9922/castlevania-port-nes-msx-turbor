@@ -79,7 +79,9 @@ AH_CRUSHERS     equ 94                  ; ceiling crushers: count, then x, phase
 AH_CRUSH_VCOL   equ 96                  ; their hidden tile columns (4 per spike row)
 AH_SWAP_TAB     equ 98                  ; swap sets: table of (patterns, size) words
 AH_SWAP_BANK    equ 100                 ; ... the bank they are in (0: the area's)
-AH_SIZE         equ 101
+AH_ITEM_TAB     equ 101                 ; power-up pictures: (patterns, size) by code
+AH_ITEM_SLOT    equ 103                 ; ... their window's first pattern
+AH_SIZE         equ 104
 CRUSH_FIRST_ROW equ 8                   ; playfield rows the crushers rewrite (NES
 CRUSH_ROWS      equ 8                   ; nametable rows 14-21)
 CRUSH_MAX       equ 4

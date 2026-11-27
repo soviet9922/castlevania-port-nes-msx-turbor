@@ -95,6 +95,8 @@ def write(gen_dir, areas):
             f"        dw {p}crushers, {a.get('crush_vcol', 0)}",
             f"        dw {p}swap_tab",
             f"        db {'SWAP_BANK_%d' % i if i in swap_far else 0}",
+            f"        dw {p}item_tab",
+            f"        db {a.get('item_slot', 0)}",
             f'{p}palette: INCBIN "{d}/palette.bin"',
         ]
         for b in range(3):
@@ -113,6 +115,12 @@ def write(gen_dir, areas):
             *([] if i in swap_far else
               [line for n in range(a.get("swaps", 0))
                for line in (f'{p}swap{n}_spt: INCBIN "{d}/{p}swap{n}_spt.bin"', f"{p}swap{n}_end:")]),
+            f"{p}item_tab:                   ; (code, ptr, size) per power-up picture, 0xFF ends",
+            *[f"        db {c}\n        dw {p}item{c}_spt, {p}item{c}_end-{p}item{c}_spt"
+              for c in a.get("items", [])],
+            "        db 0xFF",
+            *[line for c in a.get("items", [])
+              for line in (f'{p}item{c}_spt: INCBIN "{d}/{p}item{c}_spt.bin"', f"{p}item{c}_end:")],
             f"{p}swap_tab:",
             *[f"        dw {p}swap{n}_spt, {p}swap{n}_end-{p}swap{n}_spt" for n in range(a.get("swaps", 0))],
             "        dw 0, 0",

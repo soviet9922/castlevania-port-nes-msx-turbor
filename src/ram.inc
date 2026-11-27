@@ -213,7 +213,12 @@ fall8           equ crouch_t+1          ; 1  frames falling at 8 px (crouched la
 anim_acc        equ fall8+1             ; 1  walk animation counter (+36 a frame)
 jump_skip       equ anim_acc+1          ; 1  the take-off frame: no y move yet
 stair_frz       equ jump_skip+1         ; 1  hit on the stairs: frozen frames
-RAM_END         equ stair_frz+1
+pwr_out         equ stair_frz+1         ; 1  a power-up item is out (NES $72)
+subhits         equ pwr_out+1           ; 1  sub-weapon hits since the last shot item ($79)
+shot_n          equ subhits+1           ; 1  0 single, 1 double, 2 triple shot ($64)
+potion_t        equ shot_n+1            ; 1  invisible: frames / 2 left ($5B)
+rosary_t        equ potion_t+1          ; 1  rosary: frames / 2 left ($015D)
+RAM_END         equ rosary_t+1
         ASSERT RAM_END < 0xF380
         ASSERT RAM_END <= RAMCODE
 RAMCODE         equ 0xC400              ; code copied from ROM (src/ramcode.asm)

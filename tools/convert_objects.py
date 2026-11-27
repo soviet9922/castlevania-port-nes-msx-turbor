@@ -64,7 +64,9 @@ OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
               "drac_stand_l", "drac_cape_l", "drac_head_l", "drac_stand_r", "drac_cape_r", "drac_head_r",
               "mon_stand1_l", "mon_stand2_l", "mon_crouch_l", "mon_jump_l", "mon_high_l", "mon_land_l",
               "mon_fire_l", "mon_stand1_r", "mon_stand2_r", "mon_crouch_r", "mon_jump_r", "mon_high_r",
-              "mon_land_r", "mon_fire_r", "debris"]
+              "mon_land_r", "mon_fire_r", "debris",
+              "bag100", "bag400", "bag700", "pork", "cross_item", "rosary", "potion",
+              "shot2", "shot3", "pop100", "pop400", "pop700"]
 
 # Black panther: 32x16, palette 3, art faces left (recorded in the hall).
 # Run cycle run1 -> run2 -> run3, 7 frames each; the leap shows run2.
@@ -100,8 +102,19 @@ ENEMY_KNIGHT = 0x48             # block 2: a spear knight (object $08)
 ENEMY_HBAT = 0x47               # block 2: a bat hanging until Simon comes (object $07)
 ITEM_NONE = 0xFF
 ENEMY_PANTHER = 0x51            # enemy group record type: a waiting black panther
-ITEM_WHIPUP, ITEM_HEART, ITEM_DAGGER, ITEM_SMALLHEART = 0, 1, 2, 3
-ITEM_AXE, ITEM_HOLYWATER, ITEM_STOPWATCH = 4, 5, 6
+# items: the NES's obj_item codes ($EC16; a candle record's code, resolved by
+# the engine's candle_item when the item appears: code 0 becomes a small heart,
+# a whip upgrade, a 100 money bag or the double/triple shot)
+ITEM_SMALLHEART, ITEM_BAG, ITEM_WHIPUP, ITEM_HEART, ITEM_PORK = 0x00, 0x01, 0x03, 0x04, 0x05
+ITEM_DAGGER, ITEM_CROSS, ITEM_ROSARY, ITEM_HOLYWATER = 0x08, 0x09, 0x0A, 0x0B
+ITEM_SHOT, ITEM_AXE, ITEM_POTION, ITEM_STOPWATCH = 0x0C, 0x0D, 0x0E, 0x0F
+# the random enemy drops by stage group (NES $E143: stages 1-3, 4-6, ... 16-18)
+DROP_LISTS = [[0x0A, 0x0F, 0x0B, 0x00], [0x0B, 0x0A, 0x00, 0x09], [0x0A, 0x0A, 0x0E, 0x00],
+              [0x0A, 0x0E, 0x0D, 0x00], [0x00, 0x0F, 0x0E, 0x08], [0x09, 0x0F, 0x0A, 0x00]]
+
+
+def drop_group(stage):
+    return 0 if stage <= 3 else (stage - 1) // 3
 
 # frame: list of (tile, dx, dy, palette, hflip) relative to the object's
 # 16x32 box top-left (box = brazier: flame on top, bowl below)
@@ -118,6 +131,20 @@ FRAME_SPRITES = {
     "candle1": [(0x40, 4, 8, 3, 0)],
     "candle2": [(0x50, 4, 8, 3, 0)],
     "smallheart": [(0x9F, 4, 8, 3, 0)],
+    # (NES frames $49 the money bag in palette 3/1/2 by its value, $4B, $28,
+    # $72, $2C, $51, $52; the score popups $5F, $61, $62)
+    "bag100": [(0x60, 0, 8, 3, 0), (0x62, 8, 8, 3, 0)],
+    "bag400": [(0x60, 0, 8, 1, 0), (0x62, 8, 8, 1, 0)],
+    "bag700": [(0x60, 0, 8, 2, 0), (0x62, 8, 8, 2, 0)],
+    "pork": [(0x64, 0, 8, 3, 0), (0x66, 8, 8, 3, 0)],
+    "cross_item": [(0x52, 0, 8, 2, 0), (0x54, 8, 8, 2, 0)],
+    "rosary": [(0xAD, 0, 8, 2, 0), (0xAF, 8, 8, 2, 0)],
+    "potion": [(0x42, 0, 8, 0, 0), (0x44, 8, 8, 0, 0)],
+    "shot2": [(0xA5, 0, 8, 2, 0), (0xA7, 8, 8, 2, 0)],
+    "shot3": [(0xA9, 0, 8, 3, 0), (0xAB, 8, 8, 3, 0)],
+    "pop100": [(0xC9, 0, 8, 2, 0), (0xC5, 8, 8, 2, 0)],
+    "pop400": [(0xCD, 0, 8, 2, 0), (0xC5, 8, 8, 2, 0)],
+    "pop700": [(0xCF, 0, 8, 2, 0), (0xC5, 8, 8, 2, 0)],
     # zombie: 16x32 like Simon, palette 1; art faces left, flipped for right
     "zombie_l1": [(0x80, 0, 0, 1, 0), (0x82, 8, 0, 1, 0), (0x88, 0, 16, 1, 0), (0x8A, 8, 16, 1, 0)],
     "zombie_l2": [(0x80, 0, 0, 1, 0), (0x82, 8, 0, 1, 0), (0x84, 0, 16, 1, 0), (0x86, 8, 16, 1, 0)],
@@ -377,21 +404,7 @@ def candles(rom, stage, section, level_px):
         wx = (chunk - 1) * 64 + x
         if not 8 <= wx < level_px - 8:
             continue
-        if code == 4:
-            item = ITEM_HEART
-        elif code == 8:
-            item = ITEM_DAGGER
-        elif code == 0x0D:              # the axe (NES: item $18)
-            item = ITEM_AXE
-        elif code == 0x0B:              # holy water (NES: item $44)
-            item = ITEM_HOLYWATER
-        elif code in (0x0E, 0x0F):      # the stopwatch (NES: items $45, $46)
-            item = ITEM_STOPWATCH
-        elif code == 0 and kind == KIND_BRAZIER:
-            item = ITEM_WHIPUP
-        else:
-            item = ITEM_SMALLHEART
-        out.append((wx - 8, y - 64, item, kind))
+        out.append((wx - 8, y - 64, code, kind))     # (the NES's code as it is)
 
     # black panthers are single placed enemies: spawned like candles
     for chunk in range(level_px // 64 + 2):
@@ -487,9 +500,22 @@ def candles(rom, stage, section, level_px):
 # Hardware limit: 64 sprite patterns, the first 12 streamed for Simon.
 MAX_OBJ_PATTERNS = 64 - 12
 
-ITEM_FRAMES = {ITEM_WHIPUP: "whipup", ITEM_HEART: "heart",
-               ITEM_DAGGER: "dagger", ITEM_SMALLHEART: "smallheart",
-               ITEM_AXE: "axe_item", ITEM_HOLYWATER: "holy_item", ITEM_STOPWATCH: "watch_item"}
+def item_frames(code, thrown=False):
+    """the pictures an item code can end up as (the engine's candle_item: any
+    item may become a small heart or the 100 bag; code 0 a whip upgrade or,
+    with a thrown sub-weapon held, the double/triple shot)"""
+    need = {"smallheart", "bag100", "pop100"}
+    kind = code & 15
+    if kind == 0:
+        need |= {"whipup"} | ({"shot2", "shot3", "bag700", "pop700"} if thrown else set())
+    elif kind == ITEM_BAG:
+        need |= {("bag100", "bag400", "bag700")[code >> 4 & 3], ("pop100", "pop400", "pop700")[code >> 4 & 3]}
+    else:
+        need |= {ITEM_WHIPUP: {"whipup"}, ITEM_HEART: {"heart"}, ITEM_PORK: {"pork"},
+                 ITEM_DAGGER: {"dagger"}, ITEM_CROSS: {"cross_item"}, ITEM_ROSARY: {"rosary"},
+                 ITEM_HOLYWATER: {"holy_item"}, ITEM_AXE: {"axe_item"}, ITEM_POTION: {"potion"},
+                 ITEM_STOPWATCH: {"watch_item"}}.get(kind, set())
+    return need
 
 # Frames to fold into another one when an area is over the pattern budget,
 # least visible loss first.
@@ -500,6 +526,11 @@ FOLDS = [  # (least visible first: flickers and extra spin steps; the
          ("axe3", "axe1"), ("axe4", "axe2"),
          ("flame3", "flame1"), ("flame2", "flame1"), ("flame4", "flame1"), ("axe2", "axe1"),
          ("panther_sit_r", "panther_sit_l"),
+         # (items drawn in one colour: one pattern instead of two)
+         ("watch_item", "mono"), ("rosary", "mono"), ("potion", "mono"), ("shot2", "mono"),
+         ("holy_item", "mono"), ("axe_item", "mono"), ("cross_item", "mono"), ("pork", "mono"),
+         ("dagger", "mono"), ("bag100", "mono"), ("whipup", "mono"), ("heart", "mono"),
+         ("bag400", "bag100"), ("bag700", "bag100"), ("shot3", "shot2"),   # (colours)
          ("sickle1_r", "sickle1_l"), ("sickle2_r", "sickle2_l"),    # (one spin way)
          ("sickle3_r", "sickle3_l"), ("sickle4_r", "sickle4_l"),
          ("sickle3_l", "sickle1_l"), ("sickle4_l", "sickle2_l"),
@@ -513,6 +544,7 @@ FOLDS = [  # (least visible first: flickers and extra spin steps; the
          ("fish_walk2_l", "fish_walk1_l"), ("fish_walk2_r", "fish_walk1_r"),
          ("panther_run3_l", "panther_run1_l"), ("panther_run3_r", "panther_run1_r"),
          ("zombie_l2", "zombie_l1"), ("zombie_r2", "zombie_r1"),
+         ("pop700", "pop400"), ("pop400", "pop100"), ("pop700", "pop100"),
          ("aknight2_l", "aknight1_l"), ("aknight2_r", "aknight1_r"),
          ("frank3_l", "frank1_l"), ("frank3_r", "frank1_r"),
          ("rskel2_l", "rskel1_l"), ("rskel2_r", "rskel1_r"),
@@ -522,7 +554,15 @@ FOLDS = [  # (least visible first: flickers and extra spin steps; the
          ("mummy_fl", "mummy_l"), ("mummy_fr", "mummy_r"),
          ("mummy3_l", "mummy_l"), ("mummy3_r", "mummy_r"),
          ("mummy2_l", "mummy_l"), ("mummy2_r", "mummy_r"),
-         ("mummy_r", "mummy_l")]
+         ("mummy_r", "mummy_l"),
+         ("panther_run2_l", "panther_run1_l"), ("panther_run2_r", "panther_run1_r"),
+         ("raven2_l", "raven1_l"), ("raven2_r", "raven1_r"),
+         ("bat3_l", "bat1_l"), ("bat3_r", "bat1_r"),
+         ("fish_shoot_l", "fish_walk1_l"), ("fish_shoot_r", "fish_walk1_r"),
+         ("dhead2", "dhead"), ("frank2_l", "frank1_l"), ("frank2_r", "frank1_r"),
+         ("aknight1_l", "mono"), ("aknight1_r", "mono"),
+         # (last: the score popups aren't drawn; the score is still added)
+         ("pop100", None), ("pop400", None), ("pop700", None)]
 
 
 SUB_FRAMES = {ITEM_DAGGER: {"dagger_fly_r", "dagger_fly_l"},
@@ -530,10 +570,16 @@ SUB_FRAMES = {ITEM_DAGGER: {"dagger_fly_r", "dagger_fly_l"},
               ITEM_HOLYWATER: {"bottle", "flame1", "flame2", "flame3", "flame4", "flame5"}}
 
 
-def needed_frames(candle_list, spawners, carried=()):
+def needed_frames(candle_list, spawners, carried=(), drops=()):
     """-> set of frame names an area can show (others are left empty).
-    carried: the sub-weapon items Simon can have picked up by now."""
+    carried: the sub-weapon items Simon can have picked up by now; drops: the
+    stage group's random enemy drops."""
     need = {"burst1", "burst2", "burst3", "burst4"}
+    thrown = any(c in carried for c in (ITEM_DAGGER, ITEM_CROSS, ITEM_HOLYWATER, ITEM_AXE))
+    if any(k > 1 for *_, k in candle_list) or spawners:     # (enemies: their drops)
+        need |= item_frames(0, thrown) | item_frames(ITEM_HEART)
+        for code in drops:
+            need |= item_frames(code, thrown)
     for _, _, item, kind in candle_list:
         if kind == KIND_BRAZIER:
             need |= {"brazier1", "brazier2"}
@@ -578,8 +624,8 @@ def needed_frames(candle_list, spawners, carried=()):
             need |= {n for n in OBJ_FRAMES if n.startswith("hbat")}
         else:
             need |= {n for n in OBJ_FRAMES if n.startswith("panther")}
-        if item in ITEM_FRAMES:
-            need.add(ITEM_FRAMES[item])
+        if kind in (KIND_BRAZIER, KIND_CANDLE) and item != ITEM_NONE:
+            need |= item_frames(item, thrown)
     # (the flying sub-weapons' frames are not here: only the one Simon holds
     # needs patterns, and it gets a window of its own, see object_sprites)
     kinds = {k for _, _, k in spawners}
@@ -598,7 +644,7 @@ def needed_frames(candle_list, spawners, carried=()):
 
 
 # the engine's sub-weapon numbers (src/ram.inc: subweapon) for the items
-SUB_OF_ITEM = {ITEM_DAGGER: 1, ITEM_AXE: 2, ITEM_HOLYWATER: 3}
+SUB_OF_ITEM = {ITEM_DAGGER: 1, ITEM_AXE: 2, ITEM_HOLYWATER: 3}   # (stopwatch 4, cross 5)
 SUB_SETS = {1: ["dagger_fly_r", "dagger_fly_l"],
             2: ["axe1", "axe2", "axe3", "axe4"],
             3: ["bottle", "flame1", "flame2", "flame3", "flame4", "flame5"]}
@@ -660,10 +706,15 @@ class ObjectSprites:
     one can be in the air), loaded when the area starts or the sub-weapon
     changes: subs[n] = that sub-weapon's patterns (numbered from n_main)."""
     def __init__(self, main_spt, sct, frames, offsets, subs, n_main, window,
-                 swaps=None, swap_window=0):
+                 swaps=None, swap_window=0, items=None, item_window=0):
         self.main_spt, self.sct, self.frames, self.offsets = main_spt, sct, frames, offsets
         self.subs, self.n_main, self.window = subs, n_main, window
         self.swaps, self.swap_window = swaps or [], swap_window   # SWAP_SETS' patterns
+        self.items, self.item_window = items or {}, item_window   # power-up pictures
+
+    @property
+    def item_slot(self):
+        return self.n_main + self.swap_window + self.window
 
     @property
     def sub_slot(self):
@@ -675,15 +726,27 @@ def object_sprites(rom, slot_for_nes, need, carried_items):
     sub-weapons' frames in the window; FOLDS applied until it all fits."""
     subs = sorted({SUB_OF_ITEM[i] for i in carried_items if i in SUB_OF_ITEM})
     alias = {}
-    for drop, keep in [(None, None)] + FOLDS:
-        if drop is not None and (drop in need or any(drop in SUB_SETS[n] for n in subs)):
+    need = set(need)
+    mono = set()                        # pictures drawn in one colour
+    # (after the folds: whatever is left in one colour, one frame at a time)
+    for drop, keep in [(None, None)] + FOLDS + [(n, "mono") for n in reversed(OBJ_FRAMES)]:
+        if keep == "mono" and drop not in need:
+            continue
+        if keep is None and drop in need:
+            need.discard(drop)          # (not drawn at all)
+        elif keep == "mono":
+            mono.add(drop)
+        elif drop is not None and (drop in need or any(drop in SUB_SETS[n] for n in subs)):
             alias[drop] = keep
+        alias["__mono__"] = mono
         result = _object_sprites(rom, slot_for_nes, need, subs, alias)
-        if result.sub_slot + result.window <= MAX_OBJ_PATTERNS:
+        if result.item_slot + result.item_window <= MAX_OBJ_PATTERNS:
             if alias:
-                print("  object frames folded to fit:", ", ".join(f"{a}->{b}" for a, b in alias.items()))
+                print("  object frames folded to fit:", ", ".join(f"{a}->{b}" for a, b in alias.items()
+                                                                  if a != "__mono__"),
+                      "; in one colour:", ", ".join(sorted(alias.get("__mono__", ()))))
             return result
-    raise SystemExit(f"object sprites need {result.sub_slot} + {result.window} patterns, "
+    raise SystemExit(f"object sprites need {result.item_slot} + {result.item_window} patterns, "
                      f"only {MAX_OBJ_PATTERNS} available")
 
 
@@ -696,9 +759,9 @@ def _object_sprites(rom, slot_for_nes, need, subs, alias):
     swapping = pair is not None
     swapped = {n for group in pair for n in group} if swapping else set()
     for name in OBJ_FRAMES:
-        if name in need and name not in swapped:
-            per_frame[name] = (main, main.add_frame(_pixels(chr_ram, pals, alias.get(name, name),
-                                                            slot_for_nes), name))
+        if name in need and name not in swapped and name not in POWER_ITEM_FRAMES:
+            per_frame[name] = (main, main.add_frame(_pixels(chr_ram, pals, _src(alias, name),
+                                                            slot_for_nes), name, _mono(alias, name)))
     n_main = len(main.patterns)
     swap_banks = []
     if swapping:
@@ -707,8 +770,8 @@ def _object_sprites(rom, slot_for_nes, need, subs, alias):
             b.colors, b.col_index = main.colors, main.col_index
             for name in group:
                 if name in need:
-                    per_frame[name] = (b, b.add_frame(_pixels(chr_ram, pals, alias.get(name, name),
-                                                              slot_for_nes), name))
+                    per_frame[name] = (b, b.add_frame(_pixels(chr_ram, pals, _src(alias, name),
+                                                              slot_for_nes), name, _mono(alias, name)))
             swap_banks.append(b)
     swap_window = max([len(b.patterns) for b in swap_banks] + [0])
     sub_banks = {}
@@ -716,10 +779,19 @@ def _object_sprites(rom, slot_for_nes, need, subs, alias):
         b = _WindowBank(main, n_main + swap_window)
         b.colors, b.col_index = main.colors, main.col_index      # one colour table
         for name in SUB_SETS[n]:
-            per_frame[name] = (b, b.add_frame(_pixels(chr_ram, pals, alias.get(name, name),
-                                                      slot_for_nes), name))
+            per_frame[name] = (b, b.add_frame(_pixels(chr_ram, pals, _src(alias, name),
+                                                      slot_for_nes), name, _mono(alias, name)))
         sub_banks[n] = b
     window = max([len(b.patterns) for b in sub_banks.values()] + [0])
+    item_banks = {}                     # one power-up item at a time (NES $72):
+    for code, name in POWER_ITEM_FRAMES.items():    # its picture is loaded when
+        if name in need:                            # it appears
+            b = _WindowBank(main, n_main + swap_window + window)
+            b.colors, b.col_index = main.colors, main.col_index
+            per_frame[name] = (b, b.add_frame(_pixels(chr_ram, pals, _src(alias, name), slot_for_nes),
+                                              name, _mono(alias, name)))
+            item_banks[code] = b
+    item_window = max([len(b.patterns) for b in item_banks.values()] + [0])
     frames, offsets = bytearray([0]), []   # (frames an area can't show: offset 0, no sprites)
     for name in OBJ_FRAMES:
         if name not in per_frame:
@@ -735,7 +807,25 @@ def _object_sprites(rom, slot_for_nes, need, subs, alias):
         raise SystemExit("too many sprite colour columns")
     return ObjectSprites(b"".join(main.patterns), b"".join(main.colors), bytes(frames), offsets,
                          {n: b"".join(b.patterns) for n, b in sub_banks.items()}, n_main, window,
-                         [b"".join(b.patterns) for b in swap_banks], swap_window)
+                         [b"".join(b.patterns) for b in swap_banks], swap_window,
+                         {c: b"".join(b.patterns) for c, b in item_banks.items()}, item_window)
+
+
+def _src(alias, name):
+    """the frame drawn for name (a fold's target)"""
+    return alias.get(name, name)
+
+
+def _mono(alias, name):
+    """1 (one sprite a cell) if the picture drawn for name is a mono one"""
+    return 1 if _src(alias, name) in alias.get("__mono__", ()) else None
+
+
+# the power-up items (NES $72: one out at a time) by code: their pictures
+# share a window, loaded when one appears (src/objects.asm, item_window_load)
+POWER_ITEM_FRAMES = {ITEM_WHIPUP: "whipup", ITEM_HEART: "heart", ITEM_DAGGER: "dagger",
+                     ITEM_CROSS: "cross_item", ITEM_ROSARY: "rosary", ITEM_HOLYWATER: "holy_item",
+                     ITEM_AXE: "axe_item", ITEM_POTION: "potion", ITEM_STOPWATCH: "watch_item"}
 
 
 class _WindowBank(SpriteBank):
@@ -779,7 +869,9 @@ def sprite_frames(rom, slot_for_nes, need=None):
         bank = _build_bank(rom, slot_for_nes, need, alias)
         if len(bank.patterns) <= MAX_OBJ_PATTERNS:
             if alias:
-                print("  object frames folded to fit:", ", ".join(f"{a}->{b}" for a, b in alias.items()))
+                print("  object frames folded to fit:", ", ".join(f"{a}->{b}" for a, b in alias.items()
+                                                                  if a != "__mono__"),
+                      "; in one colour:", ", ".join(sorted(alias.get("__mono__", ()))))
             return bank, list(OBJ_FRAMES)
     raise SystemExit(f"object sprites need {len(bank.patterns)} patterns, "
                      f"only {MAX_OBJ_PATTERNS} available")

@@ -38,11 +38,14 @@ NOISE_BOOST = 0                 # PSG volume steps added to noise
 # the engine's sound names -> the NES game's sound numbers (found by logging
 # its sound requests while playing; the uncertain ones are marked ?)
 NES_SOUNDS = {"STAGE": 0x2A, "STAGE2": 0x2D, "STAGE3": 0x30, "STAGE4": 0x39, "BOSS": 0x42, "CLEAR": 0x48, "DEATH": 0x4E,
-              "GAME_OVER": 0x51, "WHIP": 0x0A, "HIT": 0x14, "HEART": 0x18,
-              "ITEM": 0x17, "HURT": 0x16, "THROW": 0x08, "HOLY": 0x1E,
+              "GAME_OVER": 0x51, "WHIP": 0x0A, "HIT": 0x14, "HEART": 0x16,
+              "ITEM": 0x18, "HURT": 0x16, "THROW": 0x08, "HOLY": 0x1E,
               "STOPWATCH": 0x1A, "SPLASH": 0x0F, "DOOR": 0x1D, "KILL": 0x10,
               "TICK": 0x03, "TALLY": 0x04,
-              "STAGE5": 0x36, "STAGE6": 0x33, "STAGE7": 0x3C}
+              "STAGE5": 0x36, "STAGE6": 0x33, "STAGE7": 0x3C, "MONEY": 0x17}
+# (from the code, $E76E: $16 is the hearts' pickup, $18 the sub-weapons',
+# whip's and pork chop's, $17 the money bags'; Simon's hurt sound is a DMC
+# sample the port doesn't play: it keeps $16)
 # CLEAR (at the orb), DEATH, TICK (timer tally) and TALLY (hearts tally) were
 # logged on the NES; uncertain: HURT, SPLASH, DOOR, KILL, HOLY
 

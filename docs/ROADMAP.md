@@ -67,7 +67,10 @@
       sub-weapon already held
 - [ ] Morning star flashing; the cross; double and triple shots
 - [x] Wall candles and small hearts; candles spawn by camera position like the NES
-- [ ] The NES item drop rule, money bags, enemy drops
+- [x] The NES item drop rule ($EB8A: one power-up out at a time, a held
+      sub-weapon becomes a small heart or a money bag), money bags with their
+      score popups, enemy drops, pork chop, rosary (screen flash, clears the
+      enemies), invisibility potion, the shot item; NES item codes throughout
 - [x] Zombies from the ROM's enemy groups: spawn at the screen edges, walk across, die to the whip
 - [x] Health, getting hit: freeze, knock-back arc from the ROM, crouched landing, blinking invincibility
 - [x] Sprite priority rotation (flicker instead of missing sprites past 8 per line)
