@@ -493,34 +493,36 @@ ITEM_FRAMES = {ITEM_WHIPUP: "whipup", ITEM_HEART: "heart",
 
 # Frames to fold into another one when an area is over the pattern budget,
 # least visible loss first.
-FOLDS = [  # (the NES frames added last go first)
+FOLDS = [  # (least visible first: flickers and extra spin steps; the
+           # enemies' own poses last, the ones that show most at the end)
+         ("candle2", "candle1"), ("burst4", "burst3"), ("burst2", "burst1"),
+         ("flame5", "flame4"),          # (the fire's two wide flames look alike)
+         ("axe3", "axe1"), ("axe4", "axe2"),
+         ("flame3", "flame1"), ("flame2", "flame1"), ("flame4", "flame1"), ("axe2", "axe1"),
+         ("panther_sit_r", "panther_sit_l"),
          ("sickle1_r", "sickle1_l"), ("sickle2_r", "sickle2_l"),    # (one spin way)
          ("sickle3_r", "sickle3_l"), ("sickle4_r", "sickle4_l"),
          ("sickle3_l", "sickle1_l"), ("sickle4_l", "sickle2_l"),
          ("sickle3_r", "sickle1_l"), ("sickle4_r", "sickle2_l"),
-         ("aknight2_l", "aknight1_l"), ("aknight2_r", "aknight1_r"), ("gbat2", "gbat1"),
-         ("frank3_l", "frank1_l"), ("frank3_r", "frank1_r"),
-         ("flea2_l", "flea_l"), ("flea2_r", "flea_r"),
+         ("gbat2", "gbat1"), ("bandage2", "bandage1"),
+         ("mhead2_l", "mhead1_l"), ("mhead2_r", "mhead1_r"),
+         ("raven3_l", "raven1_l"), ("raven3_r", "raven1_r"),
          ("rhalf_l", "rpile_l"), ("rhalf_r", "rpile_r"),
-         ("rskel2_l", "rskel1_l"), ("rskel2_r", "rskel1_r"),
+         ("flea2_l", "flea_l"), ("flea2_r", "flea_r"),
          ("eagle2_l", "eagle1_l"), ("eagle2_r", "eagle1_r"),
-         ("pillar_fl", "pillar"), ("pillar_fr", "pillar_r"),
-         ("mummy_fl", "mummy_l"), ("mummy_fr", "mummy_r"),
-         ("knight3_l", "knight1_l"), ("knight3_r", "knight1_r"),
+         ("fish_walk2_l", "fish_walk1_l"), ("fish_walk2_r", "fish_walk1_r"),
+         ("panther_run3_l", "panther_run1_l"), ("panther_run3_r", "panther_run1_r"),
+         ("zombie_l2", "zombie_l1"), ("zombie_r2", "zombie_r1"),
+         ("aknight2_l", "aknight1_l"), ("aknight2_r", "aknight1_r"),
+         ("frank3_l", "frank1_l"), ("frank3_r", "frank1_r"),
+         ("rskel2_l", "rskel1_l"), ("rskel2_r", "rskel1_r"),
          ("skel2_l", "skel1_l"), ("skel2_r", "skel1_r"),
+         ("pillar_fl", "pillar"), ("pillar_fr", "pillar_r"),
+         ("knight3_l", "knight1_l"), ("knight3_r", "knight1_r"),
+         ("mummy_fl", "mummy_l"), ("mummy_fr", "mummy_r"),
          ("mummy3_l", "mummy_l"), ("mummy3_r", "mummy_r"),
          ("mummy2_l", "mummy_l"), ("mummy2_r", "mummy_r"),
-         ("panther_run3_l", "panther_run1_l"), ("panther_run3_r", "panther_run1_r"),
-         ("panther_sit_r", "panther_sit_l"), ("axe3", "axe1"), ("axe4", "axe2"),
-         ("candle2", "candle1"),
-         ("flame5", "flame4"),          # (the fire's two wide flames look alike)
-         ("burst4", "burst3"), ("burst2", "burst1"),
-         ("fish_walk2_l", "fish_walk1_l"), ("fish_walk2_r", "fish_walk1_r"),
-         ("zombie_l2", "zombie_l1"), ("zombie_r2", "zombie_r1"),
-         ("flame3", "flame1"), ("flame2", "flame1"), ("flame4", "flame1"), ("axe2", "axe1"),
-         ("raven3_l", "raven1_l"), ("raven3_r", "raven1_r"),
-         ("mhead2_l", "mhead1_l"), ("mhead2_r", "mhead1_r"),
-         ("bandage2", "bandage1"), ("mummy_r", "mummy_l")]
+         ("mummy_r", "mummy_l")]
 
 
 SUB_FRAMES = {ITEM_DAGGER: {"dagger_fly_r", "dagger_fly_l"},
