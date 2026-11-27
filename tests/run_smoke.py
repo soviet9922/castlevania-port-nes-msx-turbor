@@ -466,23 +466,23 @@ def tcl_script(syms, result_file):
                         keymatrixdown 4 0x04; after time 0.05 {{ keymatrixup 4 0x04 }} }}
     after time 161.7 {{ set ::wall1 [peek {syms["walls_now"]}]; set ::bag [count_type 3]
                         keymatrixdown 8 0x80 }}
-    after time 162.4 {{ keymatrixup 8 0x80
-                        set f [open "{result_file}" a]
+    after time 162.4 {{ keymatrixup 8 0x80 }}
+    after time 162.9 {{ set f [open "{result_file}" a]
                         puts $f "wall $::wall0 $::wall1 $::bag [peek {py}] [peek {syms["cur_area"]}]"; close $f }}
     # a hidden treasure (NES $FC3F): crouching on stage 2's spot makes a
     # money bag rise on the ledge to the left
-    after time 162.5 {{ poke {eoff} 3; poke {syms["area_hdr"] + 44} 3; poke {syms["keep_player"]} 1
+    after time 163.0 {{ poke {eoff} 3; poke {syms["area_hdr"] + 44} 3; poke {syms["keep_player"]} 1
                        set x 456; poke {px_a} [expr {{$x & 255}}]; poke {px_a + 1} [expr {{$x >> 8}}]
                        poke {py} 90; poke {py + 1} 0
                        poke {syms["clear_t"]} 1; poke {syms["clear_phase"]} 4 }}
-    after time 163.9 {{ poke {eoff} 3; set ::tr0 "[peek {syms["tr_done"]}] [count_type 42]"
+    after time 164.4 {{ poke {eoff} 3; set ::tr0 "[peek {syms["tr_done"]}] [count_type 42]"
                         keymatrixdown 8 0x40; after time 0.3 {{ keymatrixup 8 0x40 }} }}
-    after time 165.6 {{ set b -1
+    after time 166.1 {{ set b -1
                         for {{set i 0}} {{$i < 8}} {{incr i}} {{ if {{[peek [expr {{{objt} + $i*{obj_size}}}]] == 42}} {{ set b [expr {{{objt} + $i*{obj_size}}}] }} }}
                         set f [open "{result_file}" a]
                         puts $f "treasure $::tr0 [peek {syms["tr_done"]}] [count_type 42] [expr {{$b >= 0 ? [peek [expr {{$b+1}}]] + 256*[peek [expr {{$b+2}}]] : -1}}] [expr {{$b >= 0 ? [peek [expr {{$b+3}}]] : -1}}]"
                         close $f }}
-    after time 165.7 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}] $::vbl_worst_fc"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
+    after time 166.2 {{ set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}] $::vbl_worst_fc"; puts $f "overruns $::overruns $::frames"; close $f; snd_report; exit }}
 """ if areas > 1 else f"""
     after time 9 {{ snd_report; set f [open "{result_file}" a]; puts $f "vblank_us [expr {{int($::vbl_worst)}}]"; puts $f "overruns $::overruns $::frames"; close $f; exit }}
 """
