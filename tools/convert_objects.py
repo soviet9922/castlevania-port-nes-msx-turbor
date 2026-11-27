@@ -57,7 +57,8 @@ OBJ_FRAMES = ["brazier1", "brazier2", "burst1", "burst2", "burst3", "burst4",
               "rskel1_l", "rskel2_l", "rskel1_r", "rskel2_r",
               "rpile_l", "rhalf_l", "rpile_r", "rhalf_r",
               "dhead", "dhead2", "vert",
-              "frank1_l", "frank2_l", "frank3_l", "frank1_r", "frank2_r", "frank3_r"]
+              "frank1_l", "frank2_l", "frank3_l", "frank1_r", "frank2_r", "frank3_r",
+              "aknight1_l", "aknight2_l", "aknight1_r", "aknight2_r", "gbat1", "gbat2"]
 
 # Black panther: 32x16, palette 3, art faces left (recorded in the hall).
 # Run cycle run1 -> run2 -> run3, 7 frames each; the leap shows run2.
@@ -81,6 +82,8 @@ KIND_RSKEL = 15                 # block 4: the red skeleton (record $53, object 
 KIND_DRAGON = 16                # block 4: the bone dragon (record $54, objects $14-$16)
 KIND_FRANK = 18                 # stage 12's boss (record $5C: Frank $1C and Igor $1F)
 ENEMY_FRANK = 0x5C
+KIND_AKNIGHT, KIND_GBAT = 19, 20  # blocks 5-6: the axe knight ($4A, object $0A),
+ENEMY_AKNIGHT, ENEMY_GBAT = 0x4A, 0x5E  # the giant bat ($5E, object $1E)
 ENEMY_RSKEL, ENEMY_DRAGON = 0x53, 0x54
 ENEMY_MUMMY = 0x5A
 ENEMY_MEDUSA_BOSS = 0x5B        # its enemy group record (object $1B)
@@ -287,6 +290,19 @@ for _n, _ts in (("frank1", ((0xF2, 0xF4), (0xF6, 0xF8), (0xFA, 0xE4))),
     _l = [(t, 8 * i, 16 * r, 1, 0) for r, ts in enumerate(_ts) for i, t in enumerate(ts)]
     FRAME_SPRITES[_n + "_l"], FRAME_SPRITES[_n + "_r"] = _l, _mirror(_l, 16)
 
+# the axe knight ($85, $86: 24x32, palette 1, art facing left; 4 px outside
+# its 16-wide box each side) and the giant bat ($A0, $A1: 48x32, palette 3,
+# symmetrical: one set for both facings; its 16x16 box's top = NES y - 57)
+for _n, _legs in (("aknight1", (0xA6, 0xA8, 0xAA)), ("aknight2", (0xAC, 0xAE, 0x90))):
+    _l = _box([(t, -12 + 8 * i, -15, 1, 0) for i, t in enumerate((0xA0, 0xA2, 0xA4))]
+              + [(t, -12 + 8 * i, 1, 1, 0) for i, t in enumerate(_legs)], 8, 15)
+    FRAME_SPRITES[_n + "_l"], FRAME_SPRITES[_n + "_r"] = _l, _mirror(_l, 16)
+FRAME_SPRITES["gbat1"] = _box([(0xD0, -24, -7, 3, 0), (0xD2, -16, -7, 3, 0), (0xD4, -8, -7, 3, 0),
+                               (0xD4, 0, -7, 3, 1), (0xD2, 8, -7, 3, 1), (0xD0, 16, -7, 3, 1),
+                               (0xD6, -8, 9, 3, 0), (0xD6, 0, 9, 3, 1)], 8, 7)
+FRAME_SPRITES["gbat2"] = _box([(0xD8, -16, -7, 3, 0), (0xDA, -8, -7, 3, 0), (0xDA, 0, -7, 3, 1),
+                               (0xD8, 8, -7, 3, 1), (0xDC, -8, 9, 3, 0), (0xDC, 0, 9, 3, 1)], 8, 7)
+
 ENEMY_ZOMBIE = 0x01             # spawner types in the enemy group records
 ENEMY_BAT = 0x02
 ENEMY_FISH = 0x03
@@ -372,6 +388,15 @@ def candles(rom, stage, section, level_px):
                 else:
                     out.append((cx - 8, cy - 56, ITEM_NONE, KIND_DRAGON))
             continue
+        if kind in (ENEMY_AKNIGHT, ENEMY_GBAT):
+            # the knight: 16x32 box (top = NES y - 64); the bat: 16x16 (- 57)
+            cx, cy = (chunk - 1) * 64 + rom.fixed(p + 1), rom.fixed(p + 2)
+            if 8 <= cx < level_px - 8:
+                if kind == ENEMY_AKNIGHT:
+                    out.append((cx - 8, cy - 64, ITEM_NONE, KIND_AKNIGHT))
+                else:
+                    out.append((cx - 8, cy - 57, ITEM_NONE, KIND_GBAT))
+            continue
         if kind == ENEMY_FRANK:
             # 16x48 as the mummy: sprite top = NES y - 23 (the engine's: - 73)
             cx, cy = (chunk - 1) * 64 + rom.fixed(p + 1), rom.fixed(p + 2)
@@ -417,6 +442,7 @@ ITEM_FRAMES = {ITEM_WHIPUP: "whipup", ITEM_HEART: "heart",
 # Frames to fold into another one when an area is over the pattern budget,
 # least visible loss first.
 FOLDS = [  # (the NES frames added last go first)
+         ("aknight2_l", "aknight1_l"), ("aknight2_r", "aknight1_r"), ("gbat2", "gbat1"),
          ("frank3_l", "frank1_l"), ("frank3_r", "frank1_r"),
          ("flea2_l", "flea_l"), ("flea2_r", "flea_r"),
          ("rhalf_l", "rpile_l"), ("rhalf_r", "rpile_r"),
@@ -468,6 +494,11 @@ def needed_frames(candle_list, spawners, carried=()):
         elif kind == KIND_FRANK:
             need |= {n for n in OBJ_FRAMES if n.startswith("frank")}
             need |= {"flea_l", "flea_r", "flea2_l", "flea2_r", "fireball", "orb"}
+        elif kind == KIND_AKNIGHT:     # (its axe: Simon's axe pictures)
+            need |= {n for n in OBJ_FRAMES if n.startswith("aknight")}
+            need |= {"axe1", "axe2", "axe3", "axe4"}
+        elif kind == KIND_GBAT:
+            need |= {"gbat1", "gbat2", "fireball"}
         elif kind == KIND_DRAGON:
             need |= {"dhead", "dhead2", "vert", "fireball"}
         elif kind == KIND_GHOST:

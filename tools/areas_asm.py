@@ -113,11 +113,17 @@ def write(gen_dir, areas):
         high, out = out, low
     pad = max(0, LOW_AREAS - len(areas))   # bank 0: code, bank 7: Simon's sprites
     n_high = max(0, len(areas) - LOW_AREAS)
-    if HIGH_FIRST_BANK + n_high > TOTAL_BANKS:
+    if HIGH_FIRST_BANK + n_high + (0 if pad else 1) > TOTAL_BANKS:
         raise SystemExit("too many areas for a 1 MB ROM")
+    # the RAM overlays (src/overlays.asm) take the first unused bank
+    ovl = ["        ORG 0x8000", '        INCLUDE "overlays.asm"     ; RAM overlays (copied by load_area)',
+           "overlays_bank_end:", "        ASSERT overlays_bank_end <= 0xC000", "        ds 0xC000-$, 0xFF"]
     out += ["", "; ---- unused banks ----"]
-    for _ in range(pad):
-        out += ["        ORG 0x8000", "        ds 0x4000, 0xFF"]
+    for k in range(pad):
+        if k == 0:
+            out += [f"OVL_BANK equ {1 + len(areas)}"] + ovl
+        else:
+            out += ["        ORG 0x8000", "        ds 0x4000, 0xFF"]
     out += ["", f"; ---- bank {ROM_BANKS - 1}: Simon's sprite patterns and colours ----",
             f"PLAYER_BANK equ {ROM_BANKS - 1}",
             "        ORG 0x8000",
@@ -132,7 +138,10 @@ def write(gen_dir, areas):
     if n_high:
         out += high
         out += ["", "; ---- unused banks up to 1 MB ----"]
-        for _ in range(TOTAL_BANKS - HIGH_FIRST_BANK - n_high):
-            out += ["        ORG 0x8000", "        ds 0x4000, 0xFF"]
+        for k in range(TOTAL_BANKS - HIGH_FIRST_BANK - n_high):
+            if k == 0:
+                out += [f"OVL_BANK equ {HIGH_FIRST_BANK + n_high}"] + ovl
+            else:
+                out += ["        ORG 0x8000", "        ds 0x4000, 0xFF"]
     with open(os.path.join(gen_dir, "areas.asm"), "w") as f:
         f.write("\n".join(out) + "\n")

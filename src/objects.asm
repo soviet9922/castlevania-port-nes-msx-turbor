@@ -56,6 +56,9 @@ OBJ_RSKEL       equ 29                  ; the red skeleton
 OBJ_DRAGON      equ 30                  ; the bone dragon (its root; the rest: parts)
 OBJ_FRANK       equ 31                  ; stage 12's boss: Frankenstein's monster
 OBJ_IGOR        equ 32                  ; ... and Igor
+OBJ_AKNIGHT     equ 33                  ; blocks 5-6: the axe knight
+OBJ_KAXE        equ 34                  ; ... its axe
+OBJ_GBAT        equ 35                  ; the giant bat (stage 16)
 
 KIND_BRAZIER    equ 0
 KIND_CANDLE     equ 1
@@ -76,6 +79,8 @@ KIND_RSKEL      equ 15                  ; candle list only: a red skeleton
 KIND_DRAGON     equ 16                  ; candle list only: a bone dragon
 KIND_EAGLE      equ 17                  ; 28x28 box at +2, +2
 KIND_FRANK      equ 18                  ; candle list only: Frankenstein (and Igor)
+KIND_AKNIGHT    equ 19                  ; the axe knight: 12x28 box at +2, +2
+KIND_GBAT       equ 20                  ; the giant bat: 40x20 around its middle
 
 ; object frame numbers (OBJ_FRAMES in tools/convert_objects.py)
 OBJF_BRAZIER    equ 0
@@ -125,6 +130,8 @@ OBJF_RSKEL      equ 113                 ; walking 1-2 left, then right
 OBJF_RPILE      equ 117                 ; the pile, half pile: left, then right
 OBJF_DHEAD      equ 121                 ; the bone dragon: skull, open, vertebra
 OBJF_FRANK      equ 124                 ; his walk 1-3 left, then right
+OBJF_AKNIGHT    equ 130                 ; the axe knight 1-2 left, then right
+OBJF_GBAT       equ 134                 ; the giant bat's two pictures
 
 ITEM_WHIPUP     equ 0
 ITEM_HEART      equ 1
@@ -3270,12 +3277,12 @@ whip_hits_object:
         jr nz,.not_wide
         ld de,31
         ld b,15
-        jr .box_ready
+        jp .box_ready
 .not_wide:
         cp KIND_BAT
         jr nz,.not_bat
         ld b,15
-        jr .box_ready
+        jp .box_ready
 .not_bat:
         cp KIND_FIREBALL
         jr nz,.not_fireball
@@ -3287,7 +3294,7 @@ whip_hits_object:
         inc hl
         inc hl
         inc hl
-        jr .box_x
+        jp .box_x
 .not_fireball:
         cp KIND_BOSS
         jr nz,.not_boss
@@ -3330,6 +3337,28 @@ whip_hits_object:
         ld bc,43*256 + 2
         jr .box_ready
 .not_mummy:
+        cp KIND_AKNIGHT                 ; the axe knight: 12x28 at +2, +2
+        jr nz,.not_aknight
+        ld de,11
+        ld bc,27*256 + 2
+        ld l,(ix+1)
+        ld h,(ix+2)
+        inc hl
+        inc hl
+        jr .box_x
+.not_aknight:
+        cp KIND_GBAT                    ; the giant bat: 40x20 around its
+        jr nz,.not_gbat                 ; middle (x + 8, top + 8)
+        ld de,39
+        ld bc,19*256 + (-2 & 255)
+        ld l,(ix+1)
+        ld h,(ix+2)
+        push de
+        ld de,-12
+        add hl,de
+        pop de
+        jr .box_x
+.not_gbat:
         cp KIND_CANDLE
         jr nz,.box_ready
         ld bc,15*256 + 8
@@ -3443,6 +3472,10 @@ draw_obj:
         cp OBJ_GHOST                    ; (a ghost not out yet: nothing)
         jr z,.hidden
         cp OBJ_ORB                      ; (an orb not shown yet / flashing)
+        jr z,.hidden
+        cp OBJ_AKNIGHT                  ; (not out yet)
+        jr z,.hidden
+        cp OBJ_GBAT
         jr z,.hidden
         cp OBJ_MEDUSA                   ; asleep, Medusa is the statue in the
         jr nz,.drawn                    ; map: no sprites

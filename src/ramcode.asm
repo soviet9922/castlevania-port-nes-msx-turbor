@@ -9,5 +9,6 @@ ramcode_start:
         ENDIF
 ramcode_end:
         ENT
+OVL_BASE        equ ramcode_end             ; the RAM overlays (src/overlays.asm)
 RAMCODE_LEN     equ ramcode_end - ramcode_start
         ASSERT RAMCODE + RAMCODE_LEN <= RAMCODE_TOP

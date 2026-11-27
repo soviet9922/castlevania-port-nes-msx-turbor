@@ -195,7 +195,8 @@ drg_frz         equ drg_t+1             ; 1  ... frames frozen by a hit
 drg_dmg         equ drg_frz+1           ; 1  ... damage taken (192: dead)
 drg_parts       equ drg_dmg+1           ; 6*6  head, vertebrae 1-5: x offset, y dir,
                                         ;      y offset (8.8), speed (8.8)
-RAM_END         equ drg_parts+36
+cur_ovl         equ drg_parts+36        ; 1  the RAM overlay loaded (0 none, 1, 2)
+RAM_END         equ cur_ovl+1
         ASSERT RAM_END < 0xF380
         ASSERT RAM_END <= RAMCODE
 RAMCODE         equ 0xC600              ; code copied from ROM (src/ramcode.asm)

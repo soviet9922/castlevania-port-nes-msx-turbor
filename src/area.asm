@@ -22,6 +22,7 @@ load_area:
         ldir
 
         di
+        call load_overlay
         ld a,(RG1SAV)                   ; display off while loading
         and 0xBF
         ld b,a
@@ -93,6 +94,46 @@ load_area:
         ret
 
 ; A = area number -> A = its ROM bank (tools/areas_asm.py)
+; Copy the RAM overlay the area's stage needs to OVL_BASE (src/overlays.asm):
+; 1 for stages up to 12, 2 for stages 13-18 (AH_STAGE is BCD). Interrupts off.
+load_overlay:
+        ld a,(area_hdr+AH_STAGE)
+        cp 0x13
+        ld a,1
+        jr c,.n
+        inc a
+.n:
+        ld hl,cur_ovl
+        cp (hl)
+        ret z                           ; (already there)
+        ld (hl),a
+        dec a
+        add a,a
+        add a,a
+        ld e,a
+        ld d,0
+        ld a,OVL_BANK
+        ld (ASCII16_PAGE2),a
+        ld hl,ovl_table
+        add hl,de
+        ld e,(hl)
+        inc hl
+        ld d,(hl)
+        inc hl
+        ld c,(hl)
+        inc hl
+        ld b,(hl)
+        ld a,b
+        or c
+        jr z,.done                      ; (an empty overlay)
+        ex de,hl
+        ld de,OVL_BASE
+        ldir
+.done:
+        ld a,(page2_bank)
+        ld (ASCII16_PAGE2),a
+        ret
+
 area_bank:
         inc a
         cp 7
