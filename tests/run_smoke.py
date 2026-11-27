@@ -973,7 +973,7 @@ def run():
     seqs = {}
     high_item = None
     stun = None
-    whip_reach = 43                     # WHIP_HIT_X2 in src/config.inc (leather whip)
+    whip_reach = 47                     # whip_boxes in src/player.asm (leather whip)
     orb_seen = clear_t = None
     block2_enemies = {}
     menu_seen = False
@@ -1080,12 +1080,13 @@ def run():
         snaps[t] for t in ("01_boot", "02_walk_right", "03_jump", "04_landed",
                            "05_walk_left", "06_whip_strike", "07_brazier_hit",
                            "08_item_collected"))
-    # expected whip (NES timing): wind-up 5, swing 7, strike 9 (hits), recovery 2
+    # expected whip (NES timing, $9A71): wind-up 5, swing 7, strike 9 (hits),
+    # recovery 1 (the strike body without the whip)
     poses = [p for p, _ in whip_seq]
     start = next((i for i, p in enumerate(poses) if p >= 4), None)
     # strike: 9 frames; the whip hits on one of them, the 5th (NES $E40B)
     expected_whip = ([(4, 0)] * 5 + [(5, 0)] * 7 + [(6, 0)] * 4 + [(6, 1)] + [(6, 0)] * 4
-                     + [(7, 0)] * 2 + [(0, 0)])
+                     + [(7, 0)] + [(0, 0)])
     actual_whip = whip_seq[start:start + len(expected_whip)] if start is not None else []
     def frame_bytes(area, name):
         """an area's sprite list for a frame (from its frame table)"""
@@ -1122,10 +1123,11 @@ def run():
         ("player lands again", land["on_ground"] == 1
          and land["py"] == walk["py"]),
         ("jump follows the jump table frame by frame", actual_arc == expected_arc),
-        ("whip runs wind-up 5 / swing 7 / strike 9 (hits on 1) / recovery 2 frames",
+        ("whip runs wind-up 5 / swing 7 / strike 9 (hits on 1) / recovery 1 frame",
          actual_whip == expected_whip),
-        ("whip hit box reaches 28 px in front (facing left)",
-         strike["whip_x1"] == strike["px"] - 28 and strike["whip_x2"] == strike["px"] - 5),
+        # NES $E40B: centre x - 24, half 16, plus the enemy's: px - 31 .. px - 1
+        ("whip hit box reaches 31 px in front (facing left)",
+         strike["whip_x1"] == strike["px"] - 31 and strike["whip_x2"] == strike["px"] - 1),
         # NTSC VBLANK is 70 lines of 63.7 us; the HUD split follows soon after
         (f"VBLANK work fits in the vertical blank ({vblank_us} us of 4450)",
          vblank_us < 4450),
@@ -1292,12 +1294,12 @@ def run():
            ("beaten, the mummies burst and the last leaves the orb",
             block2_enemies["mummies_dead"] == ["0", "0", "1"])]
           if n_areas > 11 and "mummies_dead" in block2_enemies else []),
-        *([("the chain whip has its own poses, the same reach as the leather whip",
+        *([("the chain whip has its own poses and reaches 4 px further (NES $E40B)",
             any(16 <= int(p) < 24 for p in weapons["chain"]["poses"].split(","))
-            and int(weapons["chain"]["reach"]) == whip_reach),
-           ("the morning star has its own poses and reaches 16 px further",
+            and int(weapons["chain"]["reach"]) == whip_reach + 4),
+           ("the morning star has its own poses and reaches 20 px further",
             any(24 <= int(p) < 32 for p in weapons["star"]["poses"].split(","))
-            and int(weapons["star"]["reach"]) == whip_reach + 16),
+            and int(weapons["star"]["reach"]) == whip_reach + 20),
            ("UP + whip throws the dagger: one heart, throwing poses",
             weapons["dagger"]["hearts"] == "9"
             and any(32 <= int(p) < 38 for p in weapons["dagger"]["poses"].split(","))),

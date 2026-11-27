@@ -110,11 +110,13 @@ STAIR_REACH     equ 8                   ; UP/DOWN this close to an end takes the
 ; Player movement (same model as the NES game)
 WALK_SPEED      equ 1                   ; px per frame
 JUMP_LEN        equ 20                  ; jump table entries (rising half)
-JUMP_TUCK_FROM  equ 3                   ; tucked pose from this jump frame ...
-JUMP_TUCK_TO    equ JUMP_LEN+11         ; ... until this one
-FALL_START      equ JUMP_LEN+11         ; walking off a ledge joins the arc here
-MAX_FALL_PX     equ 5                   ; px per frame after the arc ends
-WALK_FRAME_TIME equ 7                   ; frames per walk animation step
+JUMP_TUCK_FROM  equ 4                   ; tucked pose from this jump frame ...
+JUMP_TUCK_TO    equ 32                  ; ... until this one (NES $9482)
+MAX_FALL_PX     equ 8                   ; px per frame after the arc, or off a
+                                        ; ledge (NES $9B8F, $9757)
+LAND_CROUCH     equ 8                   ; that many 8-px frames: a crouched landing
+WALK_ANIM_ADD   equ 36                  ; walk animation: a step on each carry of
+                                        ; a counter += 36 a walking frame (NES $9458)
 TUCK_Y          equ 4                   ; tucked pose is drawn this much lower
 CROUCH_Y        equ 8                   ; crouching pose is drawn this much lower
 
@@ -218,9 +220,11 @@ FISH_VY0        equ -88                 ; jump speed, 1/16 px per frame (NES 5 1
 FISH_GRAVITY    equ 2
 FISH_VMAX       equ 64
 FISH_WATER_Y    equ 120                 ; box top when it leaves the water
-HIT_FREEZE      equ 6                   ; frames frozen when hit
+HIT_FREEZE      equ 5                   ; frames frozen when hit (NES $965B)
 STUN_FRAMES     equ 16                  ; crouched after landing from the knock-back
-INVULN_FRAMES   equ 140                 ; blinking, cannot be hit again
+INVULN_FRAMES   equ 96                  ; blinking, cannot be hit again (NES $5B:
+                                        ; $30, every other frame; from the landing)
+STAIR_HIT_FREEZE equ 16                 ; hit on the stairs: frozen (NES $47)
 HURT_FREEZE     equ 1                   ; hurt_state values
 HURT_FLY        equ 2
 HURT_STUN       equ 3
@@ -252,13 +256,9 @@ SPRITE_HIDE_Y   equ 212                 ; parks a sprite below the visible area
 WHIP_P2         equ 6                   ; frames 1-5 wind-up
 WHIP_P3         equ 13                  ; frames 6-12 swing
 WHIP_P4         equ 22                  ; frames 13-21 strike (hits)
-WHIP_END        equ 24
-WHIP_HIT_T      equ 17                  ; the one strike frame that hits (NES $E40B)                  ; frames 22-23 recovery
-; Whip hit box while striking, facing right, relative to the player box
-WHIP_HIT_X1     equ 20
-WHIP_HIT_X2     equ 43
-WHIP_HIT_Y1     equ 11
-WHIP_HIT_Y2     equ 15
+WHIP_END        equ 23                  ; frame 22: the strike body, no whip
+WHIP_HIT_T      equ 17                  ; the one strike frame that hits (NES $E40B)
+WHIP_SND_T      equ 11                  ; the swing's sound (NES $9A71)
 
 ; a zombie that walks off a platform falls (NES stage 3: 64 px in about 28
 ; frames, without moving across); 1/16 px units

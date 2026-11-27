@@ -26,6 +26,11 @@ player_reset:
         ld (anim_step),a
         ld (whip_t),a
         ld (whip_active),a
+        ld (whip_wait),a
+        ld (crouch_t),a
+        ld (fall8),a
+        ld (jump_skip),a
+        ld (stair_frz),a
         inc a
         ld (on_ground),a
         ld a,(area_hdr+AH_FACE)
@@ -340,17 +345,23 @@ arc_jump:
         ret
 
 ; ---------------------------------------------------------------------------
-; Getting hit. B = direction to knock Simon (+1 right, -1 left).
-; Frozen HIT_FREEZE frames, then knocked back along the NES knock-back arc
-; (facing the enemy, moving away from it), stunned STUN_FRAMES after landing,
-; and invincible (blinking) for INVULN_FRAMES. On the stairs he only takes
-; the damage, as on the NES.
+; Getting hit (NES $96C1). B = direction to knock Simon (+1 right, -1 left).
+; On the stairs: frozen STAIR_HIT_FREEZE frames (the whip paused), then
+; invincible. Else: with a ceiling over his head he only crouches
+; STUN_FRAMES; otherwise frozen HIT_FREEZE frames (his pose as it was), then
+; knocked back along the NES arc (facing the enemy, moving away from it), and
+; crouched STUN_FRAMES after landing. He blinks, invincible, INVULN_FRAMES
+; from the landing (until then the knock-back itself keeps him safe). A hit
+; that empties his health still knocks him back: he dies when he lands.
 ; ---------------------------------------------------------------------------
 simon_hurt:
         ld a,(invuln_t)
         or a
         ret nz
         ld a,(hurt_state)
+        or a
+        ret nz
+        ld a,(stair_frz)
         or a
         ret nz
         ld a,(area_hdr+AH_STAGE)        ; NES $E74A: 8 in stages 1-6,
@@ -364,23 +375,27 @@ simon_hurt:
 .dmg:
         ld a,(hp)
         sub c
-        jr c,.dead
-        jr z,.dead
+        jr nc,.hp
+        xor a
+.hp:
         ld (hp),a
         ld a,1
         ld (hud_dirty),a
-        ld a,INVULN_FRAMES
-        ld (invuln_t),a
         ld a,SND_HURT
         call sfx_play
+        ld a,(stair_state)
+        cp 2
+        jr nz,.not_stairs
+        ld a,STAIR_HIT_FREEZE           ; on the stairs: frozen, then invincible
+        ld (stair_frz),a
+        ld a,INVULN_FRAMES
+        ld (invuln_t),a
+        ret
+.not_stairs:
         xor a
         ld (whip_t),a
         ld (whip_active),a
-        ld (crouching),a
-        ld a,(stair_state)
-        cp 2
-        ret z                           ; on the stairs: no knock-back
-        xor a
+        ld (whip_wait),a
         ld (stair_state),a
         ld a,b
         ld (air_dx),a
@@ -388,42 +403,81 @@ simon_hurt:
         and 1
         xor 1
         ld (facing),a
+        ld a,(on_ground)                ; (in the air his y is the jump's)
+        or a
+        jr z,.no_snap
+        ld a,(py)
+        and 0xF8
+        ld (py),a
+.no_snap:
+        call head_probe                 ; a ceiling: no knock-back, a crouch
+        jr nc,.knock
+        ld a,(hp)
+        or a
+        jr z,.dies
+        ld a,STUN_FRAMES
+        ld (crouch_t),a
+        ld a,1
+        ld (crouching),a
+        ld a,INVULN_FRAMES
+        ld (invuln_t),a
+        ret
+.knock:
+        xor a
+        ld (crouching),a
+        ld (crouch_t),a
         ld a,HURT_FREEZE
         ld (hurt_state),a
         ld a,HIT_FREEZE
         ld (hurt_t),a
         ret
-.dead:
-        xor a
-        ld (hp),a
-        inc a
+.dies:
+        ld a,1
         ld (player_dead),a
-        ld (hud_dirty),a
         ret
 
-; Count down the freeze (then start the knock-back) or the stun.
+; Carry if the tile over his head is solid (NES $9998: y - 19 at x - 7, x,
+; x + 7: port py - 3 at px + 1, 8, 15)
+head_probe:
+        ld b,1
+        call .at
+        ret c
+        ld b,8
+        call .at
+        ret c
+        ld b,15
+.at:
+        ld hl,(py)
+        ld de,-3
+        add hl,de
+        ex de,hl
+        ld l,b
+        ld h,0
+        push bc
+        ld bc,(px)
+        add hl,bc
+        pop bc
+        jp solid_at
+
+; Count down the freeze, then start the knock-back.
 hurt_tick:
         ld hl,hurt_t
         dec (hl)
         ret nz
-        ld a,(hurt_state)
-        cp HURT_FREEZE
-        jr nz,.stun_over
         ld a,HURT_FLY
         ld (hurt_state),a
         xor a
         ld (jump_idx),a
         ld (on_ground),a
+        ld (fall8),a
         ld hl,kb_table
         ld (arc_ptr),hl
         ld a,KB_LEN
         ld (arc_len),a
         ret
-.stun_over:
-        xor a
-        ld (hurt_state),a
-        ret
 
+; One frame of Simon (NES $934C): the x move first, then the stairs, A (jump),
+; B (whip), DOWN (crouch), in that order
 player_update:
         ld a,(invuln_t)
         or a
@@ -431,33 +485,32 @@ player_update:
         dec a
         ld (invuln_t),a
 .not_invuln:
-        ld a,(hurt_state)               ; hit: frozen, knocked back or stunned
-        or a
+        ld a,(hurt_state)               ; hit: frozen (his pose as it was) or
+        or a                            ; knocked back
         jr z,.not_hurt
         cp HURT_FLY
-        jp z,.in_air                    ; the knock-back arc carries him
-        call hurt_tick
-        jp player_animate
+        jp z,.in_air
+        jp hurt_tick
 .not_hurt:
         ld a,(stair_state)
         or a
         jp nz,stairs_update
 
         ; ---- whip: once started it runs to the end ----
+        ld a,(whip_wait)                ; (pressed on the ground last frame)
+        or a
+        jr z,.no_wait
+        xor a
+        ld (whip_wait),a
+        inc a
+        ld (whip_t),a
+.no_wait:
         ld a,(whip_t)
         or a
-        jr nz,.whip_busy
-        ld a,(whip_pressed)
-        or a
         jr z,.intent
-        ld a,1
-        ld (whip_t),a
-        call start_throw
-        call whip_sound
-.whip_busy:
         ld a,(on_ground)
         or a
-        jr z,.in_air                    ; in the air the jump arc carries on
+        jp z,.in_air                    ; in the air the jump arc carries on
         xor a
         ld (walk_dx),a                  ; on the ground Simon stands still
         jp .vertical
@@ -466,7 +519,46 @@ player_update:
 .intent:
         ld a,(on_ground)
         or a
-        jr z,.in_air
+        jp z,.in_air
+        ld a,(crouch_t)                 ; crouched after a landing or a hit:
+        or a                            ; he can turn and whip
+        jr z,.no_stun
+        dec a
+        ld (crouch_t),a
+        jr nz,.crouched
+        xor a                           ; (the last frame: he stands up)
+        ld (crouching),a
+        ld (walk_dx),a
+        jp .vertical
+.no_stun:
+        ld a,(crouching)                ; crouched: DOWN still held?
+        or a
+        jr z,.standing
+        ld a,(stick)
+        cp 4
+        jr c,.stand_up
+        cp 7
+        jr c,.crouched
+.stand_up:
+        xor a                           ; DOWN let go: he stands up (nothing
+        ld (crouching),a                ; else this frame)
+        ld (walk_dx),a
+        jp .vertical
+.crouched:
+        ld a,1
+        ld (crouching),a
+        xor a
+        ld (walk_dx),a
+        call .turn
+        ld a,(whip_pressed)
+        or a
+        call nz,.whip_ground
+        jp .vertical
+.standing:
+        ld a,(stick)
+        call stick_to_dx
+        ld (walk_dx),a
+        call .turn
         ld a,(stick)                    ; UP near the foot of a staircase
         call stick_vertical
         cp 1
@@ -475,46 +567,76 @@ player_update:
         call find_stair
         jp c,stairs_begin_up
 .not_up:
-        ld a,(stick)
+        ld a,(stick)                    ; DOWN near the top of one
         cp 4
         jr c,.not_down
         cp 7
         jr nc,.not_down
-        ld c,ST_TOPX                    ; DOWN near the top of a staircase
+        ld c,ST_TOPX
         call find_stair
         jp c,stairs_begin_down
-        ld a,1                          ; 4, 5, 6: down (incl. diagonals)
-        ld (crouching),a
-        xor a
-        ld (walk_dx),a
-        jp .vertical
 .not_down:
-        xor a
-        ld (crouching),a
-        ld a,(stick)
-        call stick_to_dx
-        ld (walk_dx),a
+        ld a,(jump_pressed)             ; A: a jump, if his head is clear
         or a
-        jr z,.no_turn
-        rlca
-        and 1                           ; 1 if moving left
-        ld (facing),a
-.no_turn:
-        ld a,(jump_pressed)
-        or a
-        jr z,.move_h
+        jr z,.no_jump
+        call head_probe
+        jr c,.no_jump
         call arc_jump
         xor a
         ld (jump_idx),a
         ld (on_ground),a
+        ld (fall8),a
+        inc a
+        ld (jump_skip),a                ; (no y move on the take-off frame)
         ld a,(walk_dx)
         ld (air_dx),a
         jr .move_h
+.no_jump:
+        ld a,(whip_pressed)             ; B: the whip
+        or a
+        jr z,.no_whip
+        call .whip_ground
+        jr .move_h
+.no_whip:
+        ld a,(stick)                    ; DOWN: crouch (the move still happens)
+        cp 4
+        jr c,.move_h
+        cp 7
+        jr nc,.move_h
+        ld a,1
+        ld (crouching),a
+        jr .move_h
+.turn:                                  ; face the way L/R points
+        ld a,(stick)
+        call stick_to_dx
+        or a
+        ret z
+        rlca
+        and 1                           ; 1 if moving left
+        ld (facing),a
+        ret
+.whip_ground:                           ; starts the next frame
+        ld a,1
+        ld (whip_wait),a
+        jp start_throw
 .in_air:
+        ld a,(whip_t)                   ; B in the air: a whip at once
+        or a
+        jr nz,.air_move
+        ld a,(hurt_state)
+        or a
+        jr nz,.air_move
+        ld a,(whip_pressed)
+        or a
+        jr z,.air_move
+        ld a,1
+        ld (whip_t),a
+        call start_throw
+.air_move:
         ld a,(air_dx)
         ld (walk_dx),a
 
-        ; ---- horizontal move with collision ----
+        ; ---- horizontal move with collision (NES $9809, $9ECE) ----
 .move_h:
         ld a,(walk_dx)
         or a
@@ -529,28 +651,33 @@ player_update:
         ld de,(cam_x)
         or a
         sbc hl,de
-        jr c,.vertical                  ; would leave the screen on the left
-        ld de,241
+        dec hl                          ; his middle stays at screen x 9..239
+        bit 7,h
+        jr nz,.vertical
+        ld de,231
         or a
         sbc hl,de
-        jr nc,.vertical                 ; would leave the screen on the right
-        ld a,(walk_dx)
-        ld c,3
+        jr nc,.vertical
+        ld a,(walk_dx)                  ; walls 8 px from his middle, now
+        ld c,1                          ; (px + 0 / px + 16 of the old x)
         bit 7,a
         jr nz,.left_edge
-        ld c,12
+        ld c,15
 .left_edge:
         ld a,c
         ld (probe_off),a
-        ld c,2
+        ld hl,wall_rows
+        ld b,5
+.wall:
+        ld c,(hl)
+        inc hl
+        push hl
+        push bc
         call side_probe
+        pop bc
+        pop hl
         jr c,.vertical
-        ld c,16
-        call side_probe
-        jr c,.vertical
-        ld c,29
-        call side_probe
-        jr c,.vertical
+        djnz .wall
         ld hl,(new_x)
         ld (px),hl
 
@@ -562,14 +689,32 @@ player_update:
         ld c,32                         ; anything under the feet?
         call foot_probe
         jp c,player_animate
-        call arc_jump
-        xor a                           ; walked off a ledge
-        ld (on_ground),a
-        ld (air_dx),a
-        ld a,FALL_START
+        call arc_jump                   ; walked off a ledge (NES $9757): 8 px
+        xor a                           ; a frame at once, 1 px a frame on
+        ld (on_ground),a                ; the way he faces
+        ld (crouching),a
+        ld (crouch_t),a
+        ld a,1
+        ld (fall8),a                    ; (the NES counts the landing frame)
+        ld a,JUMP_LEN*2
         ld (jump_idx),a
+        ld a,(facing)
+        or a
+        ld a,1
+        jr z,.fwd
+        ld a,-1
+.fwd:
+        ld (air_dx),a
+        jp player_animate
 
-.airborne:                              ; arc: jump or knock-back table
+.airborne:
+        ld a,(jump_skip)                ; take-off: the arc starts next frame
+        or a
+        jr z,.arc
+        xor a
+        ld (jump_skip),a
+        jp player_animate
+.arc:                                   ; arc: jump or knock-back table
         ld a,(arc_len)
         ld b,a
         ld a,(jump_idx)
@@ -600,6 +745,8 @@ player_update:
         neg
         jr .step
 .terminal:
+        ld hl,fall8
+        inc (hl)
         ld a,MAX_FALL_PX
         jr .apply
 .step:
@@ -617,55 +764,63 @@ player_update:
         add hl,de
         ld (py),hl
 
-        ld a,(arc_len)
+        ld a,(arc_len)                  ; only falling: the floor
         ld b,a
         ld a,(jump_idx)
         dec a
         cp b
-        jr c,.rising
+        jr c,.check_pit
 
-        ld c,31                         ; falling: feet inside something solid?
+        ld c,32                         ; feet on something solid?
         call foot_probe
         jr nc,.check_pit
-        ld hl,(py)                      ; land on top of the tile
-        ld de,31
-        add hl,de
-        ld a,l
-        and 0xF8
-        ld l,a
-        ld de,-32
-        add hl,de
-        ld (py),hl
+        ld a,(py)                       ; land: y on the 16-px grid (8 with
+        ld b,0xF0                       ; a whip going on, and in stage 10)
+        ld hl,whip_t
+        inc (hl)
+        dec (hl)
+        jr nz,.grid8
+        ld a,(area_hdr+AH_STAGE)
+        cp 0x10
+        ld a,(py)
+        jr nz,.grid
+.grid8:
+        ld b,0xF8
+.grid:
+        and b
+        ld (py),a
         ld a,1
         ld (on_ground),a
         xor a
         ld (jump_idx),a
-        ld a,(hurt_state)               ; landing from a knock-back: stunned
-        cp HURT_FLY
-        jp nz,player_animate
-        ld a,HURT_STUN
+        ld a,(hurt_state)               ; landing from a knock-back: dead, or
+        cp HURT_FLY                     ; crouched and invincible
+        jr nz,.landed
+        xor a
         ld (hurt_state),a
-        ld a,STUN_FRAMES
-        ld (hurt_t),a
+        ld a,(hp)
+        or a
+        jr nz,.stun
+        inc a
+        ld (player_dead),a
         jp player_animate
-
-.rising:
-        ld c,0                          ; head inside something solid?
-        call foot_probe
-        jr nc,.check_pit
-        ld hl,(py)                      ; push back below the tile
-        ld a,l
-        and 0xF8
-        ld l,a
-        ld de,8
-        add hl,de
-        ld (py),hl
-        ld a,(jump_idx)                 ; continue with the mirrored fall
-        ld b,a
-        ld a,(arc_len)
-        add a,a
-        sub b
-        ld (jump_idx),a
+.stun:
+        ld a,INVULN_FRAMES
+        ld (invuln_t),a
+        jr .crouch_land
+.landed:
+        ld a,(fall8)                    ; a long fall: a crouched landing
+        cp LAND_CROUCH
+        jp c,player_animate
+        ld a,(whip_t)
+        or a
+        jp nz,player_animate
+.crouch_land:
+        ld a,STUN_FRAMES+1
+        ld (crouch_t),a
+        ld a,1
+        ld (crouching),a
+        jp player_animate
 
 .check_pit:
         ld hl,(py)
@@ -692,11 +847,8 @@ player_animate:
         jr .set_frame
 .not_stairs:
         ld a,(hurt_state)
-        or a
-        jr z,.not_hurt_pose
-        cp HURT_STUN
-        ld a,CROUCH_Y
-        jr z,.tucked                    ; stunned: crouched
+        cp HURT_FLY
+        jr nz,.not_hurt_pose
         ld a,POSE_HURT
         jr .set_frame
 .not_hurt_pose:
@@ -720,32 +872,26 @@ player_animate:
         ld a,3
         jr .set_frame
 .walk_anim:
-        ld a,(walk_dx)
-        or a
-        jr nz,.walking
-        ld (anim_t),a
-        ld (anim_step),a
-.stand:
-        xor a
-        jr .set_frame
-.walking:
-        ld a,(anim_t)
-        inc a
-        cp WALK_FRAME_TIME
-        jr c,.same_step
-        ld a,(anim_step)
-        inc a
-        and 3
-        ld (anim_step),a
-        xor a
+        ld a,(walk_dx)                  ; (the step and its counter carry on
+        or a                            ; over stops, as the NES's)
+        jr z,.stand
+        ld a,(anim_acc)
+        add a,WALK_ANIM_ADD
+        ld (anim_acc),a
+        jr nc,.same_step
+        ld hl,anim_step
+        inc (hl)
 .same_step:
-        ld (anim_t),a
         ld a,(anim_step)
+        and 3
         ld e,a
         ld d,0
         ld hl,walk_cycle
         add hl,de
         ld a,(hl)
+        jr .set_frame
+.stand:
+        xor a
 .set_frame:
         ld (pframe),a
 
@@ -756,6 +902,13 @@ player_animate:
         or a
         ret z
         ld c,a
+        cp WHIP_SND_T                   ; the swing's sound
+        jr nz,.no_snd
+        push bc
+        call whip_sound
+        pop bc
+.no_snd:
+        ld a,c
         ld b,0                          ; B = phase 0-3
         cp WHIP_P2
         jr c,.whip_pose
@@ -772,15 +925,25 @@ player_animate:
         ld a,(throwing)
         or a
         jr nz,.throw_now
-        call whip_hitbox
+        call whip_hitbox                ; (it hits on WHIP_HIT_T only)
         jr .struck
 .throw_now:
-        ld a,(thrown)                   ; the dagger leaves his hand once
+        ld a,c                          ; the dagger leaves his hand on the
+        cp WHIP_HIT_T                   ; NES's frame 17
+        jr nz,.struck
+        ld a,(thrown)
         or a
         call z,throw_dagger
 .struck:
         pop bc
 .whip_pose:
+        ld a,(crouching)                ; crouched: the crouched set, drawn
+        or a                            ; lower; standing / in the air: the
+        ld a,0                          ; standing set
+        jr z,.py
+        ld a,CROUCH_Y
+.py:
+        ld (pyoff),a
         ld a,(throwing)                 ; throwing: arm poses without a whip
         or a
         jr z,.whip_kind
@@ -808,10 +971,10 @@ player_animate:
         ld b,a
         ld e,4                          ; crouched set: +4
 .crouched:
-        ld a,(pframe)
-        cp POSE_TUCK                    ; crouching / tucked: crouched set
+        ld a,(crouching)
+        or a
         ld a,b
-        jr nz,.whip_standing
+        jr z,.whip_standing
         add a,e
 .whip_standing:
         ld (pframe),a
@@ -824,7 +987,10 @@ player_animate:
         ld (whip_t),a
         ret
 
-; Hit box of the extended whip in world coordinates (mirrored when facing left).
+; Hit box of the extended whip in world coordinates (NES $E40B: centre x + 24,
+; 26 or 34 by the whip, y - 2; crouched y + 3; half sizes 16/6, 18/8, 26/8
+; added to the enemy's): as an inclusive box, facing right, px + X1..X2,
+; py + Y1..Y2; facing left mirrored around his middle (px + 16 - X)
 whip_hitbox:
         ld a,c                          ; the NES tests the whip on one frame
         cp WHIP_HIT_T                   ; of the strike only: one hit a swing
@@ -832,71 +998,97 @@ whip_hitbox:
         ld a,1
         ld (whip_active),a
 .box:
-        ld hl,(px)
-        ld a,(facing)
-        or a
-        jr nz,.left
-        ld de,WHIP_HIT_X1
-        add hl,de
-        ld (whip_x1),hl
-        ld de,WHIP_HIT_X2-WHIP_HIT_X1
-        add hl,de
-        ld (whip_x2),hl
-        jr .y
-.left:
-        ld de,15-WHIP_HIT_X2
-        add hl,de
-        ld (whip_x1),hl
-        ld de,WHIP_HIT_X2-WHIP_HIT_X1
-        add hl,de
-        ld (whip_x2),hl
-.y:
-        ld a,(whip_level)               ; the morning star reaches further
+        ld a,(whip_level)
         cp 2
-        jr c,.reach_ok
-        ld a,(facing)
-        or a
-        ld hl,(whip_x2)
-        ld de,STAR_EXTRA
-        jr z,.longer
-        ld hl,(whip_x1)
-        ld de,-STAR_EXTRA
-        add hl,de
-        ld (whip_x1),hl
-        jr .reach_ok
-.longer:
-        add hl,de
-        ld (whip_x2),hl
-.reach_ok:
-        ld a,(pyoff)
+        jr c,.lvl
+        ld a,2
+.lvl:
+        add a,a
+        add a,a
         ld e,a
         ld d,0
+        ld hl,whip_boxes
+        add hl,de                       ; X1, X2, Y1, Y2
+        ld c,(hl)
+        inc hl
+        ld b,(hl)
+        inc hl
+        push hl
+        ld a,(facing)
+        or a
+        jr z,.right
+        ld a,16                         ; facing left: 16 - X2 .. 16 - X1
+        sub b
+        ld e,a
+        ld a,16
+        sub c
+        ld b,a
+        ld c,e
+.right:
+        ld a,c
+        call .x
+        ld (whip_x1),hl
+        ld a,b
+        call .x
+        ld (whip_x2),hl
+        pop hl
+        ld c,(hl)
+        inc hl
+        ld b,(hl)
+        ld a,(crouching)                ; crouched: 9 px lower
+        or a
+        jr z,.yrow
+        ld a,9
+        add a,c
+        ld c,a
+        ld a,9
+        add a,b
+        ld b,a
+.yrow:
         ld hl,(py)
-        add hl,de
-        ld de,WHIP_HIT_Y1
+        ld e,c
+        ld d,0
         add hl,de
         ld (whip_y1),hl
-        ld de,WHIP_HIT_Y2-WHIP_HIT_Y1
+        ld hl,(py)
+        ld e,b
         add hl,de
         ld (whip_y2),hl
         ret
+.x:                                     ; HL = px + A (signed)
+        ld e,a
+        rla
+        sbc a,a
+        ld d,a
+        ld hl,(px)
+        add hl,de
+        ret
+whip_boxes:                             ; X1, X2, Y1, Y2 (standing)
+        db 17, 47, 9, 19                ; leather
+        db 17, 51, 7, 21                ; chain
+        db 17, 67, 7, 21                ; morning star
 
-walk_cycle:
-        db 1, 2, 1, 0
+walk_cycle:                             ; stand, walk1, walk2, walk1 (NES)
+        db 0, 1, 2, 1
+
+; side probes: rows py + 7, 12, 16, 24, 31 (NES y - 9, -4, 0, +8, +15)
+wall_rows:
+        db 7, 12, 16, 24, 31
 
 ; A whip action starts: UP held, the dagger, a heart and no dagger flying ->
 ; it throws the dagger instead (one heart)
 ; the sound of what the B press did: stopwatch, a throw, or the whip
+; the swing's sound, on its 11th frame (NES $9A71): the whip's, or the
+; throw's for the dagger only
 whip_sound:
-        ld a,(whip_t)
-        or a
-        ld a,SND_STOPWATCH
-        jr z,.play                      ; (the stopwatch cancels the whip)
         ld a,(throwing)
         or a
-        ld a,SND_THROW
-        jr nz,.play
         ld a,SND_WHIP
+        jr z,.play
+        ld a,(sub_kind)
+        cp 1
+        ret nz
+        ld a,SND_THROW
 .play:
         jp sfx_play
 
@@ -928,7 +1120,7 @@ start_throw:
         ld a,(subweapon)
         ld (sub_kind),a
         ret
-.stopwatch:                             ; 5 hearts: enemies freeze (no throw)
+.stopwatch:                             ; 5 hearts: enemies freeze
         ld a,(freeze_t)
         or a
         ret nz
@@ -941,9 +1133,8 @@ start_throw:
         ld (freeze_t),a
         ld a,1
         ld (hud_dirty),a
-        xor a
-        ld (whip_t),a                   ; no whip action either
-        ret
+        ld a,SND_STOPWATCH              ; (and the whip swings, as the NES's)
+        jp sfx_play
 
 ; The dagger leaves Simon's hand: an object flying the way he faces
 throw_dagger:
@@ -960,11 +1151,11 @@ throw_dagger:
         ld hl,(px)
         ld (ix+1),l
         ld (ix+2),h
-        ld a,(pyoff)
+        ld a,(pyoff)                    ; NES: his y - 8 (crouched: 4 lower)
+        rrca
         ld b,a
         ld a,(py)
         add a,b
-        add a,4                         ; at chest height (NES: top row)
         ld (ix+3),a
         ld a,(facing)
         or a
@@ -1039,7 +1230,8 @@ side_probe:
         add hl,bc
         jp solid_at
 
-; C = y offset from py; probes px+4 and px+11. Carry if either is solid.
+; C = y offset from py; probes px+4 and px+12 (NES x - 4, x + 4). Carry if
+; either is solid.
 foot_probe:
         push bc
         ld hl,(py)
@@ -1057,7 +1249,7 @@ foot_probe:
         add hl,bc
         ex de,hl
         ld hl,(px)
-        ld bc,11
+        ld bc,12
         add hl,bc
         jp solid_at
 
@@ -1276,14 +1468,36 @@ stairs_begin:
         jp player_animate
 
 stairs_update:
+        ld a,(stair_frz)                ; hit: frozen, the whip paused (NES $47)
+        or a
+        jr z,.not_frozen
+        dec a
+        ld (stair_frz),a
+        ret nz
+        ld a,(hp)                       ; (health gone: he dies)
+        or a
+        ret nz
+        inc a
+        ld (player_dead),a
+        ret
+.not_frozen:
         ld a,(whip_t)                   ; whipping: stand still until it ends
         or a
         jr nz,.still
         ld a,(whip_pressed)
         or a
         jr z,.no_whip
+        ld a,(stair_state)              ; (not while walking to the stairs)
+        cp 2
+        jr nz,.no_whip
+        ld a,(py)                       ; only near a step's end: y & 7 in
+        add a,2                         ; 6, 7, 0, 1 (NES $9586)
+        and 7
+        cp 4
+        jr nc,.no_whip
         ld a,1
         ld (whip_t),a
+        call start_throw                ; (UP + B: a sub-weapon, as on the floor)
 .still:
         xor a
         ld (walk_dx),a

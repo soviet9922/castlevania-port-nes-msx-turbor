@@ -207,7 +207,13 @@ drac_frac       equ drac_head+1         ; 1  ... damage fraction (1/16)
 drac_hvy        equ drac_frac+1         ; 2  ... the flying head: vy (8.8, + = up)
 drac_hyf        equ drac_hvy+2          ; 1  ... its y fraction
 drac_box        equ drac_hyf+1          ; OBJ_SIZE  his head's box (whip tests)
-RAM_END         equ drac_box+OBJ_SIZE
+whip_wait       equ drac_box+OBJ_SIZE   ; 1  a whip pressed on the ground starts next frame
+crouch_t        equ whip_wait+1         ; 1  frames crouched after a landing / a hit
+fall8           equ crouch_t+1          ; 1  frames falling at 8 px (crouched landing)
+anim_acc        equ fall8+1             ; 1  walk animation counter (+36 a frame)
+jump_skip       equ anim_acc+1          ; 1  the take-off frame: no y move yet
+stair_frz       equ jump_skip+1         ; 1  hit on the stairs: frozen frames
+RAM_END         equ stair_frz+1
         ASSERT RAM_END < 0xF380
         ASSERT RAM_END <= RAMCODE
 RAMCODE         equ 0xC600              ; code copied from ROM (src/ramcode.asm)
