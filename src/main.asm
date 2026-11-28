@@ -187,6 +187,9 @@ wait_frame:
 ; On a turbo R, switch to the R800 in DRAM mode (BIOS copied to fast RAM).
 ; ---------------------------------------------------------------------------
 select_cpu:
+        IF R800 == 0
+        ret                             ; (built for the Z80: R800=0)
+        ENDIF
         ld a,(MSXVER)
         cp 3
         ret c

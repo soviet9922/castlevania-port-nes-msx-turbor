@@ -27,7 +27,9 @@ CV_TOOLS  := $(PH_TOOLS) tools/convert_stage.py tools/cv_rom.py tools/convert_si
              tools/sprite_edit.py $(wildcard art_overrides/*.bmp) \
              tools/convert_sound.py tools/nes_sound.py tools/cpu6502.py
 
-SJASM_FLAGS = --nologo --msg=war --fullpath --inc=src -DDEBUG_MENU=$(DEBUG)
+# R800=0: stay on the Z80 on a turbo R
+R800      ?= 1
+SJASM_FLAGS = --nologo --msg=war --fullpath --inc=src -DDEBUG_MENU=$(DEBUG) -DR800=$(R800)
 
 .PHONY: all nes run run-cbios run-nes test test-nes disasm clean
 
