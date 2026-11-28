@@ -28,6 +28,9 @@
 
 init:
         di
+        ld sp,STACK_TOP                 ; our own stack: a disk ROM (Nextor on a
+                                        ; flash cart, a drive) moves the BIOS's
+                                        ; down into the RAM the game uses
         xor a                           ; no BIOS key click on key presses
         ld (CLIKSW),a
         call select_cpu

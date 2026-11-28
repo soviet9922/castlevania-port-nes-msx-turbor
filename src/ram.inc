@@ -244,4 +244,5 @@ ct_row          equ ct_var+1            ; 1
 ct_slot         equ ct_row+1            ; 1
 ct_cells        equ ct_slot+1           ; 2
         ASSERT ct_cells+2 <= 0xF0A0     ; (the stack keeps 0xF0A0-0xF37F)
+STACK_TOP       equ 0xF380              ; the game's stack, down from the BIOS's work area
 
