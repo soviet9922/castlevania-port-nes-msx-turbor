@@ -13,9 +13,12 @@ ORs with layer A into slot 6).
 Single-colour pixels (the whip) are cut into cells anchored at their own
 bounding box. MSX sprites can change colour on every line, so one sprite
 per cell carries the majority colour of each line; a second sprite is
-added only for lines that use two colours. A line with three colours gets a
-black silhouette behind the most used other colour, so the third colour
-shows as black rather than as a hole.
+added only for lines that use two colours. A line with three or more colours
+keeps the two that change the picture least (with PALETTE set: the pair
+whose nearest-colour error over the line is smallest) and draws every other
+pixel in the nearer of the two, so a missing shade becomes the closest
+shade the line has rather than a hole or a black dot. Without PALETTE the
+third colour is drawn black behind the most used other colour.
 
 Outputs (bytes):
     patterns   32 bytes per unique 16x16 pattern
@@ -26,8 +29,32 @@ Outputs (bytes):
 SLOT_A, SLOT_B = 2, 4
 BLACK = 1               # palette slot of black (NES $0F)
 CC = 0x40
+PALETTE = None          # the area's MSX palette (slot -> RGB) while its object
+                        # sprites are built (tools/convert_stage.py), else None
 MAX_SPRITES = 16        # hardware sprites per frame (Death 40x48: 14; the engine
                         # draws objects until its 32 slots are used)
+
+
+def _dist(a, b):
+    if a == b:
+        return 0
+    return sum((x - y) ** 2 for x, y in zip(PALETTE[a], PALETTE[b]))
+
+
+def _best_pair(counts):
+    """counts: {colour: pixels} of one line, 3+ colours -> (front, back): the
+    two colours whose nearest-colour error over the line is smallest (the
+    more used one in front); the others are drawn in the nearer of them"""
+    cols = sorted(counts)
+    best = None
+    for i, a in enumerate(cols):
+        for b in cols[i + 1:]:
+            err = sum(n * min(_dist(v, a), _dist(v, b)) for v, n in counts.items())
+            key = (err, -(counts[a] + counts[b]), a, b)
+            if best is None or key < best[0]:
+                best = (key, a, b)
+    _, a, b = best
+    return (a, b) if counts[a] >= counts[b] else (b, a)
 
 
 def _pattern(cell):
@@ -99,6 +126,15 @@ class SpriteBank:
                     for _, v in line:
                         counts[v] = counts.get(v, 0) + 1
                     order = sorted(counts, key=lambda v: -counts[v])
+                    if len(order) > 2 and PALETTE is not None:
+                        # three colours, two sprites: each pixel in the nearer
+                        # of the two colours that lose the least
+                        front, back = _best_pair(counts)
+                        c1[ly], c2[ly] = front, back
+                        for x, v in line:
+                            near = front if _dist(v, front) <= _dist(v, back) else back
+                            (first if near == front else second).add((x, ly))
+                        continue
                     if len(order) > 2:
                         # three colours, two sprites: the back one is the whole
                         # line in black (or the least used colour), the front

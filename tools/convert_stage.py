@@ -693,7 +693,9 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
         added.append(f"${nes:02X}")
     if added:
         print("  sprite colours added to the palette:", ", ".join(added))
+    msx_sprites.PALETTE = msx_pal       # (closest shades for 3-colour lines)
     objs = convert_objects.object_sprites(rom, slot_for_nes, need, carried)
+    msx_sprites.PALETTE = None
     write_object_sprites(out_dir, index, objs)
     n_obj_patterns = objs.n_main
     convert_objects.write_candles(os.path.join(out_dir, "candles.bin"), cl)
