@@ -70,6 +70,7 @@ main_loop:
         push af                         ; waits a frame (both at once can
         call upload_column              ; overrun the vertical blank)
         call door_vram
+        call candle_vram
         call medusa_vram
         call flip_sprites
         pop af
@@ -226,6 +227,7 @@ enable_page2:
         INCLUDE "area.asm"
         INCLUDE "walls.asm"
         INCLUDE "treasure.asm"
+        INCLUDE "ctiles.asm"
         INCLUDE "sound.asm"
         INCLUDE "sound.inc"             ; generated: the sound table, SND_ numbers
 

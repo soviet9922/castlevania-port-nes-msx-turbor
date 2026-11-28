@@ -72,6 +72,7 @@ prepare_column:
         ldir
         pop de
         call walls_patch                ; (broken walls)
+        call ctiles_patch               ; (destroyed candles)
         jr .done
 
 .blank:
@@ -240,23 +241,30 @@ solid_at:
         sbc hl,de
         pop hl
         jr nc,.solid
-        add hl,hl                       ; column * 22
-        ld d,h
-        ld e,l
+        ld d,h                          ; the collision map: 3 bytes a column,
+        ld e,l                          ; bit (row & 7) of byte row / 8
         add hl,hl
         add hl,de
-        add hl,hl
-        add hl,hl
-        or a
-        sbc hl,de
-        ASSERT PF_ROWS == 22
-        ld b,0
-        add hl,bc
+        ASSERT PF_ROWS <= 24
+        ld a,c
+        rrca
+        rrca
+        rrca
+        and 3
+        ld e,a
+        ld d,0
+        add hl,de
         ld de,(area_hdr+AH_COLL)
         add hl,de
+        ld a,c
+        and 7
+        ld b,a
         ld a,(hl)
-        or a
-        jr z,.empty
+        inc b
+.bit:
+        rrca
+        djnz .bit
+        jr nc,.empty
         ld a,(walls_now)                ; a broken wall's block isn't solid
         or a
         jr z,.solid

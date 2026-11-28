@@ -86,7 +86,8 @@ AH_SUB5_SZ      equ 106
 AH_WALLS        equ 108                 ; breakable walls: count, then (column, row, item)
 AH_TREASURES    equ 110                 ; hidden treasures: count, then 8 bytes each
 AH_PLATS        equ 112                 ; moving platforms: count, then 8 bytes each
-AH_SIZE         equ 114
+AH_CTILES       equ 114                 ; wall candles in the background: count, then 15 bytes each
+AH_SIZE         equ 116
 CRUSH_FIRST_ROW equ 8                   ; playfield rows the crushers rewrite (NES
 CRUSH_ROWS      equ 8                   ; nametable rows 14-21)
 CRUSH_MAX       equ 4

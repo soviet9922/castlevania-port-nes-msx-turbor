@@ -26,6 +26,7 @@ from gen_placeholder_assets import write_png  # noqa: E402
 # Palette slots that keep a fixed meaning in every area:
 #   0 transparent/backdrop, 1 black, 2/4/6 player sprite (OR trick), 14 whip,
 #   15 white
+TILE_CANDLES = True     # wall candles drawn into the background (src/ctiles.asm)
 FIXED_SLOTS = {0: None, 1: 0x0F, 2: None, 4: None, 6: None, 15: 0x30}
 FREE_SLOTS = [3, 5, 7, 8, 9, 10, 11, 12, 13]     # 14 = whip (convert_simon.py)
 
@@ -633,9 +634,47 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
     if pl:
         print("  platforms:", ", ".join(f"x {c + x_off} y {y - 48}" for _, _, c, y, _ in pl))
     convert_objects.write_platforms(os.path.join(out_dir, "platforms.bin"), pl, x_off)
+    # the wall candles are drawn into the background (8 sprites a line run
+    # out at Simon's height): the map has each one's first flame frame; its
+    # second frame and the plain wall (once whipped) are extra tiles; the
+    # engine swaps them in (src/ctiles.asm). Each covers 2x2 tiles.
+    ctiles = []                          # per candle: None, or (col, row, cells)
+    extra = []
+    if TILE_CANDLES:
+        flames = [convert_objects.frame_pixels(rom, n, slot_for_nes) for n in ("candle1", "candle2")]
+        for x, y, _it, k in cl:
+            if k != convert_objects.KIND_CANDLE:
+                ctiles.append(None)
+                continue
+            c0 = (x + min(px for px, _ in flames[0])) // 8
+            r0 = (y + min(py for _, py in flames[0])) // 8
+            if not (0 <= r0 and r0 + 1 < msx_area.PF_ROWS and 0 <= c0 and (c0 + 2) * 8 <= width):
+                ctiles.append(None)
+                continue
+            base = [row[c0 * 8:c0 * 8 + 16] for row in pixels[r0 * 8:r0 * 8 + 16]]
+            variants = []
+            for f in (None,) + tuple(flames):
+                img = [list(r) for r in base]
+                for (px, py), v in (f or {}).items():
+                    X, Y = x + px - c0 * 8, y + py - r0 * 8
+                    if 0 <= X < 16 and 0 <= Y < 16 and v:
+                        img[Y][X] = v
+                variants.append(img)
+            for Y in range(16):                       # the map: the first frame
+                pixels[r0 * 8 + Y][c0 * 8:c0 * 8 + 16] = variants[1][Y]
+            cells = []
+            for dr in (0, 1):
+                for dc in (0, 1):
+                    for v in (0, 2):
+                        extra.append((r0 + dr, [variants[v][dr * 8 + Y][dc * 8:dc * 8 + 8]
+                                                for Y in range(8)]))
+                    cells.append((c0 + dc, r0 + dr))
+            ctiles.append((c0, r0, cells))
     need = convert_objects.needed_frames(
         cl, en, carried, convert_objects.DROP_LISTS[convert_objects.drop_group(area["stage"])],
         {t[5] for t in tr}, bool(pl))
+    if any(ctiles):                      # (no candle sprites then)
+        need -= {"candle1", "candle2"}
     # sprite colours the background lacks go into the palette's free slots,
     # the most used first (pickups weigh most): else they take the nearest
     # colour, e.g. red hearts turn brown where the background has no red
@@ -678,7 +717,24 @@ def convert_area(rom, area, index, out_root, nes_rgb, simon_slots, carried=(), p
         f.write(data)
 
     write_crushers(out_dir, crushers)
-    params = msx_area.write_area(out_dir, pixels, msx_pal, solid, sx, sy, area["name"])
+    params = msx_area.write_area(out_dir, pixels, msx_pal, solid, sx, sy, area["name"], extra)
+    # count, then per candle (candles.bin's order): its left tile column (2;
+    # 0xFFFF: a sprite candle), top tile row, and per cell (top left, top
+    # right, bottom left, bottom right) the tiles: wall, flame 1, flame 2
+    data = bytearray([len(ctiles) if any(ctiles) else 0])
+    k = 0
+    for ct in ctiles if any(ctiles) else ():
+        if ct is None:
+            data += b"\xff" * 15
+            continue
+        c0, r0, cells = ct
+        data += bytes([c0 & 0xFF, c0 >> 8, r0])
+        for c, r in cells:
+            data += bytes([params["extra_tiles"][k], params["tile_map"][c][r],
+                           params["extra_tiles"][k + 1]])
+            k += 2
+    with open(os.path.join(out_dir, "ctiles.bin"), "wb") as f:
+        f.write(data)
     nxt = AREAS[area.get("next_area", 0)]
     if area.get("exit_kind") == 2 and exit_left:
         # the next stage's last 8 columns are this area's first 8: its x is

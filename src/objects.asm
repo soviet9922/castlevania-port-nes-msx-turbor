@@ -642,6 +642,19 @@ candle_update:
         xor a
 .t:
         ld (ix+4),a
+        ld c,1                          ; drawn in the background: its flame
+        or a                            ; frame's tiles at each change
+        jr z,.tiles
+        cp 9
+        jr nz,.frame
+        inc c
+.tiles:
+        push af
+        call ctile_rec
+        ld a,c
+        call nz,ctile_show
+        pop af
+.frame:
         cp 9
         ld a,OBJF_CANDLE
         jr c,.f
@@ -657,6 +670,9 @@ candle_whipped:
         ld a,(hl)
         or b
         ld (hl),a
+        call ctile_rec                  ; (in the background: the wall again)
+        ld a,0
+        call nz,ctile_show
         ld a,SND_HIT                    ; (struck: candle or enemy)
         call sfx_play
         ld (ix+0),OBJ_BURST

@@ -12,7 +12,7 @@ Output files (in out_dir)
   bg_pgt_b{0,1,2}.bin    pattern bytes for the tiles used in each band
   bg_ct_b{0,1,2}.bin     colour bytes (fg<<4 | bg per row)
   level_tiles.bin        column-major tile numbers, PF_ROWS bytes per 8-px column
-  level_coll.bin         column-major solidity, PF_ROWS bytes per 8-px column
+  level_coll.bin         solidity, 3 bytes per 8-px column (bit row & 7 of byte row // 8)
 Returns a dict of parameters for the area header (tools/areas_asm.py).
 
 Screen 4 allows 2 colours per 8-pixel tile row. Rows with more colours are
@@ -68,7 +68,9 @@ def band_of(pf_row):
     return (pf_row + HUD_ROWS) // 8
 
 
-def write_area(out_dir, pixels, palette, solid, start_x, start_y, name="area"):
+def write_area(out_dir, pixels, palette, solid, start_x, start_y, name="area", extra=()):
+    """extra: (tile row, 8 rows of 8 pixels) blocks to have tiles for besides
+    the map (their numbers: the result's "extra_tiles")"""
     h = len(pixels)
     w = len(pixels[0])
     assert h == PF_ROWS * 8, h
@@ -96,6 +98,20 @@ def write_area(out_dir, pixels, palette, solid, start_x, start_y, name="area"):
                 bands[b][key] = BG_TILE_BASE + len(band_lists[b])
                 band_lists[b].append(key)
             tile_map[tc][tr] = bands[b][key]
+    extra_tiles = []
+    for tr, block in extra:
+        b = band_of(tr)
+        pat, col = bytearray(), bytearray()
+        for row in block:
+            row, lossy = _reduce_row(list(row), palette)
+            p, c = _encode_row(row)
+            pat.append(p)
+            col.append(c)
+        key = (bytes(pat), bytes(col))
+        if key not in bands[b]:
+            bands[b][key] = BG_TILE_BASE + len(band_lists[b])
+            band_lists[b].append(key)
+        extra_tiles.append(bands[b][key])
     for b in range(3):
         if len(band_lists[b]) > MAX_TILES:
             raise SystemExit(f"{name}: band {b} needs {len(band_lists[b])} tiles (max {MAX_TILES})")
@@ -114,7 +130,13 @@ def write_area(out_dir, pixels, palette, solid, start_x, start_y, name="area"):
         wr(f"bg_pgt_b{b}.bin", b"".join(k[0] for k in band_lists[b]) or b"\0" * 8)
         wr(f"bg_ct_b{b}.bin", b"".join(k[1] for k in band_lists[b]) or b"\0" * 8)
     wr("level_tiles.bin", bytes(v for col in tile_map for v in col))
-    wr("level_coll.bin", bytes(solid[r][c] for c in range(tcols) for r in range(PF_ROWS)))
+    # solidity: 3 bytes a column, bit (row & 7) of byte row // 8
+    coll = bytearray()
+    for c in range(tcols):
+        for b in range(3):
+            coll.append(sum(1 << k for k in range(8)
+                            if b * 8 + k < PF_ROWS and solid[b * 8 + k][c]))
+    wr("level_coll.bin", coll)
 
     return {
         "name": name,
@@ -127,4 +149,6 @@ def write_area(out_dir, pixels, palette, solid, start_x, start_y, name="area"):
         "lossy_rows": lossy_rows,
         "total_rows": PF_ROWS * tcols * 8,
         "width": w,
+        "extra_tiles": extra_tiles,
+        "tile_map": tile_map,
     }

@@ -992,6 +992,13 @@ PICKUP_FRAMES = {"heart", "smallheart", "whipup", "dagger", "holy_item", "watch_
                  "shot3"}
 
 
+def frame_pixels(rom, name, slot_for_nes):
+    """{(x, y): slot} of an object frame, from its box's top left"""
+    chr_ram = rom.chr_ram()
+    pals = [[rom.fixed(SPRITE_PALETTES + p * 4 + v) for v in range(4)] for p in range(4)]
+    return _pixels(chr_ram, pals, name, slot_for_nes)
+
+
 def frame_colour_counts(rom, names):
     """-> {NES colour: weighted pixel count} over the object frames `names`
     (a pickup's pixels count 8 times)"""
