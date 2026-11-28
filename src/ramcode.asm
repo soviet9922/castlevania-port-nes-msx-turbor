@@ -7,6 +7,7 @@ ramcode_start:
         INCLUDE "player2.asm"
         INCLUDE "platforms.asm"
         INCLUDE "ctiles2.asm"
+        INCLUDE "sprites2.asm"
         INCLUDE "area_tab.inc"          ; (generated: the areas' banks)
         IF DEBUG_MENU
         INCLUDE "debugmenu.asm"

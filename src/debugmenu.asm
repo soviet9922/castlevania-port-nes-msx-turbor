@@ -295,8 +295,10 @@ dbg_draw:
         ld a,' '
 .cur:
         out (VDP_DATA),a
+        call vpace
         ld a,' '
         out (VDP_DATA),a
+        call vpace
         ld a,b                          ; label: 16 characters
         add a,a
         add a,a
@@ -310,6 +312,7 @@ dbg_draw:
 .lab:
         ld a,(hl)
         out (VDP_DATA),a
+        call vpace
         inc hl
         djnz .lab
         pop bc
@@ -341,8 +344,10 @@ dbg_draw:
         ld a,' '
 .two:
         out (VDP_DATA),a
+        call vpace
         ld a,c
         out (VDP_DATA),a
+        call vpace
         jr .next
 .v_hp:
         ld a,(dbg_hp)
@@ -359,6 +364,7 @@ dbg_draw:
 .s:
         ld a,(hl)
         out (VDP_DATA),a
+        call vpace
         inc hl
         djnz .s
         jr .next
@@ -382,6 +388,7 @@ dbg_draw:
 .n:
         ld a,(hl)
         out (VDP_DATA),a
+        call vpace
         inc hl
         djnz .n
 .next:
@@ -403,6 +410,7 @@ dbg_print:
         or a
         ret z
         out (VDP_DATA),a
+        call vpace
         inc hl
         jr .lp
 

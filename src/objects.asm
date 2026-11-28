@@ -4431,6 +4431,7 @@ objects_load_patterns:
 .lp:
         ld a,(hl)
         out (VDP_DATA),a
+        call vpace
         inc hl
         dec bc
         ld a,b
@@ -4501,6 +4502,7 @@ load_window:                            ; (sub_src) bytes (sub_len) to pattern A
 .lp:
         ld a,(hl)
         out (VDP_DATA),a
+        call vpace
         inc hl
         dec bc
         ld a,b
@@ -4579,10 +4581,12 @@ hud_bcd:
         and 15
         add a,"0"
         out (VDP_DATA),a
+        call vpace
         ld a,c
         and 15
         add a,"0"
         out (VDP_DATA),a
+        call vpace
         ret
 
 ; Game over: the HUD's top line says so (VBLANK work done by the main loop)
@@ -4636,6 +4640,7 @@ hud_update:
         ld c,0
 .full:
         out (VDP_DATA),a
+        call vpace
         djnz .bar
         ld hl,HUD_EN_ADDR               ; enemy (boss) bar
         call vram_set_write
@@ -4652,6 +4657,7 @@ hud_update:
         ld c,0
 .efull:
         out (VDP_DATA),a
+        call vpace
         djnz .ebar
         ret
 .part2_draw:
@@ -4725,12 +4731,14 @@ hud_update:
         call vram_set_write
         ld a,b
         out (VDP_DATA),a
+        call vpace
         ld a,c
         out (VDP_DATA),a
         ld hl,HUD_ICON_ADDR+32
         call vram_set_write
         ld a,d
         out (VDP_DATA),a
+        call vpace
         ld a,e
         out (VDP_DATA),a
         ld hl,HUD_HEARTS_ADDR
@@ -4745,6 +4753,7 @@ hud_update:
         ld c,a
         ld a,b
         out (VDP_DATA),a
+        call vpace
         ld a,c
         out (VDP_DATA),a
         ret

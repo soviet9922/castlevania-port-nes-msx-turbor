@@ -121,9 +121,23 @@ candle_vram:
         inc hl
         ld a,(hl)
         out (VDP_DATA),a
+        call vpace
         inc hl
         djnz .lp
         xor a
         ld (cq_n),a
         ret
 
+
+; (src/walls.asm, run from RAM for room in bank 0)
+; restart: every wall whole again
+walls_reset:
+        ld hl,wall_bits
+        ld b,WALL_BYTES
+        xor a
+.lp:
+        ld (hl),a
+        inc hl
+        djnz .lp
+        ld (walls_now),a
+        ret

@@ -301,6 +301,7 @@ medusa_vram:
         ld b,4
 .t:
         out (VDP_DATA),a
+        call vpace
         djnz .t
         pop hl
         ld de,32

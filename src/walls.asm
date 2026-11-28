@@ -42,17 +42,6 @@ walls_load:
         ld (walls_now),a
         ret
 
-; restart: every wall whole again
-walls_reset:
-        ld hl,wall_bits
-        ld b,WALL_BYTES
-        xor a
-.lp:
-        ld (hl),a
-        inc hl
-        djnz .lp
-        ld (walls_now),a
-        ret
 
 ; Each frame, while the whip can hit (not a throw's swing): a wall it
 ; reaches breaks.

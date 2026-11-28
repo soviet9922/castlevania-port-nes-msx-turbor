@@ -32,6 +32,7 @@ vram_copy:
 .lp:
         ld a,(hl)
         out (VDP_DATA),a
+        call vpace
         inc hl
         dec bc
         ld a,b
@@ -46,6 +47,7 @@ vram_fill:
 .lp:
         ld a,e
         out (VDP_DATA),a
+        call vpace
         dec bc
         ld a,b
         or c
@@ -70,9 +72,11 @@ vdp_init:
         jr .lp
 .regs_done:
         ; (the palette comes with each area, see load_area)
-        ; clear all 16 KB used by Screen 4
+        ; clear both sprite pages (0x0000-0x7FFF): a real MSX's VRAM holds
+        ; garbage at power-on (C-BIOS clears it), and a garbage sprite list
+        ; keeps the VDP busy enough to drop writes
         ld hl,0
-        ld bc,0x4000
+        ld bc,0x8000
         xor a
         call vram_fill
         ; the address counter carried past 0x3FFF into R#14: reset it,
@@ -97,7 +101,9 @@ vdp_reg_table:
         db 15, 0x00
         db 19, SPLIT_LINE               ; line interrupt position
         db 23, 0x00                     ; no vertical scroll
-        db 25, 0x02                     ; V9958: MSK = hide leftmost 8 px
+        db 25, 0x42                     ; V9958: CMD = VDP commands in screen 4
+                                        ; (src/player_bank.asm), MSK = hide
+                                        ; the leftmost 8 px
         db 26, 0x00
         db 27, 0x00
         db 0xFF
@@ -128,12 +134,18 @@ load_graphics:
         ld bc,HUD_TILE_COUNT*8
         call vram_copy
 
-        ; empty sprite list
+        ; empty sprite lists on both pages (a list of zeros is 32 sprites
+        ; on the top lines: the VDP then has no time left for our writes)
+        xor a
+        call .end
+        ld a,1
+.end:
+        di
         ld hl,VRAM_SAT
-        call vram_set_write
+        call vram_set_write_far
         ld a,SAT_END_Y
         out (VDP_DATA),a
-        ret
+        jp vram_r14_zero
 
 ; ---------------------------------------------------------------------------
 ; Player metasprites
@@ -178,13 +190,6 @@ vram_r14_zero:
         ei
         ret
 
-; Write B bytes from HL to the VDP at a pace that is safe during display.
-vram_out_slow:
-        ld c,VDP_DATA
-.lp:
-        outi
-        jp nz,.lp
-        ret
 
 ; ---------------------------------------------------------------------------
 ; Double-buffered sprites
@@ -192,12 +197,15 @@ vram_out_slow:
 ; Two complete sprite pages exist in VRAM; page 1 is page 0 + 0x4000:
 ;   page 0: patterns 0x3800, attributes 0x1E00, colours 0x1C00
 ;   page 1: patterns 0x7800, attributes 0x5E00, colours 0x5C00
-; The game logic writes the next frame into the page that is NOT shown,
-; at any time during the frame. In VBLANK, flip_sprites just points R#5 and
-; R#6 at it, so VBLANK work no longer depends on how many sprites change.
+; While the picture is drawn, the VDP (sprite mode 2: it reads the sprite
+; list on every line) leaves the CPU so few memory slots that writes closer
+; than ~32 us get lost on a real V9938/V9958 (openMSX models it too). So
+; the game logic only notes what the hidden page needs (write_player_sprites:
+; Simon's new pose, the colour columns that changed; sat_buf), and the
+; vertical blank writes it there and shows that page (sprite_vram).
 ; ---------------------------------------------------------------------------
 
-; Write the current frame (cur_frame, sat_buf) into the hidden page.
+; The current frame (cur_frame, sat_buf): note the hidden page's changes.
 write_player_sprites:
         ld a,(spr_page)
         xor 1
@@ -208,87 +216,10 @@ write_player_sprites:
         add hl,de
         ld a,(cur_frame)
         cp (hl)
-        jr z,.sat
+        jr z,.cols
         ld (hl),a
-        call stream_frame
-.sat:
-        di
-        ld a,(spr_back)
-        ld hl,VRAM_SAT
-        call vram_set_write_far
-        ei
-        ld hl,sat_buf
-        ld a,(spr_total)                ; (sprites + end marker) * 4 bytes
-        inc a
-        add a,a
-        add a,a
-        ld b,a
-        call vram_out_slow
-
-        ; colour columns of the object sprites. Their sprite numbers change
-        ; with Simon's sprite count, so each page remembers which column
-        ; every hardware sprite has (sct_cache) and only changes are written.
-        ld a,(spr_back)
-        ld hl,sct_cache
-        or a
-        jr z,.cache0
-        ld hl,sct_cache+MAX_SPRITES
-.cache0:
-        ld (tmp_w),hl                   ; this page's cache
-        ld a,(spr_player_n)
-        ld c,a
-        ld a,(spr_total)
-        sub c
-        jr z,.no_objects
-        ld b,a
-.obj_lp:
-        push bc
-        ld e,c
-        ld d,0
-        ld hl,obj_sct_list
-        add hl,de
-        ld a,(hl)                       ; wanted column
-        ld hl,(tmp_w)
-        add hl,de
-        cp (hl)
-        jr z,.obj_same
-        ld (hl),a
-        push af
-        ld l,c                          ; VRAM_SCT + sprite * 16
-        ld h,0
-        add hl,hl
-        add hl,hl
-        add hl,hl
-        add hl,hl
-        ld de,VRAM_SCT
-        add hl,de
-        di
-        ld a,(spr_back)
-        call vram_set_write_far
-        ei
-        pop af
-        ld l,a
-        ld h,0
-        add hl,hl
-        add hl,hl
-        add hl,hl
-        add hl,hl
-        ld de,(area_hdr+AH_OBJSCT)
-        add hl,de
-        ld b,16
-        call vram_out_slow
-.obj_same:
-        pop bc
-        inc c
-        djnz .obj_lp
-.no_objects:
-        call vram_r14_zero
         ld a,1
-        ld (flip_pending),a
-        ret
-
-; Copy the patterns and colour columns of cur_frame into the hidden page.
-stream_frame:
+        ld (sv_simon),a
         ld a,(spr_back)                 ; Simon's colours replace these entries
         ld hl,sct_cache
         or a
@@ -300,115 +231,148 @@ stream_frame:
         ld (hl),0xFF
         inc hl
         djnz .inv_lp
-        ld a,PLAYER_BANK                ; Simon's patterns: the last ROM bank,
-        ld (page2_bank),a               ; (the sound interrupt puts it back)
-        ld (ASCII16_PAGE2),a            ; at 0x8000 instead of the area's
-        ld a,(cur_frame)
-        call frame_address
-        ld b,(ix+0)
-        inc ix
-        ld c,0                          ; sprite / pattern slot
-.lp:
-        push bc
-        ld l,(ix+2)                     ; pattern: player_spt + n*32
-        ld h,0
-        add hl,hl
-        add hl,hl
-        add hl,hl
-        add hl,hl
-        add hl,hl
-        ld de,player_spt
-        add hl,de
-        ex de,hl
-        ld l,c                          ; -> VRAM_SPT + slot*32
-        ld h,0
-        add hl,hl
-        add hl,hl
-        add hl,hl
-        add hl,hl
-        add hl,hl
-        ld bc,VRAM_SPT
-        add hl,bc
-        di
+.cols:
+        ; colour columns of the object sprites. Their sprite numbers change
+        ; with Simon's sprite count, so each page remembers which column
+        ; every hardware sprite has (sct_cache) and only changes are noted.
         ld a,(spr_back)
-        call vram_set_write_far
-        ei
-        ex de,hl
-        call clip_pattern               ; (entering the castle gate: cut off)
-        ld b,32
-        call vram_out_slow
-        pop bc
-        push bc
-        ld l,(ix+3)                     ; colours: player_sct + n*16
-        ld h,0
-        add hl,hl
-        add hl,hl
-        add hl,hl
-        add hl,hl
-        ld de,player_sct
+        ld hl,sct_cache
+        or a
+        jr z,.cache0
+        ld hl,sct_cache+MAX_SPRITES
+.cache0:
+        ld (tmp_w),hl                   ; this page's cache
+        xor a
+        ld (sv_ncol),a
+        ld a,(spr_player_n)
+        ld c,a
+        ld a,(spr_total)
+        sub c
+        jr z,.done
+        ld b,a
+.obj_lp:
+        ld e,c
+        ld d,0
+        ld hl,obj_sct_list
         add hl,de
-        ex de,hl
-        ld l,c                          ; -> VRAM_SCT + slot*16
+        ld a,(hl)                       ; wanted column
+        ld hl,(tmp_w)
+        add hl,de
+        cp (hl)
+        jr z,.obj_same
+        ld (hl),a
+        push bc
+        ld e,a
+        ld a,(sv_ncol)                  ; note (sprite, column)
+        ld l,a
+        inc a
+        ld (sv_ncol),a
         ld h,0
         add hl,hl
-        add hl,hl
-        add hl,hl
-        add hl,hl
-        ld bc,VRAM_SCT
-        add hl,bc
-        di
-        ld a,(spr_back)
-        call vram_set_write_far
-        ei
-        ex de,hl
-        ld b,16
-        call vram_out_slow
-        ld de,4
-        add ix,de
+        ld a,e
+        ld de,sv_cols
+        add hl,de
+        ld (hl),c
+        inc hl
+        ld (hl),a
         pop bc
+.obj_same:
         inc c
-        djnz .lp
-        ld a,(cur_area)                 ; the area's bank again
-        call area_bank
-        ld (page2_bank),a
-        ld (ASCII16_PAGE2),a
+        djnz .obj_lp
+.done:
+        ld a,1
+        ld (flip_pending),a
         ret
 
-; HL = a 16x16 pattern (32 bytes: left 8 columns, then right 8). While Simon
-; walks into the castle gate, the columns past the gate's pillar are cleared
-; (the NES draws him behind it); returns HL = the pattern to copy.
-clip_pattern:
-        ld a,(seq_kind)
-        cp 1
-        ret nz
-        push de
+; Vertical blank (interrupts off): the hidden page gets Simon's new pose,
+; the changed colour columns and the sprite list, then it is shown.
+sprite_vram:
+        ld a,(flip_pending)
+        or a
+        ret z
+        ld a,(RG1SAV)                   ; the display off while we copy: with
+        and 0xBF                        ; sprites on, the VDP leaves the CPU
+        out (VDP_CTRL),a                ; few slots even in the vertical
+        ld a,0x80|1                     ; blank (nothing shows: the beam is in
+        out (VDP_CTRL),a                ; the border)
+        ld a,(sv_simon)
+        or a
+        call nz,stream_frame
+        ld a,(sv_ncol)
+        or a
+        jr z,.sat
+        ld b,a
+        ld hl,sv_cols
+.col:
         push bc
-        ld de,clip_buf
-        push de
-        ld b,16
-        ld a,(clip_l)
-        ld c,a
-.left:
-        ld a,(hl)
-        and c
-        ld (de),a
+        ld a,(hl)                       ; sprite: VRAM_SCT + sprite * 16
         inc hl
-        inc de
-        djnz .left
-        ld b,16
-        ld a,(clip_r)
-        ld c,a
-.right:
-        ld a,(hl)
-        and c
-        ld (de),a
+        ld c,(hl)                       ; its column
         inc hl
-        inc de
-        djnz .right
+        push hl
+        ld l,a
+        ld h,0
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        ld de,VRAM_SCT
+        add hl,de
+        ld a,(spr_back)
+        call vram_set_write_far
+        ld l,c
+        ld h,0
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        ld de,(area_hdr+AH_OBJSCT)
+        add hl,de
+        ld b,16
+        call vram_out_vb
         pop hl
         pop bc
-        pop de
+        djnz .col
+.sat:
+        ld a,(spr_back)
+        ld hl,VRAM_SAT
+        call vram_set_write_far
+        ld hl,sat_buf
+        ld a,(spr_total)                ; (sprites + end marker) * 4 bytes
+        inc a
+        add a,a
+        add a,a
+        ld b,a
+        call vram_out_vb
+        xor a
+        ld (sv_simon),a
+        ld (sv_ncol),a
+        out (VDP_CTRL),a                ; R#14 = 0 (interrupts stay off)
+        ld a,0x80|14
+        out (VDP_CTRL),a
+        ld a,(RG1SAV)                   ; the display on again
+        out (VDP_CTRL),a
+        ld a,0x80|1
+        out (VDP_CTRL),a
+        jp flip_sprites
+
+; B bytes from HL to the VDP, about 100 T-states apart: screen 4 drops CPU
+; writes closer than about 90 (a turbo R also spaces the R800's)
+vram_out_vb:
+        ld c,VDP_DATA
+.lp:
+        outi
+        call vpace
+        jp nz,.lp
         ret
+
+; After a VDP data write: 69 T-states (with the call) before the next one
+; (keeps every register and flag)
+vpace:
+        ex (sp),hl
+        ex (sp),hl
+        ret
+
 
 ; VBLANK: show the page written last frame (interrupts disabled).
 flip_sprites:

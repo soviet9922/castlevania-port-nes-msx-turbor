@@ -1118,12 +1118,15 @@ crush_rows:
         ld bc,PF_ROWS
         ld a,(hl)
         out (VDP_DATA),a
+        call vpace
         add hl,bc
         ld a,(hl)
         out (VDP_DATA),a
+        call vpace
         add hl,bc
         ld a,(hl)
         out (VDP_DATA),a
+        call vpace
         add hl,bc
         ld a,(hl)
         out (VDP_DATA),a

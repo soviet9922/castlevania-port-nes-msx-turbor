@@ -231,10 +231,10 @@ RAM_END         equ tr_px+2
         ASSERT RAM_END < 0xF380
         ASSERT RAM_END <= RAMCODE
 RAMCODE         equ 0xC400              ; code copied from ROM (src/ramcode.asm)
-RAMCODE_TOP     equ 0xF000              ; (then the platforms and the candle queue; the
+RAMCODE_TOP     equ 0xF100              ; (then the platforms and the candle queue; the
                                         ; stack is above them, from about 0xF370 down)
 PLAT_MAX        equ 4
-plat_table      equ 0xF000              ; PLAT_MAX*OBJ_SIZE  moving platforms (src/platforms.asm)
+plat_table      equ 0xF100              ; PLAT_MAX*OBJ_SIZE  moving platforms (src/platforms.asm)
 plat_ride       equ plat_table+PLAT_MAX*12 ; 1  the platform Simon stands on (index + 1, 0 none)
 hit_nomark      equ plat_ride+1         ; 1  weapon_hits: don't mark the axe / cross (Dracula's body)
 cq_n            equ hit_nomark+1        ; 1  candle tiles queued for the vertical blank
@@ -243,6 +243,9 @@ ct_var          equ cq_buf+48           ; 1  ctile_show / ctiles_patch
 ct_row          equ ct_var+1            ; 1
 ct_slot         equ ct_row+1            ; 1
 ct_cells        equ ct_slot+1           ; 2
-        ASSERT ct_cells+2 <= 0xF0A0     ; (the stack keeps 0xF0A0-0xF37F)
+sv_simon        equ ct_cells+2          ; 1  the vertical blank streams Simon's pose (sprite_vram)
+sv_ncol         equ sv_simon+1          ; 1  ... and these colour columns:
+sv_cols         equ sv_ncol+1           ; 64 (sprite, column) each
+        ASSERT sv_cols+2*MAX_SPRITES <= 0xF200 ; (the stack keeps 0xF200-0xF37F)
 STACK_TOP       equ 0xF380              ; the game's stack, down from the BIOS's work area
 

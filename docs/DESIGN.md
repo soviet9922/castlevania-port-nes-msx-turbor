@@ -63,6 +63,8 @@ written during VBLANK. The camera moves at most 8 px per frame.
 | 0x1E00-0x1E7F | sprite attribute table |
 | 0x2000-0x37FF | colour table, 3 bands |
 | 0x3800-0x3FFF | sprite patterns (64 x 16x16) |
+| 0x4000-0x7FFF | sprite page 1 (its tables at the same offsets) |
+| 0x8000-...   | all of Simon's frames, copied by the VDP (see below) |
 
 Tile numbers: `0x00` blank, `0x01-0x1F` HUD symbols, `0x20-0x5F` font
 (copied from the BIOS), `0x60-0xFF` background tiles. Each band has its
@@ -134,14 +136,30 @@ pre-mirrored: 12 poses x 2 directions.
 
 ### Double-buffered sprite pages
 
-Patterns are streamed: only the current frame's patterns are in VRAM, in
-the player's 12 pattern slots, leaving the rest of the sprite patterns for enemies.
-Copying a new frame (up to 480 bytes) during VBLANK took too long on a 3.58 MHz
-Z80 (7.5 ms worst case; the vertical blank is 4.4 ms). So there are two
-complete sprite pages in VRAM: patterns, attributes and colours, with page 1 at
-page 0 + 0x4000 (the V9958 has 128 KB). The game writes the next frame
-into the hidden page during the frame. In VBLANK, R#5 and R#6 are switched
-to it. Worst-case VBLANK work is now about 2.7 ms, and the smoke test checks it.
+Patterns are streamed: only the current frame's patterns are in a sprite page,
+in the player's 12 pattern slots, leaving the rest of the sprite patterns for
+enemies. There are two complete sprite pages in VRAM: patterns, attributes and
+colours, with page 1 at page 0 + 0x4000 (the V9958 has 128 KB). During the
+frame the game notes what the hidden page needs (`write_player_sprites`); in
+VBLANK `sprite_vram` writes it and switches R#5 and R#6 to it.
+
+### VDP write speed (real hardware)
+
+In screen 4 the V99x8 gives the CPU few VRAM access slots in the border and
+the vertical blank. A Z80 writing faster than about one byte per 90 T-states
+there loses bytes (openMSX shows it with `too_fast_vram_access real`; the
+first real-hardware tests showed garbled sprites). On a turbo R the S1990
+spaces the R800's VDP writes itself. So:
+
+- every CPU copy loop to the VDP waits about 100 T-states per byte
+  (`vram_out_vb`, `vpace` in `src/vdp.asm`);
+- a new pose of Simon (up to 11 sprites: 528 bytes) is not written by the
+  CPU. All 140 of his frames are copied once at start-up into the VRAM above
+  0x8000, each as its patterns in sprite order followed by its colours
+  (`player_vram` in `tools/areas_asm.py` lays them out in 256-byte lines).
+  A pose change is then 2 or 3 HMMM commands into the hidden page
+  (`src/player_bank.asm`). The V9958 runs VDP commands in screen 4 when
+  R#25.CMD is set, addressing the VRAM as in screen 8.
 
 ### Objects
 

@@ -46,7 +46,7 @@ init:
         ld (hl),0
         ldir
 
-        ld a,PLAYER_BANK                ; the RAM code (src/ramcode.asm)
+        ld a,RAMCODE_BANK               ; the RAM code (src/ramcode.asm)
         ld (ASCII16_PAGE2),a
         ld hl,ramcode_src
         ld de,RAMCODE
@@ -57,6 +57,12 @@ init:
 
         call vdp_init
         call load_graphics
+        ld a,PLAYER_BANK                ; Simon's frames into the VRAM above
+        ld (ASCII16_PAGE2),a            ; 0x8000 (src/player_bank.asm)
+        call player_vram_fill
+        di
+        ld a,1
+        ld (ASCII16_PAGE2),a
         call install_irq
         call sound_init
         call start_game                 ; (the debug menu first, if built in)
@@ -75,7 +81,7 @@ main_loop:
         call door_vram
         call candle_vram
         call medusa_vram
-        call flip_sprites
+        call sprite_vram                ; (the hidden sprite page, then show it)
         pop af
         or a
         call z,hud_or_crusher           ; (one of them: the VBLANK is short)
