@@ -289,10 +289,16 @@ HUD has two colours per tile row), converted from the NES HUD's icons.
 
 ## Areas and ROM banks
 
-Each area (courtyard, entrance hall, …) is one 16 KB ROM bank that starts with a
-header. Areas 0-5 are in banks 1-6; bank 7 holds Simon's sprites and banks 8-15 the
-sound, so areas 6 and up go in banks 16 and up and the ROM grows to 512 KB (1 MB with the areas of stages 13-18)
-(`area_bank`). The header holds: palette, background tiles per band,
+Bank 0 holds the code, bank 7 Simon's sprites and the RAM code, banks 8 and up the
+sound streams (as many as they fill). Every area (courtyard, entrance hall, …) has
+two pieces, packed into the other banks first fit, largest first
+(`tools/areas_asm.py`): its run-time piece (header, map, collision, object tables)
+and its graphics (palette, background tiles, sprite patterns, the windows'
+pictures), which are mapped only while they are copied (`AH_SWAP_BANK`). A bank
+with run-time pieces starts with their header addresses; `area_bank_tab` gives
+per area its bank and slot (`area_bank`, `area_entry`). The whole game fits in
+512 KB. The collision map is a bit per tile (3 bytes a column). The header holds:
+palette, background tiles per band,
 map, collision, candle list, object sprites, start position, and an exit
 (x position, the highest y at which it counts, plus next area). The current area's bank stays mapped at
 0x8000 because column streaming and collision read it directly. The header

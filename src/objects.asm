@@ -4423,6 +4423,7 @@ objects_load_patterns:
         jp load_sub_patterns
 .page:
         di
+        call map_gfx                    ; (in the graphics bank)
         ld hl,VRAM_SPT + PLAYER_SPRITES*32
         call vram_set_write_far
         ld hl,(area_hdr+AH_OBJSPT)
@@ -4435,6 +4436,7 @@ objects_load_patterns:
         ld a,b
         or c
         jr nz,.lp
+        call map_area
         jp vram_r14_zero                ; (enables interrupts)
 
 ; The patterns of the sub-weapon Simon holds into the area's sub-weapon window

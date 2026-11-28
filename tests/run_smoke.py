@@ -542,7 +542,7 @@ def tcl_script(syms, result_file):
 proc apeek {{addr}} {{
     if {{$addr < 0x8000 || $addr >= 0xC000}} {{ return [peek $addr] }}
     set a [peek {syms["cur_area"]}]
-    set bank [expr {{$a < 6 ? $a + 1 : $a + 10}}]
+    set bank [expr {{[peek [expr {{{syms["area_bank_tab"]} + $a}}]] & 31}}]
     return [debug read "{os.path.basename(ROM)}" [expr {{$bank * 0x4000 + $addr - 0x8000}}]]
 }}
 proc play {{}} {{

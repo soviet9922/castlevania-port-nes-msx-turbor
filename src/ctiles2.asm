@@ -103,3 +103,27 @@ cq_put:
         pop bc
         ret
 
+
+; vertical blank: the queued tiles
+candle_vram:
+        ld a,(cq_n)
+        or a
+        ret z
+        ld b,a
+        ld hl,cq_buf
+.lp:
+        ld a,(hl)
+        out (VDP_CTRL),a
+        inc hl
+        ld a,(hl)
+        or 0x40
+        out (VDP_CTRL),a
+        inc hl
+        ld a,(hl)
+        out (VDP_DATA),a
+        inc hl
+        djnz .lp
+        xor a
+        ld (cq_n),a
+        ret
+

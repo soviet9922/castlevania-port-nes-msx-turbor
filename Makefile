@@ -43,6 +43,7 @@ nes: $(NES_OUT)
 $(PH_GEN)/.stamp: $(PH_TOOLS)
 	$(PYTHON) tools/gen_placeholder_assets.py $(PH_GEN)
 	$(PYTHON) tools/gen_sound.py $(PH_GEN)
+	$(PYTHON) tools/areas_asm.py $(PH_GEN)
 	@touch $@
 
 $(CV_GEN)/.stamp: $(PH_GEN)/.stamp $(CV_TOOLS) $(NES_ROM) $(BUILD)/.sound-$(SOUND)
@@ -52,6 +53,7 @@ $(CV_GEN)/.stamp: $(PH_GEN)/.stamp $(CV_TOOLS) $(NES_ROM) $(BUILD)/.sound-$(SOUN
 	$(PYTHON) tools/convert_stage.py $(NES_ROM) $(CV_GEN)
 	@if [ "$(SOUND)" = rom ]; then rm -f $(CV_GEN)/snd_bank*.bin; \
 	    $(PYTHON) tools/convert_sound.py $(NES_ROM) $(CV_GEN); fi
+	$(PYTHON) tools/areas_asm.py $(CV_GEN)
 	@touch $@
 
 # rebuild the converted set when SOUND changes

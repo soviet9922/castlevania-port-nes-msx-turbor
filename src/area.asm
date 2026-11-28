@@ -1,22 +1,71 @@
 ; ---------------------------------------------------------------------------
 ; Areas
 ;
-; Each area (courtyard, entrance hall, ...) lives in its own 16 KB ROM bank
-; (area_bank: areas 0-5 in banks 1-6, the others from bank 16, after Simon's
-; and the sound banks) that starts with a header (tools/areas_asm.py). The
-; current area's bank stays mapped at 0x8000 while it is played, because
-; column streaming and collision read its map directly. The header is copied
-; to area_hdr so the engine can use its values without banking.
+; Each area (courtyard, entrance hall, ...) has two pieces packed into the ROM
+; banks (tools/areas_asm.py): its run-time piece (header, map, collision,
+; object tables), mapped at 0x8000 while it is played because column
+; streaming and collision read its map directly, and its graphics (palette,
+; background tiles, sprite patterns, the windows' pictures), mapped only
+; while they are copied (AH_SWAP_BANK). area_bank_tab (in the RAM code) has
+; per area its run-time bank and its slot in that bank's list of headers.
+; The header is copied to area_hdr so the engine can use its values without
+; banking.
 ; ---------------------------------------------------------------------------
+
+; A = area -> A = its run-time bank (keeps the other registers but F)
+area_bank:
+        push hl
+        call area_entry
+        pop hl
+        ret
+
+; A = area -> A = the bank of its run-time piece (tools/areas_asm.py), HL =
+; its entry in that bank's list of headers (at 0x8000)
+area_entry:
+        ld hl,area_bank_tab
+        add a,l
+        ld l,a
+        adc a,h
+        sub l
+        ld h,a
+        ld a,(hl)                       ; bank | slot << 5
+        push af
+        rlca
+        rlca
+        rlca
+        and 7
+        add a,a
+        ld l,a
+        ld h,0x80
+        pop af
+        and 0x1F
+        ret
+
+; the area's graphics bank at 0x8000 (palette, tiles, sprite patterns), and
+; back to its run-time bank (page2_bank: the sound interrupt puts it back)
+map_gfx:
+        ld a,(area_hdr+AH_SWAP_BANK)
+        jr map_page2
+map_area:
+        ld a,(cur_area)
+        call area_bank
+map_page2:
+        ld (page2_bank),a
+        ld (ASCII16_PAGE2),a
+        ret
+
 
 ; A = area number. Loads everything and restarts the player at the start
 ; (or, with keep_player set, keeps him where he is: section change).
 load_area:
         ld (cur_area),a
-        call area_bank
+        call area_entry                 ; its bank's list: its header's address
         ld (page2_bank),a               ; (for the sound interrupt)
         ld (ASCII16_PAGE2),a            ; ASCII16: bank seen at 0x8000
-        ld hl,0x8000
+        ld a,(hl)
+        inc hl
+        ld h,(hl)
+        ld l,a
         ld de,area_hdr
         ld bc,AH_SIZE
         ldir
@@ -32,6 +81,7 @@ load_area:
         ld c,1
         call vdp_wreg
 
+        call map_gfx                    ; (the graphics: in their own bank)
         ld bc,0x0010                    ; palette
         call vdp_wreg
         ld hl,(area_hdr+AH_PALETTE)
@@ -54,6 +104,7 @@ load_area:
         ld bc,(area_hdr+AH_BGSZ2)
         ld a,2
         call load_band
+        call map_area
 
         call objects_load_patterns      ; (enables interrupts)
         ld a,(area_hdr+AH_MUSIC)        ; the stage's music (carries on if
@@ -95,7 +146,6 @@ load_area:
         ei
         ret
 
-; A = area number -> A = its ROM bank (tools/areas_asm.py)
 ; Copy the RAM overlay the area's stage needs to OVL_BASE (src/overlays.asm):
 ; 1 for stages up to 12, 2 for stages 13-18 (AH_STAGE is BCD). Interrupts off.
 load_overlay:
@@ -136,12 +186,6 @@ load_overlay:
         ld (ASCII16_PAGE2),a
         ret
 
-area_bank:
-        inc a
-        cp 7
-        ret c                           ; areas 0-5: banks 1-6
-        add a,16-7                      ; areas 6 and up: banks 16 and up
-        ret
 
 ; Copy one band's background tiles.  A = band, HL = patterns, DE = colours,
 ; BC = size in bytes. Tiles start at pattern BG_TILE_BASE of the band.
