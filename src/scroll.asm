@@ -109,10 +109,12 @@ upload_column:
         ld b,PF_ROWS
 .lp:
         ld a,l
+        di
         out (VDP_CTRL),a
         ld a,h
         or 0x40
         out (VDP_CTRL),a
+        ei
         ld a,(ix+0)
         out (VDP_DATA),a
         inc ix

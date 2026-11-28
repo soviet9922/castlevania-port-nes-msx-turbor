@@ -113,11 +113,13 @@ candle_vram:
         ld hl,cq_buf
 .lp:
         ld a,(hl)
+        di
         out (VDP_CTRL),a
         inc hl
         ld a,(hl)
         or 0x40
         out (VDP_CTRL),a
+        ei
         inc hl
         ld a,(hl)
         out (VDP_DATA),a

@@ -17,6 +17,7 @@ fv_spr          equ sv_cols+2
 ; Start-up (interrupts off): every frame into the VRAM, as player_vram_tab
 ; places it
 player_vram_fill:
+        di                              ; (fv_addr: address writes)
         xor a
 .frame:
         ld (fv_f),a

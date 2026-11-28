@@ -5,24 +5,19 @@
 ; interrupt writes VDP registers through the same port).
 ; ---------------------------------------------------------------------------
 
-; Write register.  B = value, C = register number
+; Write register.  B = value, C = register number (interrupts on after)
 vdp_wreg:
+        di
         ld a,b
         out (VDP_CTRL),a
         ld a,c
         or 0x80
         out (VDP_CTRL),a
+        ei
         ret
 
-; Set VRAM write address.  HL = address
-vram_set_write:
-        ld a,l
-        out (VDP_CTRL),a
-        ld a,h
-        and 0x3F
-        or 0x40
-        out (VDP_CTRL),a
-        ret
+; (vram_set_write, vram_set_write_far, vram_out_vb and vpace are in RAM:
+; src/sprites2.asm)
 
 ; Copy RAM/ROM -> VRAM.  HL = source, DE = VRAM address, BC = length (>0)
 vram_copy:
@@ -172,14 +167,6 @@ frame_address:
         pop ix
         ret
 
-; Set the VRAM write address anywhere in 128 KB (interrupts disabled).
-; A = address bits 16-14 (R#14), HL = address bits 13-0
-vram_set_write_far:
-        out (VDP_CTRL),a
-        ld a,0x80|14
-        out (VDP_CTRL),a
-        jp vram_set_write
-
 ; Back to R#14 = 0, which every other VRAM routine assumes.
 vram_r14_zero:
         di
@@ -197,12 +184,11 @@ vram_r14_zero:
 ; Two complete sprite pages exist in VRAM; page 1 is page 0 + 0x4000:
 ;   page 0: patterns 0x3800, attributes 0x1E00, colours 0x1C00
 ;   page 1: patterns 0x7800, attributes 0x5E00, colours 0x5C00
-; While the picture is drawn, the VDP (sprite mode 2: it reads the sprite
-; list on every line) leaves the CPU so few memory slots that writes closer
-; than ~32 us get lost on a real V9938/V9958 (openMSX models it too). So
-; the game logic only notes what the hidden page needs (write_player_sprites:
-; Simon's new pose, the colour columns that changed; sat_buf), and the
-; vertical blank writes it there and shows that page (sprite_vram).
+; At the end of each frame's logic the hidden page gets Simon's new pose (VDP
+; commands); the next VBLANK writes the colour columns that changed and the
+; sprite list (CPU writes, about 100 T-states apart: screen 4 drops faster
+; ones) and switches to it. The VBLANK work runs with interrupts on, so the
+; HUD's scroll split comes on time even when that work is slow.
 ; ---------------------------------------------------------------------------
 
 ; The current frame (cur_frame, sat_buf): note the hidden page's changes.
@@ -279,19 +265,21 @@ write_player_sprites:
         inc c
         djnz .obj_lp
 .done:
-        ld a,1
+        ld a,1                          ; the VBLANK writes and shows it
         ld (flip_pending),a
         ret
 
-; Vertical blank (interrupts off): the hidden page gets Simon's new pose,
-; the changed colour columns and the sprite list, then it is shown.
+; VBLANK (interrupts on): the hidden page's colour columns and sprite list,
+; then show it
 sprite_vram:
         ld a,(flip_pending)
         or a
         ret z
-        ld a,(sv_simon)
-        or a
-        call nz,stream_frame
+        call sprite_write
+        jp flip_sprites
+
+; The hidden page gets the changed colour columns and the sprite list
+sprite_write:
         ld a,(sv_ncol)
         or a
         jr z,.sat
@@ -339,32 +327,10 @@ sprite_vram:
         ld b,a
         call vram_out_vb
         xor a
-        ld (sv_simon),a
         ld (sv_ncol),a
-        out (VDP_CTRL),a                ; R#14 = 0 (interrupts stay off)
-        ld a,0x80|14
-        out (VDP_CTRL),a
-        jp flip_sprites
+        jp vram_r14_zero
 
-; B bytes from HL to the VDP, about 100 T-states apart: screen 4 drops CPU
-; writes closer than about 90 (a turbo R also spaces the R800's)
-vram_out_vb:
-        ld c,VDP_DATA
-.lp:
-        outi
-        call vpace
-        jp nz,.lp
-        ret
-
-; After a VDP data write: 69 T-states (with the call) before the next one
-; (keeps every register and flag)
-vpace:
-        ex (sp),hl
-        ex (sp),hl
-        ret
-
-
-; VBLANK: show the page written last frame (interrupts disabled).
+; VBLANK: show the page written last frame.
 flip_sprites:
         ld a,(flip_pending)
         or a
@@ -380,6 +346,7 @@ flip_sprites:
         ld b,(VRAM_SAT + 0x4000) >> 7 | 7
         ld c,(VRAM_SPT + 0x4000) >> 11
 .set:
+        di
         ld a,b
         out (VDP_CTRL),a
         ld a,0x80|5
@@ -388,4 +355,5 @@ flip_sprites:
         out (VDP_CTRL),a
         ld a,0x80|6
         out (VDP_CTRL),a
+        ei
         ret

@@ -79,7 +79,7 @@ def tcl_script(syms, result_file):
                            set fx [expr {{[apeek [expr {{$sp+1}}]] + 256*[apeek [expr {{$sp+2}}]] + 6}}]
                            poke {px_a} [expr {{$fx & 255}}]; poke {px_a + 1} [expr {{$fx >> 8}}]
                            set f [open "{result_file}" a]
-                           puts $f "stair foot=[expr {{[peek [expr {{$sp+1}}]] + 256*[peek [expr {{$sp+2}}]]}}],[peek [expr {{$sp+3}}]] top=[expr {{[peek [expr {{$sp+4}}]] + 256*[peek [expr {{$sp+5}}]]}}],[peek [expr {{$sp+6}}]]"
+                           puts $f "stair foot=[expr {{[apeek [expr {{$sp+1}}]] + 256*[apeek [expr {{$sp+2}}]]}}],[apeek [expr {{$sp+3}}]] top=[expr {{[apeek [expr {{$sp+4}}]] + 256*[apeek [expr {{$sp+5}}]]}}],[apeek [expr {{$sp+6}}]]"
                            close $f
                        }} }}
     after time 14.1 {{ keymatrixdown 8 0x20 }}

@@ -164,7 +164,10 @@ load_overlay:
         add a,a
         ld e,a
         ld d,0
-        ld a,OVL_BANK
+        ld a,(page2_bank)
+        push af
+        ld a,OVL_BANK                   ; (page2_bank too: the sound interrupt
+        ld (page2_bank),a               ; maps it back if it comes)
         ld (ASCII16_PAGE2),a
         ld hl,ovl_table
         add hl,de
@@ -182,7 +185,8 @@ load_overlay:
         ld de,OVL_BASE
         ldir
 .done:
-        ld a,(page2_bank)
+        pop af
+        ld (page2_bank),a
         ld (ASCII16_PAGE2),a
         ret
 

@@ -243,8 +243,8 @@ ct_var          equ cq_buf+48           ; 1  ctile_show / ctiles_patch
 ct_row          equ ct_var+1            ; 1
 ct_slot         equ ct_row+1            ; 1
 ct_cells        equ ct_slot+1           ; 2
-sv_simon        equ ct_cells+2          ; 1  the vertical blank streams Simon's pose (sprite_vram)
-sv_ncol         equ sv_simon+1          ; 1  ... and these colour columns:
+sv_simon        equ ct_cells+2          ; 1  (unused)
+sv_ncol         equ sv_simon+1          ; 1  sprite_write: the colour columns that changed:
 sv_cols         equ sv_ncol+1           ; 64 (sprite, column) each
         ASSERT sv_cols+2*MAX_SPRITES <= 0xF200 ; (the stack keeps 0xF200-0xF37F)
 STACK_TOP       equ 0xF380              ; the game's stack, down from the BIOS's work area

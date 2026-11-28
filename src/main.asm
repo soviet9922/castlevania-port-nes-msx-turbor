@@ -73,8 +73,9 @@ init:
 main_loop:
         call wait_frame
 
-        ; --- VBLANK work: everything that touches VRAM ---
-        di
+        ; --- VBLANK work: everything that touches VRAM (interrupts on:
+        ; the line interrupt must split the scroll on time; the VRAM
+        ; routines protect their address writes) ---
         ld a,(col_pending)              ; a new map column this frame: the HUD
         push af                         ; waits a frame (both at once can
         call upload_column              ; overrun the vertical blank)

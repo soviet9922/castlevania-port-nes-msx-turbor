@@ -163,8 +163,14 @@ spaces the R800's VDP writes itself. So:
 - the pose is copied at the end of the frame's logic, not in VBLANK: on a
   turbo R every VDP access of the R800 waits for the VDP, and in VBLANK the
   copy pushed the VBLANK work past the HUD's scroll split (line 13), which
-  tore the top of the playfield. Interrupts stay on while it runs, except
-  for the two bytes of each register write.
+  tore the top of the playfield.
+- the VBLANK work itself runs with interrupts on, so the line interrupt
+  that splits the HUD's scroll from the playfield's comes on time however
+  long that work takes (on a Goa'uld MSX2+ it ran past the split). An
+  interrupt between two VRAM data writes is harmless (the handler moves no
+  VRAM address); only the two bytes of an address or register write are
+  protected (`vram_set_write`, `vdp_wreg`, ...), and every page-2 bank
+  switch sets `page2_bank`, which the sound interrupt maps back.
 
 ### Objects
 
