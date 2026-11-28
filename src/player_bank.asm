@@ -139,11 +139,15 @@ fv_addr:
         out (VDP_CTRL),a
         ret
 
-; Vertical blank (interrupts off): cur_frame's patterns and colours into the
-; hidden page (spr_back). Done when this returns.
+; The game logic, after write_player_sprites (interrupts on): cur_frame's
+; patterns and colours into the hidden page (spr_back), which the next
+; VBLANK shows. Done when this returns. (Not in the VBLANK: on a turbo R
+; every VDP access of the R800 waits, and the wait for the commands made
+; the VBLANK work run past the HUD's scroll split.) At the castle gate
+; (seq_kind 1): the CPU copy.
 player_pose:
-        ld a,(seq_kind)                 ; the castle gate: the CPU copies,
-        cp 1                            ; cutting him off at the pillar
+        ld a,(seq_kind)
+        cp 1
         jp z,stream_cpu
         ld a,(cur_frame)
         ld l,a
@@ -156,10 +160,6 @@ player_pose:
         add hl,de                       ; * 9
         ld de,player_vram_tab
         add hl,de
-        ld a,2                          ; S#2: CE
-        out (VDP_CTRL),a
-        ld a,0x80|15
-        out (VDP_CTRL),a
         ld b,0x38                       ; patterns: VRAM_SPT, line 0x38
         call .rect
         ld b,0x39                       ; (sprites 8-10: the next line)
@@ -177,15 +177,7 @@ player_pose:
 .colours:
         ld b,0x1C                       ; colours: VRAM_SCT, line 0x1C
         call .rect
-.done:
-        in a,(VDP_CTRL)                 ; the last one finished
-        rrca
-        jr c,.done
-        xor a                           ; S#0 again
-        out (VDP_CTRL),a
-        ld a,0x80|15
-        out (VDP_CTRL),a
-        ret
+        jp ce_wait                      ; the last one finished
 ; HL = x, y, width (0: 256) of the source; B = destination line in page 0.
 ; One HMMM to x 0 of that line in the hidden page; HL += 3; NZ.
 .rect:
@@ -194,14 +186,13 @@ player_pose:
         rrca
         add a,b
         ld b,a
-.ce:
-        in a,(VDP_CTRL)                 ; the one before finished
-        rrca
-        jr c,.ce
+        call ce_wait                    ; the one before finished
+        di                              ; (a register write: 2 bytes)
         ld a,32                         ; R#32 on, auto-increment
         out (VDP_CTRL),a
         ld a,0x80|17
         out (VDP_CTRL),a
+        ei                              ; (the interrupts leave R#17 alone)
         ld c,VDP_IND
         ld d,(hl)
         inc hl
@@ -241,7 +232,27 @@ player_pose:
         or a                            ; (NZ)
         ret
 
-; The castle gate: the CPU writes the frame (clip_pattern cuts it)
+; Wait until the VDP's command is done (S#2 CE), interrupts allowed between
+; reads (the line interrupt selects S#1 and then S#0 itself). Keeps B.
+ce_wait:
+        di
+        ld a,2
+        out (VDP_CTRL),a
+        ld a,0x80|15
+        out (VDP_CTRL),a
+        in a,(VDP_CTRL)
+        ld c,a
+        xor a
+        out (VDP_CTRL),a
+        ld a,0x80|15
+        out (VDP_CTRL),a
+        ei
+        rr c
+        jr c,ce_wait
+        ret
+
+; The castle gate: the CPU writes the frame (clip_pattern cuts it), into
+; the hidden page while the picture is drawn: interrupts stay on
 stream_cpu:
         ld a,(cur_frame)
         call frame_address
@@ -270,7 +281,9 @@ stream_cpu:
         ld bc,VRAM_SPT
         add hl,bc
         ld a,(spr_back)
+        di                              ; (the address: no interrupt between)
         call vram_set_write_far
+        ei
         ex de,hl
         call clip_pattern               ; (entering the castle gate: cut off)
         ld b,32
@@ -295,7 +308,9 @@ stream_cpu:
         ld bc,VRAM_SCT
         add hl,bc
         ld a,(spr_back)
+        di                              ; (the address: no interrupt between)
         call vram_set_write_far
+        ei
         ex de,hl
         ld b,16
         call vram_out_vb
@@ -304,7 +319,7 @@ stream_cpu:
         pop bc
         inc c
         djnz .lp
-        ret
+        jp vram_r14_zero
 
 ; HL = a 16x16 pattern (32 bytes: left 8 columns, then right 8). While Simon
 ; walks into the castle gate, the columns past the gate's pillar are cleared

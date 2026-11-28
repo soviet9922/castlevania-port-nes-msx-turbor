@@ -218,8 +218,7 @@ write_player_sprites:
         cp (hl)
         jr z,.cols
         ld (hl),a
-        ld a,1
-        ld (sv_simon),a
+        call stream_frame               ; his new pose, now (src/player_bank.asm)
         ld a,(spr_back)                 ; Simon's colours replace these entries
         ld hl,sct_cache
         or a

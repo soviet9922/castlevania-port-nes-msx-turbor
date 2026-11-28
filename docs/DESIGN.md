@@ -160,6 +160,11 @@ spaces the R800's VDP writes itself. So:
   A pose change is then 2 or 3 HMMM commands into the hidden page
   (`src/player_bank.asm`). The V9958 runs VDP commands in screen 4 when
   R#25.CMD is set, addressing the VRAM as in screen 8.
+- the pose is copied at the end of the frame's logic, not in VBLANK: on a
+  turbo R every VDP access of the R800 waits for the VDP, and in VBLANK the
+  copy pushed the VBLANK work past the HUD's scroll split (line 13), which
+  tore the top of the playfield. Interrupts stay on while it runs, except
+  for the two bytes of each register write.
 
 ### Objects
 
