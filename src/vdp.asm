@@ -290,11 +290,6 @@ sprite_vram:
         ld a,(flip_pending)
         or a
         ret z
-        ld a,(RG1SAV)                   ; the display off while we copy: with
-        and 0xBF                        ; sprites on, the VDP leaves the CPU
-        out (VDP_CTRL),a                ; few slots even in the vertical
-        ld a,0x80|1                     ; blank (nothing shows: the beam is in
-        out (VDP_CTRL),a                ; the border)
         ld a,(sv_simon)
         or a
         call nz,stream_frame
@@ -349,10 +344,6 @@ sprite_vram:
         ld (sv_ncol),a
         out (VDP_CTRL),a                ; R#14 = 0 (interrupts stay off)
         ld a,0x80|14
-        out (VDP_CTRL),a
-        ld a,(RG1SAV)                   ; the display on again
-        out (VDP_CTRL),a
-        ld a,0x80|1
         out (VDP_CTRL),a
         jp flip_sprites
 

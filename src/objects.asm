@@ -4423,7 +4423,9 @@ objects_load_patterns:
         jp load_sub_patterns
 .page:
         di
-        call map_gfx                    ; (in the graphics bank)
+        push af
+        call map_gfx                    ; (in the graphics bank; A = its number)
+        pop af                          ; A = the page again
         ld hl,VRAM_SPT + PLAYER_SPRITES*32
         call vram_set_write_far
         ld hl,(area_hdr+AH_OBJSPT)
